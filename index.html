@@ -194,13 +194,23 @@ carregarHistorico();
 
 function avaliar(){
 
-let total=0;
+let ergonomia = 0;
+let fatoresHumanos = 0;
 
-for(let i=0;i<20;i++){
-total += Number(
+for(let i=0;i<10;i++){
+ergonomia += Number(
 document.getElementById("q"+i).value
 );
 }
+
+for(let i=10;i<20;i++){
+fatoresHumanos += Number(
+document.getElementById("q"+i).value
+);
+}
+
+let total = ergonomia + fatoresHumanos;
+
 
 let texto="";
 let cor="";
@@ -225,10 +235,18 @@ cor="#ffd9d9";
 document.getElementById("resultado").innerHTML=
 `
 <div class="resultado" style="background:${cor}">
-${texto}<br>
-Pontuação: ${total}
+
+ERGONOMIA: ${ergonomia} pontos<br><br>
+
+FATORES HUMANOS: ${fatoresHumanos} pontos<br><br>
+
+TOTAL: ${total} pontos<br><br>
+
+${texto}
+
 </div>
 `;
+
 
 salvarHistorico(texto,total);
 
