@@ -522,30 +522,28 @@ carregarHistorico();
 }
 
 </script>
-document.getElementById("foto")
-.addEventListener("change", function(event){
+let fotoBase64 = "";
 
-const arquivo = event.target.files[0];
+document.getElementById("foto").addEventListener("change", function(event){
+  const arquivo = event.target.files[0];
+  if (!arquivo) return;
 
-if(!arquivo) return;
+  const leitor = new FileReader();
 
-const leitor = new FileReader();
+  leitor.onload = function(e){
+    fotoBase64 = e.target.result;
 
-leitor.onload = function(e){
+    let preview = document.getElementById("previewFotoJS");
+    if (!preview) {
+      preview = document.createElement("img");
+      preview.id = "previewFotoJS";
+      preview.style.maxWidth = "100%";
+      preview.style.borderRadius = "10px";
+      preview.style.marginTop = "10px";
+      document.getElementById("foto").after(preview);
+    }
+    preview.src = fotoBase64;
+  };
 
-document.getElementById(
-"previewFoto"
-).src = e.target.result;
-
-document.getElementById(
-"previewFoto"
-).style.display = "block";
-
-};
-
-leitor.readAsDataURL(arquivo);
-
+  leitor.readAsDataURL(arquivo);
 });
-
-</body>
-</html>
