@@ -129,19 +129,32 @@ Finalizar Avaliação
 
 const perguntas = [
 
-"Postura do tronco",
+"Postura do tronco durante a atividade",
 "Postura dos membros superiores",
 "Movimentos repetitivos",
-"Esforço físico",
+"Esforço físico exigido",
 "Manipulação de cargas",
 
-"Pressão de tempo",
+"Pressão de tempo para execução",
 "Distrações ou interrupções",
 "Clareza das instruções",
 "Comunicação entre envolvidos",
-"Probabilidade de erro humano"
+"Probabilidade de erro humano",
+
+"Nível de atenção necessário",
+"Complexidade da atividade",
+"Fadiga mental percebida",
+"Fadiga física percebida",
+"Variabilidade da tarefa",
+
+"Condição de iluminação",
+"Condição de ruído",
+"Condição térmica",
+"Disponibilidade de recursos",
+"Possibilidade de recuperação durante a jornada"
 
 ];
+ 
 
 const opcoes = [
 "Adequado",
@@ -163,9 +176,14 @@ html+=`
 <option value="2">${opcoes[2]}</option>
 <option value="3">${opcoes[3]}</option>
 </select>
-`;
 
+<textarea
+id="obs${i}"
+placeholder="Observação da pergunta">
+</textarea>
+`;
 });
+
 
 document.getElementById("perguntas").innerHTML=html;
 
@@ -178,7 +196,7 @@ function avaliar(){
 
 let total=0;
 
-for(let i=0;i<10;i++){
+for(let i=0;i<20;i++){
 total += Number(
 document.getElementById("q"+i).value
 );
@@ -187,15 +205,15 @@ document.getElementById("q"+i).value
 let texto="";
 let cor="";
 
-if(total<=8){
+if(total<=15){
 texto="🟢 Baixa Exposição";
 cor="#dff5df";
 }
-else if(total<=18){
+else if(total<=30){
 texto="🟡 Média Exposição";
 cor="#fff7d6";
 }
-else if(total<=24){
+else if(total<=45){
 texto="🟠 Alta Exposição";
 cor="#ffe4c7";
 }
