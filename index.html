@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ErgoContexto</title>
+
+<style>
+body{
+  font-family: Arial, sans-serif;
+  margin:0;
+  background:#f4f6f8;
+}
+
+header{
+  background:#142b40;
+  color:white;
+  padding:20px;
+  text-align:center;
+}
+
+main{
+  padding:20px;
+}
+
+.card{
+  background:white;
+  padding:20px;
+  border-radius:12px;
+  margin-bottom:15px;
+  box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+
+button{
+  width:100%;
+  padding:15px;
+  border:none;
+  border-radius:8px;
+  background:#df652b;
+  color:white;
+  font-size:16px;
+}
+
+input{
+  width:100%;
+  padding:12px;
+  margin-top:10px;
+  margin-bottom:10px;
+  box-sizing:border-box;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>ErgoContexto</h1>
+<p>MVP de teste</p>
+</header>
+
+<main id="app">
+
+<div class="card">
+<h2>Teste do Aplicativo</h2>
+
+<input id="nome" placeholder="Nome da atividade">
+
+<button onclick="salvar()">
+Salvar
+</button>
+
+<p id="resultado"></p>
+</div>
+
+</main>
+
+<script>
+
+function salvar(){
+
+let atividade =
+document.getElementById("nome").value;
+
+document.getElementById("resultado").innerHTML =
+"Atividade registrada: " + atividade;
+
+}
+
+</script>
+
+</body>
+</html>
