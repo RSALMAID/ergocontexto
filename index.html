@@ -155,6 +155,20 @@ Não constitui AET, laudo ergonômico ou avaliação especializada.
 
 <label>Local</label>
 <input id="local">
+<label>Foto da Atividade</label>
+<input
+type="file"
+id="foto"
+accept="image/*"
+capture="environment">
+<img
+id="previewFoto"
+style="
+max-width:100%;
+margin-top:10px;
+border-radius:10px;
+display:none;
+">
 
 <label>Atividade</label>
 <input id="atividade">
@@ -485,6 +499,30 @@ carregarHistorico();
 }
 
 </script>
+document.getElementById("foto")
+.addEventListener("change", function(event){
+
+const arquivo = event.target.files[0];
+
+if(!arquivo) return;
+
+const leitor = new FileReader();
+
+leitor.onload = function(e){
+
+document.getElementById(
+"previewFoto"
+).src = e.target.result;
+
+document.getElementById(
+"previewFoto"
+).style.display = "block";
+
+};
+
+leitor.readAsDataURL(arquivo);
+
+});
 
 </body>
 </html>
