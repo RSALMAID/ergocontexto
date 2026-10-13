@@ -9,7 +9,7 @@
 body{
 font-family:Arial,sans-serif;
 margin:0;
-background:#f4f6f8;
+background:#f2f5f8;
 }
 
 header{
@@ -23,7 +23,7 @@ text-align:center;
 background:white;
 margin:15px;
 padding:20px;
-border-radius:12px;
+border-radius:15px;
 box-shadow:0 2px 8px rgba(0,0,0,.1);
 }
 
@@ -33,41 +33,65 @@ margin-top:15px;
 font-weight:bold;
 }
 
-input,select{
+input,select,textarea{
 width:100%;
 padding:12px;
-margin-top:5px;
 box-sizing:border-box;
+margin-top:5px;
+border:1px solid #d4d4d4;
+border-radius:8px;
+}
+
+textarea{
+height:100px;
 }
 
 button{
 width:100%;
 padding:15px;
 margin-top:20px;
-border:none;
-border-radius:8px;
 background:#df652b;
 color:white;
-font-size:16px;
+border:none;
+border-radius:10px;
+font-size:18px;
 }
 
-#resultado{
+.resultado{
 margin-top:20px;
-font-size:22px;
-font-weight:bold;
+padding:15px;
+border-radius:10px;
 text-align:center;
+font-size:24px;
+font-weight:bold;
+}
+
+.itemHistorico{
+background:#f7f7f7;
+padding:10px;
+margin-top:10px;
+border-radius:8px;
 }
 </style>
-
 </head>
+
 <body>
 
 <header>
 <h1>ErgoContexto</h1>
-<p>Avaliação Inicial de Ergonomia e Fatores Humanos</p>
+<p>Triagem Ergonômica e Fatores Humanos</p>
 </header>
 
 <div class="card">
+
+<label>Unidade</label>
+<input id="unidade">
+
+<label>Área</label>
+<input id="area">
+
+<label>Local</label>
+<input id="local">
 
 <label>Atividade</label>
 <input id="atividade">
@@ -75,35 +99,18 @@ text-align:center;
 <label>Função</label>
 <input id="funcao">
 
-<label>1. Há postura forçada?</label>
-<select id="p1">
-<option value="0">Não</option>
-<option value="1">Sim</option>
-</select>
+<label>Avaliador</label>
+<input id="avaliador">
 
-<label>2. Há esforço físico significativo?</label>
-<select id="p2">
-<option value="0">Não</option>
-<option value="1">Sim</option>
-</select>
+<label>Data</label>
+<input id="data" type="date">
 
-<label>3. Há movimentos repetitivos?</label>
-<select id="p3">
-<option value="0">Não</option>
-<option value="1">Sim</option>
-</select>
+<h2>Ergonomia</h2>
 
-<label>4. Há pressão de tempo?</label>
-<select id="p4">
-<option value="0">Não</option>
-<option value="1">Sim</option>
-</select>
+<div id="perguntas"></div>
 
-<label>5. Há interrupções frequentes?</label>
-<select id="p5">
-<option value="0">Não</option>
-<option value="1">Sim</option>
-</select>
+<label>Observações Gerais</label>
+<textarea id="obs"></textarea>
 
 <button onclick="avaliar()">
 Finalizar Avaliação
@@ -113,40 +120,169 @@ Finalizar Avaliação
 
 </div>
 
+<div class="card">
+<h2>Histórico</h2>
+<div id="historico"></div>
+</div>
+
 <script>
+
+const perguntas = [
+
+"Postura do tronco",
+"Postura dos membros superiores",
+"Movimentos repetitivos",
+"Esforço físico",
+"Manipulação de cargas",
+
+"Pressão de tempo",
+"Distrações ou interrupções",
+"Clareza das instruções",
+"Comunicação entre envolvidos",
+"Probabilidade de erro humano"
+
+];
+
+const opcoes = [
+"Adequado",
+"Baixa exposição",
+"Média exposição",
+"Alta exposição"
+];
+
+let html="";
+
+perguntas.forEach((p,i)=>{
+
+html+=`
+<label>${i+1}. ${p}</label>
+
+<select id="q${i}">
+<option value="0">${opcoes[0]}</option>
+<option value="1">${opcoes[1]}</option>
+<option value="2">${opcoes[2]}</option>
+<option value="3">${opcoes[3]}</option>
+</select>
+`;
+
+});
+
+document.getElementById("perguntas").innerHTML=html;
+
+document.getElementById("data").value =
+new Date().toISOString().substring(0,10);
+
+carregarHistorico();
 
 function avaliar(){
 
-let total=
-Number(document.getElementById('p1').value)+
-Number(document.getElementById('p2').value)+
-Number(document.getElementById('p3').value)+
-Number(document.getElementById('p4').value)+
-Number(document.getElementById('p5').value);
+let total=0;
 
-let resultado='';
-
-if(total<=1){
-resultado='🟢 Baixo Potencial de Exposição';
+for(let i=0;i<10;i++){
+total += Number(
+document.getElementById("q"+i).value
+);
 }
-else if(total<=3){
-resultado='🟡 Médio Potencial de Exposição';
+
+let texto="";
+let cor="";
+
+if(total<=8){
+texto="🟢 Baixa Exposição";
+cor="#dff5df";
+}
+else if(total<=18){
+texto="🟡 Média Exposição";
+cor="#fff7d6";
+}
+else if(total<=24){
+texto="🟠 Alta Exposição";
+cor="#ffe4c7";
 }
 else{
-resultado='🔴 Alto Potencial de Exposição';
+texto="🔴 Exposição Crítica";
+cor="#ffd9d9";
 }
 
-document.getElementById('resultado').innerHTML=resultado;
+document.getElementById("resultado").innerHTML=
+`
+<div class="resultado" style="background:${cor}">
+${texto}<br>
+Pontuação: ${total}
+</div>
+`;
+
+salvarHistorico(texto,total);
+
+}
+
+function salvarHistorico(resultado,pontos){
+
+let lista =
+JSON.parse(
+localStorage.getItem("historicoErgo")
+|| "[]"
+);
+
+lista.unshift({
+
+data:new Date().toLocaleString(),
+
+atividade:
+document.getElementById(
+"atividade"
+).value,
+
+funcao:
+document.getElementById(
+"funcao"
+).value,
+
+resultado:resultado,
+pontos:pontos
+
+});
 
 localStorage.setItem(
-'ultimaAvaliacao',
-JSON.stringify({
-atividade:document.getElementById('atividade').value,
-funcao:document.getElementById('funcao').value,
-resultado:resultado,
-data:new Date().toLocaleString()
-})
+"historicoErgo",
+JSON.stringify(lista)
 );
+
+carregarHistorico();
+
+}
+
+function carregarHistorico(){
+
+let lista =
+JSON.parse(
+localStorage.getItem("historicoErgo")
+|| "[]"
+);
+
+let html="";
+
+lista.forEach(item=>{
+
+html+=`
+<div class="itemHistorico">
+
+<b>${item.atividade}</b><br>
+
+${item.funcao}<br>
+
+${item.resultado}<br>
+
+${item.data}
+
+</div>
+`;
+
+});
+
+document.getElementById(
+"historico"
+).innerHTML=html;
 
 }
 
