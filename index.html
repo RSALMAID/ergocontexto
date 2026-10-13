@@ -280,6 +280,16 @@ localStorage.getItem("historicoErgo")
 
 let html="";
 
+html += `
+<button onclick="limparHistorico()"
+style="
+background:#c62828;
+margin-bottom:15px;
+">
+Limpar Histórico
+</button>
+`;
+
 lista.forEach(item=>{
 
 html+=`
@@ -287,11 +297,13 @@ html+=`
 
 <b>${item.atividade}</b><br>
 
-${item.funcao}<br>
+Função: ${item.funcao}<br>
 
-${item.resultado}<br>
+Resultado: ${item.resultado}<br>
 
-${item.data}
+Pontuação: ${item.pontos}<br>
+
+Data: ${item.data}
 
 </div>
 `;
@@ -301,6 +313,19 @@ ${item.data}
 document.getElementById(
 "historico"
 ).innerHTML=html;
+
+}
+function limparHistorico(){
+
+if(confirm("Deseja apagar todo o histórico?")){
+
+localStorage.removeItem(
+"historicoErgo"
+);
+
+carregarHistorico();
+
+}
 
 }
 
