@@ -43,23 +43,23 @@ box-sizing:border-box;
 button{
 width:100%;
 padding:15px;
+margin-top:20px;
 border:none;
 border-radius:8px;
 background:#df652b;
 color:white;
 font-size:16px;
-margin-top:20px;
 }
 
-.resultado{
+#resultado{
+margin-top:20px;
 font-size:22px;
 font-weight:bold;
-margin-top:20px;
 text-align:center;
 }
 </style>
-</head>
 
+</head>
 <body>
 
 <header>
@@ -109,7 +109,7 @@ text-align:center;
 Finalizar Avaliação
 </button>
 
-<div id="resultado" class="resultado"></div>
+<div id="resultado"></div>
 
 </div>
 
@@ -117,33 +117,33 @@ Finalizar Avaliação
 
 function avaliar(){
 
-let total =
-Number(document.getElementById("p1").value)+
-Number(document.getElementById("p2").value)+
-Number(document.getElementById("p3").value)+
-Number(document.getElementById("p4").value)+
-Number(document.getElementById("p5").value);
+let total=
+Number(document.getElementById('p1').value)+
+Number(document.getElementById('p2').value)+
+Number(document.getElementById('p3').value)+
+Number(document.getElementById('p4').value)+
+Number(document.getElementById('p5').value);
 
-let texto="";
+let resultado='';
 
 if(total<=1){
-texto="🟢 Baixo Potencial de Exposição";
+resultado='🟢 Baixo Potencial de Exposição';
 }
 else if(total<=3){
-texto="🟡 Médio Potencial de Exposição";
+resultado='🟡 Médio Potencial de Exposição';
 }
 else{
-texto="🔴 Alto Potencial de Exposição";
+resultado='🔴 Alto Potencial de Exposição';
 }
 
-document.getElementById("resultado").innerHTML=texto;
+document.getElementById('resultado').innerHTML=resultado;
 
 localStorage.setItem(
-"ultimaAvaliacao",
+'ultimaAvaliacao',
 JSON.stringify({
-atividade:document.getElementById("atividade").value,
-funcao:document.getElementById("funcao").value,
-resultado:texto,
+atividade:document.getElementById('atividade').value,
+funcao:document.getElementById('funcao').value,
+resultado:resultado,
 data:new Date().toLocaleString()
 })
 );
