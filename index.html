@@ -118,6 +118,9 @@ Finalizar Avaliação
 
 <div id="resultado"></div>
 
+<div id="relatorio"></div>
+
+
 </div>
 
 <div class="card">
@@ -243,6 +246,32 @@ FATORES HUMANOS: ${fatoresHumanos} pontos<br><br>
 TOTAL: ${total} pontos<br><br>
 
 ${texto}
+
+</div>
+`;
+document.getElementById("relatorio").innerHTML=
+`
+<div class="card">
+
+<h2>RELATÓRIO ERGOCONTEXTO</h2>
+
+<b>Unidade:</b> ${document.getElementById("unidade").value}<br>
+<b>Área:</b> ${document.getElementById("area").value}<br>
+<b>Local:</b> ${document.getElementById("local").value}<br><br>
+
+<b>Atividade:</b> ${document.getElementById("atividade").value}<br>
+<b>Função:</b> ${document.getElementById("funcao").value}<br>
+<b>Avaliador:</b> ${document.getElementById("avaliador").value}<br>
+<b>Data:</b> ${document.getElementById("data").value}<br><br>
+
+<b>Ergonomia:</b> ${ergonomia} pontos<br>
+<b>Fatores Humanos:</b> ${fatoresHumanos} pontos<br>
+<b>Total:</b> ${total} pontos<br><br>
+
+<b>Resultado:</b> ${texto}<br><br>
+
+<b>Observações Gerais:</b><br>
+${document.getElementById("obs").value}
 
 </div>
 `;
