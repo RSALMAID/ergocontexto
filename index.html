@@ -247,12 +247,15 @@ ${texto}
 </div>
 `;
 
-
-salvarHistorico(texto,total);
-
 }
 
-function salvarHistorico(resultado,pontos){
+function salvarHistorico(
+resultado,
+pontos,
+ergonomia,
+fatoresHumanos
+){
+
 
 let lista =
 JSON.parse(
@@ -275,7 +278,10 @@ document.getElementById(
 ).value,
 
 resultado:resultado,
-pontos:pontos
+pontos:pontos,
+ergonomia:ergonomia,
+fatoresHumanos:fatoresHumanos
+
 
 });
 
