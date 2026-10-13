@@ -241,26 +241,25 @@ const perguntas = [
 "Movimentos repetitivos",
 "Esforço físico exigido",
 "Manipulação de cargas",
+"Fadiga física percebida",
+"Condição de iluminação",
+"Condição de ruído",
+"Condição térmica",
+"Possibilidade de recuperação durante a jornada",
 
 "Pressão de tempo para execução",
 "Distrações ou interrupções",
 "Clareza das instruções",
 "Comunicação entre envolvidos",
 "Probabilidade de erro humano",
-
 "Nível de atenção necessário",
 "Complexidade da atividade",
 "Fadiga mental percebida",
-"Fadiga física percebida",
 "Variabilidade da tarefa",
-
-"Condição de iluminação",
-"Condição de ruído",
-"Condição térmica",
-"Disponibilidade de recursos",
-"Possibilidade de recuperação durante a jornada"
+"Disponibilidade de recursos"
 
 ];
+
  
 
 const opcoes = [
@@ -273,6 +272,9 @@ const opcoes = [
 let html="";
 
 perguntas.forEach((p,i)=>{
+if(i===10){
+html+=`<h2>Fatores Humanos</h2>`;
+}
 
 html+=`
 <label>${i+1}. ${p}</label>
