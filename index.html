@@ -194,6 +194,24 @@ display:none;
 
 <label>Observações Gerais</label>
 <textarea id="obs"></textarea>
+<h2>Plano de Ação</h2>
+
+<label>Ação recomendada</label>
+<textarea id="acao"></textarea>
+
+<label>Responsável</label>
+<input id="responsavel">
+
+<label>Prazo</label>
+<input id="prazo" type="date">
+
+<label>Prioridade</label>
+<select id="prioridade">
+<option>Baixa</option>
+<option>Média</option>
+<option>Alta</option>
+<option>Imediata</option>
+</select>
 
 <button onclick="avaliar()">
 Finalizar Avaliação
@@ -361,6 +379,11 @@ document.getElementById("relatorio").innerHTML=
 <br><br>
 
 
+<b>PLANO DE AÇÃO</b><br>
+<b>Ação:</b> ${document.getElementById("acao").value}<br>
+<b>Responsável:</b> ${document.getElementById("responsavel").value}<br>
+<b>Prazo:</b> ${document.getElementById("prazo").value.split("-").reverse().join("/")}<br>
+<b>Prioridade:</b> ${document.getElementById("prioridade").value}<br><br>
 
 <b>Observações Gerais:</b><br>
 ${document.getElementById("obs").value}
