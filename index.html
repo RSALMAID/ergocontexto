@@ -281,6 +281,25 @@ resultado:resultado,
 pontos:pontos,
 ergonomia:ergonomia,
 fatoresHumanos:fatoresHumanos
+unidade:
+document.getElementById(
+"unidade"
+).value,
+
+area:
+document.getElementById(
+"area"
+).value,
+
+local:
+document.getElementById(
+"local"
+).value,
+
+avaliador:
+document.getElementById(
+"avaliador"
+).value,
 
 
 });
@@ -319,18 +338,27 @@ lista.forEach(item=>{
 html+=`
 <div class="itemHistorico">
 
-<b>${item.atividade}</b><br>
+<b>${item.atividade}</b><br><br>
+
+Unidade: ${item.unidade}<br>
+Área: ${item.area}<br>
+Local: ${item.local}<br><br>
 
 Função: ${item.funcao}<br>
+Avaliador: ${item.avaliador}<br><br>
 
-Resultado: ${item.resultado}<br>
+Ergonomia: ${item.ergonomia} pontos<br>
+Fatores Humanos: ${item.fatoresHumanos} pontos<br>
+Pontuação Total: ${item.pontos} pontos<br><br>
 
-Pontuação: ${item.pontos}<br>
+${item.resultado}<br><br>
 
-Data: ${item.data}
+${item.data}
 
 </div>
 `;
+
+
 
 });
 
