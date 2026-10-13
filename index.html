@@ -324,15 +324,17 @@ let total = ergonomia + fatoresHumanos;
 let texto="";
 let cor="";
 
-if(total<=15){
+let media = total / 20;
+
+if(media < 0.5){
 texto="🟢 Baixa Exposição";
 cor="#dff5df";
 }
-else if(total<=30){
-texto="🟡 Média Exposição";
+else if(media < 1.5){
+texto="🟡 Exposição Moderada";
 cor="#fff7d6";
 }
-else if(total<=45){
+else if(media < 2.25){
 texto="🟠 Alta Exposição";
 cor="#ffe4c7";
 }
@@ -341,17 +343,25 @@ texto="🔴 Exposição Crítica";
 cor="#ffd9d9";
 }
 
+
 document.getElementById("resultado").innerHTML=
 `
 <div class="resultado" style="background:${cor}">
 
-ERGONOMIA: ${ergonomia} pontos<br><br>
+<b>ERGONOMIA</b><br>
+${ergonomia} pontos<br><br>
 
-FATORES HUMANOS: ${fatoresHumanos} pontos<br><br>
+<b>FATORES HUMANOS</b><br>
+${fatoresHumanos} pontos<br><br>
 
-TOTAL: ${total} pontos<br><br>
+<b>TOTAL</b><br>
+${total} pontos<br><br>
+
+<b>MÉDIA DAS RESPOSTAS</b><br>
+${media.toFixed(2).replace(".", ",")}<br><br>
 
 ${texto}
+
 
 </div>
 `;
