@@ -355,12 +355,29 @@ document.getElementById("relatorio").innerHTML=
 <b>Total:</b> ${total} pontos<br><br>
 
 <b>Resultado:</b> ${texto}<br><br>
+<b>Foto da Atividade:</b><br>
+
+
+<br><br>
+
+
 
 <b>Observações Gerais:</b><br>
 ${document.getElementById("obs").value}
 
 </div>
 `;
+ const fotoOrigem = document.getElementById("previewFoto");
+
+if (fotoOrigem && fotoOrigem.src && fotoOrigem.style.display !== "none") {
+  const fotoRelatorio = document.createElement("img");
+  fotoRelatorio.src = fotoOrigem.src;
+  fotoRelatorio.style.maxWidth = "100%";
+  fotoRelatorio.style.borderRadius = "10px";
+  fotoRelatorio.style.marginTop = "10px";
+  document.querySelector("#relatorio .card").appendChild(fotoRelatorio);
+}
+
 salvarHistorico(
 texto,
 total,
