@@ -592,4 +592,54 @@ let fotoBase64 = "";
 
   leitor.readAsDataURL(arquivo);
 });
+const URL_IA = "https://ergocontexto-ia.raul-almeida-siqueira.workers.dev/api/ergo";
+let analiseIA = "";
+
+async function analisarComIA(){
+  const caixa = document.getElementById("analiseIA");
+  const botao = document.getElementById("btnIA");
+  let erg = 0, fh = 0;
+  const respostas = perguntas.map((p, i) => {
+    const v = Number(document.getElementById("q" + i).value);
+    if (i < 10) erg += v; else fh += v;
+    const o = document.getElementById("obs" + i);
+    return { n: i + 1, pergunta: p, resposta: opcoes[v], observacao: o ? o.value.trim() : "" };
+  });
+  const total = erg + fh, media = total / 20;
+  const classe = media < 0.5 ? "Baixa" : media < 1.5 ? "Moderada" : media < 2.25 ? "Alta" : "Crítica";
+  const dados = {
+    atividade: document.getElementById("atividade").value,
+    funcao: document.getElementById("funcao").value,
+    ergonomia: erg, fatoresHumanos: fh, total: total,
+    media: media.toFixed(2), classificacao: classe,
+    observacoesGerais: document.getElementById("obs").value,
+    respostas: respostas
+  };
+  botao.disabled = true;
+  botao.textContent = "⏳ Analisando...";
+  try {
+    const r = await fetch(URL_IA, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(dados) });
+    const j = await r.json();
+    if (!r.ok || !j.analise) throw new Error();
+    analiseIA = j.analise;
+    caixa.innerHTML = '<div class="card" style="margin:15px 0"><h3>🤖 Análise assistida por IA</h3><div id="txtIA" style="white-space:pre-wrap;line-height:1.5"></div><small>Sugestões para validação do avaliador. Não alteram pontuação nem classificação.</small><button style="background:#E46F2A" onclick="copiarIA()">Copiar sugestões para o plano de ação</button></div>';
+    document.getElementById("txtIA").textContent = analiseIA;
+  } catch (e) {
+    caixa.textContent = "Não foi possível gerar a análise. Verifique a internet e tente novamente.";
+  } finally {
+    botao.disabled = false;
+    botao.textContent = "🤖 Analisar com IA";
+  }
+}
+
+function copiarIA(){
+  const ini = analiseIA.indexOf("SUGESTÕES DE AÇÃO:");
+  const fim = analiseIA.indexOf("NECESSIDADE DE AVALIAÇÃO");
+  let t = analiseIA;
+  if (ini >= 0) t = analiseIA.substring(ini + 18, fim > ini ? fim : undefined).trim();
+  const c = document.getElementById("acao");
+  c.value = (c.value ? c.value + "\n" : "") + t;
+  c.focus();
+}
+
 </script>
