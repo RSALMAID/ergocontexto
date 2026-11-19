@@ -2,644 +2,1179 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ErgoContexto</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#004F3D">
+<title>ErgoContexto — Triagem ergonômica e fatores humanos</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <style>
-body{
-font-family:Arial,sans-serif;
-margin:0;
-background:#f2f5f8;
+:root{
+  --verde:#004F3D;--verde2:#007A5E;--laranja:#E46F2A;
+  --bg:#f2f5f8;--card:#fff;--tx:#1b2a27;--mut:#5b6b67;--bd:#d9e0e4;--soft:#f6f8fa;
+  --n0:#2e9e5b;--n0b:#e3f5e9;--n0t:#14532d;
+  --n1:#d9a400;--n1b:#fff4cc;--n1t:#6b4e00;
+  --n2:#e46f2a;--n2b:#ffe4cf;--n2t:#7a3300;
+  --n3:#c62828;--n3b:#ffdada;--n3t:#7f1212;
+  --nd:#9aa7a3;--ndb:#eceff1;--ndt:#455a64;
 }
-
-header{
-background:linear-gradient(135deg,#004F3D,#007A5E);
-color:#ffffff;
-padding:28px 20px;
-text-align:center;
-border-bottom:5px solid #E46F2A;
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0f1618;--card:#182226;--tx:#e8eeec;--mut:#9fb0ab;--bd:#2b393e;--soft:#1e2a2f;
+    --n0b:#153a26;--n0t:#9be3b5;--n1b:#3d3300;--n1t:#ffe083;--n2b:#4a2410;--n2t:#ffc49a;--n3b:#4a1515;--n3t:#ffb3b3;
+    --ndb:#2a3438;--ndt:#b0bec5;
+  }
 }
-
-
-.card{
-background:white;
-margin:15px;
-padding:20px;
-border-radius:15px;
-box-shadow:0 2px 8px rgba(0,0,0,.1);
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:120px;scroll-padding-bottom:90px}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--tx);line-height:1.45}
+h1,h2,h3,h4{line-height:1.25;margin:0 0 .4em}
+h2{font-size:1.2rem}h3{font-size:1.05rem}
+p{margin:.4em 0}
+small,.mut{color:var(--mut)}
+button{font:inherit;cursor:pointer}
+.topo{background:linear-gradient(135deg,var(--verde),var(--verde2));color:#fff;border-bottom:5px solid var(--laranja);padding:calc(10px + env(safe-area-inset-top)) 14px 0;position:sticky;top:0;z-index:20}
+.marca{display:flex;gap:10px;align-items:center;padding-bottom:8px}
+.marca h1{font-size:1.25rem;margin:0}
+.marca span{font-size:.8rem;opacity:.85}
+.marca svg{flex:none}
+#nav{display:flex;gap:4px;overflow-x:auto}
+#nav button{background:transparent;border:0;color:#d7efe8;padding:9px 14px;border-radius:8px 8px 0 0;font-size:.92rem;white-space:nowrap}
+#nav button.on{background:var(--bg);color:var(--verde);font-weight:700}
+@media (prefers-color-scheme:dark){#nav button.on{color:var(--tx)}}
+main{max-width:860px;margin:0 auto;padding:10px 10px 110px}
+.view{display:none}.view.on{display:block}
+.card{background:var(--card);border-radius:14px;box-shadow:0 1px 6px rgba(0,0,0,.09);padding:16px;margin:12px 0}
+.aviso{background:#fff3cd;color:#6b5200;border-radius:10px;padding:10px 12px;font-size:.85rem}
+@media (prefers-color-scheme:dark){.aviso{background:#3b3200;color:#ffe083}}
+label.campo{display:block;margin-top:12px;font-weight:600;font-size:.92rem}
+input,select,textarea{width:100%;padding:11px;margin-top:4px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--tx);font:inherit}
+textarea{min-height:84px;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible,.opt:focus-within{outline:3px solid color-mix(in srgb,var(--verde2) 55%,transparent);outline-offset:1px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+@media (max-width:560px){.grid2{grid-template-columns:1fr}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:10px;padding:12px 16px;background:var(--laranja);color:#fff;font-weight:700;font-size:1rem}
+.btn.sec{background:var(--card);color:var(--verde);border:1.5px solid var(--verde2)}
+@media (prefers-color-scheme:dark){.btn.sec{color:#9be3d0}}
+.btn.verde{background:var(--verde)}
+.btn.perigo{background:#c62828}
+.btn.peq{padding:7px 11px;font-size:.85rem}
+.btn[disabled]{opacity:.55;cursor:default}
+.linha{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:4px 2px 8px;margin:0 -2px}
+.chip{flex:none;border:1.5px solid var(--bd);background:var(--card);color:var(--tx);border-radius:12px;padding:7px 10px;display:flex;flex-direction:column;align-items:center;min-width:74px;font-size:.78rem}
+.chip.on{border-color:var(--verde2);background:color-mix(in srgb,var(--verde2) 12%,var(--card));font-weight:700}
+.chip.ok{border-color:var(--n0)}
+.chip .ci{font-size:1.15rem}
+.chip small{font-size:.7rem}
+.rodape{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--bd);padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:10px;justify-content:center;z-index:15}
+.rodape[hidden]{display:none}
+.rodape .btn{flex:1;max-width:260px}
+.tag{display:inline-block;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--soft);border:1px solid var(--bd);color:var(--mut);margin:0 4px 4px 0}
+.domhead{border-left:6px solid var(--verde2)}
+.item{border:1px solid var(--bd);border-radius:12px;padding:12px;margin:12px 0;background:var(--card)}
+.item legend{font-weight:700;padding:0 6px;font-size:.98rem}
+.item .num{display:inline-block;background:var(--verde);color:#fff;border-radius:99px;min-width:24px;height:24px;line-height:24px;text-align:center;font-size:.8rem;margin-right:4px}
+.dica{font-size:.83rem;color:var(--mut);margin:0 0 8px}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--bd);border-radius:10px;padding:9px 10px;margin:6px 0;cursor:pointer;background:var(--card)}
+.opt input{width:auto;margin:3px 0 0;flex:none;accent-color:var(--verde2)}
+.opt .otx{font-size:.9rem}
+.opt .otx b{display:block;font-size:.82rem;letter-spacing:.02em;text-transform:uppercase}
+.opt.n0 b{color:var(--n0t)}.opt.n1 b{color:var(--n1t)}.opt.n2 b{color:var(--n2t)}.opt.n3 b{color:var(--n3t)}
+.opt:has(input:checked).n0{border-color:var(--n0);background:var(--n0b)}
+.opt:has(input:checked).n1{border-color:var(--n1);background:var(--n1b)}
+.opt:has(input:checked).n2{border-color:var(--n2);background:var(--n2b)}
+.opt:has(input:checked).n3{border-color:var(--n3);background:var(--n3b)}
+.opt:has(input:checked).na{border-color:var(--nd);background:var(--ndb)}
+.opt.na{font-size:.85rem;color:var(--mut);padding:6px 10px}
+.ev{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:.8rem;color:var(--mut)}
+.ev label{border:1px solid var(--bd);border-radius:99px;padding:3px 10px;cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+.ev label{position:relative}
+.ev label:focus-within{outline:3px solid color-mix(in srgb,var(--verde2) 55%,transparent)}
+.ev label:has(input:checked){background:var(--verde2);border-color:var(--verde2);color:#fff}
+.ev input{width:auto;margin:0;accent-color:#fff;position:absolute;opacity:0;pointer-events:none}
+details.nota{margin-top:8px}
+details.nota summary{cursor:pointer;color:var(--verde2);font-size:.85rem;font-weight:600}
+.bd{display:inline-block;padding:3px 10px;border-radius:99px;font-weight:700;font-size:.8rem;white-space:nowrap}
+.bd.n0{background:var(--n0b);color:var(--n0t)}.bd.n1{background:var(--n1b);color:var(--n1t)}
+.bd.n2{background:var(--n2b);color:var(--n2t)}.bd.n3{background:var(--n3b);color:var(--n3t)}
+.bd.nd{background:var(--ndb);color:var(--ndt)}
+.acao{border:1px solid var(--bd);border-radius:12px;padding:12px;margin:10px 0;background:var(--soft)}
+.sug{display:flex;gap:8px;align-items:center;justify-content:space-between;border-bottom:1px dashed var(--bd);padding:7px 0;font-size:.88rem}
+/* Relatório */
+.rel h2.titulo{background:linear-gradient(135deg,var(--verde),var(--verde2));color:#fff;border-radius:10px;padding:14px;margin:0 0 12px;font-size:1.15rem}
+.rel h3{border-bottom:2px solid var(--laranja);padding-bottom:3px;margin:18px 0 8px}
+.rel table{width:100%;border-collapse:collapse;font-size:.85rem}
+.rel th,.rel td{border:1px solid var(--bd);padding:6px 8px;text-align:left;vertical-align:top}
+.rel th{background:var(--soft)}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:3px 10px;font-size:.9rem}
+.kv b{color:var(--mut);font-weight:600}
+@media (max-width:560px){.kv{grid-template-columns:110px 1fr}}
+.resumo{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0}
+.resumo>div{flex:1;min-width:150px;border:1px solid var(--bd);border-radius:10px;padding:10px;background:var(--soft)}
+.resumo small{display:block}
+.resumo strong{font-size:1.05rem}
+.radar{width:100%;max-width:420px;display:block;margin:0 auto}
+.radar .anel{fill:none;stroke:var(--bd);stroke-width:1}
+.radar .eixo{stroke:var(--bd);stroke-width:1}
+.radar .area{fill-opacity:.25;stroke-width:2.5}
+.radar .ant{fill:none;stroke:var(--mut);stroke-width:1.5;stroke-dasharray:5 4}
+.radar text{fill:var(--tx);font-size:11.5px;font-weight:600}
+.radar .esc{fill:var(--mut);font-size:9px;font-weight:400}
+.mc-linha{display:flex;align-items:center;gap:8px;margin:4px 0}
+.mc-rot{width:92px;font-size:.78rem;color:var(--mut);flex:none}
+.mc-cel{display:flex;gap:3px;flex-wrap:wrap}
+.mc{display:inline-block;width:20px;height:20px;border-radius:5px;background:var(--nd)}
+.mc.n0{background:var(--n0)}.mc.n1{background:var(--n1)}.mc.n2{background:var(--n2)}.mc.n3{background:var(--n3)}.mc.nd{background:var(--ndb);border:1px dashed var(--nd)}
+.leg{display:flex;gap:10px;flex-wrap:wrap;font-size:.75rem;color:var(--mut);margin-top:6px}
+.leg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.foto-rel{max-width:100%;max-height:340px;border-radius:10px;display:block;margin:8px 0}
+.ia-txt{white-space:pre-wrap;background:var(--soft);border-radius:10px;padding:12px;font-size:.9rem}
+.assin{display:flex;gap:30px;margin-top:40px}
+.assin div{flex:1;border-top:1px solid var(--tx);padding-top:4px;font-size:.8rem;text-align:center}
+.stack{display:flex;height:16px;border-radius:6px;overflow:hidden;background:var(--ndb)}
+.stack i{display:block}
+.hist{border:1px solid var(--bd);border-radius:12px;padding:12px;margin:10px 0;background:var(--card)}
+.dots{display:flex;gap:4px;margin:6px 0}
+.dots i{width:14px;height:14px;border-radius:50%;background:var(--ndb);border:1px solid var(--nd)}
+.dots i.n0{background:var(--n0)}.dots i.n1{background:var(--n1)}.dots i.n2{background:var(--n2)}.dots i.n3{background:var(--n3)}
+.banner{border:1.5px solid var(--verde2);background:color-mix(in srgb,var(--verde2) 10%,var(--card));border-radius:12px;padding:12px;margin:10px 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.kpi{border:1px solid var(--bd);border-radius:12px;padding:12px;text-align:center;background:var(--card)}
+.kpi strong{display:block;font-size:1.6rem}
+.alerta{border-left:5px solid var(--n2);background:var(--n2b);color:var(--n2t);padding:8px 10px;border-radius:8px;font-size:.85rem;margin:8px 0}
+.sobre table{width:100%;border-collapse:collapse;font-size:.85rem}
+.sobre td,.sobre th{border:1px solid var(--bd);padding:6px 8px;text-align:left;vertical-align:top}
+.sobre th{background:var(--soft)}
+@media (max-width:620px){
+  .rel table.resp thead{display:none}
+  .rel table.resp,.rel table.resp tbody{display:block}
+  .rel table.resp tr{display:block;border:1px solid var(--bd);border-radius:10px;margin:8px 0;padding:6px 8px;background:var(--card)}
+  .rel table.resp td{display:block;border:0;padding:4px 2px}
+  .rel table.resp td::before{content:attr(data-l);display:block;font-size:.68rem;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
 }
-
-label{
-display:block;
-margin-top:15px;
-font-weight:bold;
-}
-
-input,select,textarea{
-width:100%;
-padding:12px;
-box-sizing:border-box;
-margin-top:5px;
-border:1px solid #d4d4d4;
-border-radius:8px;
-}
-
-textarea{
-height:100px;
-}
-
-button{
-width:100%;
-padding:15px;
-margin-top:20px;
-background:#df652b;
-color:white;
-border:none;
-border-radius:10px;
-font-size:18px;
-}
-
-.resultado{
-margin-top:20px;
-padding:15px;
-border-radius:10px;
-text-align:center;
-font-size:24px;
-font-weight:bold;
-}
-
-.itemHistorico{
-background:#f7f7f7;
-padding:10px;
-margin-top:10px;
-border-radius:8px;
+@media print{
+  :root{--bg:#fff;--card:#fff;--tx:#000;--mut:#444;--bd:#bbb;--soft:#f3f3f3;
+    --n0b:#e3f5e9;--n0t:#14532d;--n1b:#fff4cc;--n1t:#6b4e00;--n2b:#ffe4cf;--n2t:#7a3300;--n3b:#ffdada;--n3t:#7f1212;--ndb:#eceff1;--ndt:#455a64}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .no-print,.topo,.rodape{display:none!important}
+  body{background:#fff}
+  main{max-width:none;padding:0}
+  .card{box-shadow:none;border-radius:0;padding:0;margin:0}
+  .rel h3{break-after:avoid}
+  .rel h3,.rel table,.rel .resumo,.mc-linha{break-inside:avoid}
+  .rel tr{break-inside:avoid}
 }
 </style>
 </head>
-
 <body>
-
-<header>
-<h1>ErgoContexto</h1>
-<p>Triagem Ergonômica e Fatores Humanos</p>
-
-<p style="
-background:#fff3cd;
-padding:10px;
-border-radius:8px;
-font-size:14px;
-margin-top:10px;
-color:#856404;
-">
-
-⚠️ Ferramenta de triagem ergonômica e fatores humanos.
-Não substitui análise ergonômica formal, avaliação especializada ou estudo ergonômico do trabalho.
-
-</p>
-
+<header class="topo no-print">
+  <div class="marca">
+    <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#fff" opacity=".15"/><circle cx="32" cy="14" r="6" fill="#fff"/><path d="M32 22v18m0 0-10 14m10-14 10 14M20 30l12-4 12 4" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+    <div><h1>ErgoContexto</h1><span>Triagem ergonômica e fatores humanos</span></div>
+  </div>
+  <nav id="nav" aria-label="Seções">
+    <button data-v="avaliar" class="on">Avaliar</button>
+    <button data-v="historico">Histórico</button>
+    <button data-v="painel">Painel</button>
+    <button data-v="sobre">Sobre o método</button>
+  </nav>
 </header>
-<div class="card">
 
-<h3>Matriz de Classificação</h3>
+<main>
+  <section id="v-avaliar" class="view on">
+    <div id="banner" class="no-print"></div>
+    <div id="palco"></div>
+  </section>
+  <section id="v-historico" class="view"></section>
+  <section id="v-painel" class="view"></section>
+  <section id="v-sobre" class="view sobre"></section>
+</main>
 
-🟢 Baixa Exposição: 0 a 9 pontos<br>
-<small>Média entre 0,00 e 0,49</small><br><br>
-
-🟡 Exposição Moderada: 10 a 29 pontos<br>
-<small>Média entre 0,50 e 1,49</small><br><br>
-
-🟠 Alta Exposição: 30 a 44 pontos<br>
-<small>Média entre 1,50 e 2,24</small><br><br>
-
-🔴 Exposição Crítica: 45 a 60 pontos<br>
-<small>Média entre 2,25 e 3,00</small><br><br>
-
-
-<small>
-Classificação baseada na soma das respostas da triagem.
-Não substitui análise ergonômica formal ou avaliação especializada.
-</small>
-
-</div>
-<div class="card">
-
-<h3>Base Conceitual</h3>
-
-<ul>
-
-<li>Ergonomia da Atividade</li>
-
-<li>Fatores Humanos</li>
-
-<li>Sistemas Sociotécnicos</li>
-
-<li>Ergonomia Participativa</li>
-
-<li>Avaliação Ergonômica Preliminar</li>
-
-<li>Diagnóstico Preliminar inspirado na lógica SOBANE/Déparis</li>
-
-</ul>
-
-<small>
-
-O ErgoContexto é uma ferramenta de triagem destinada à identificação preliminar de exposições ergonômicas e fatores humanos, apoiando a priorização de análises e ações de melhoria.
-
-Não constitui AET, laudo ergonômico ou avaliação especializada.
-
-</small>
-
-</div>
-
-
-<div class="card">
-
-<label>Unidade</label>
-<input id="unidade">
-
-<label>Área</label>
-<input id="area">
-
-<label>Local</label>
-<input id="local">
-<label>Foto da Atividade</label>
-
-<input
-type="file"
-id="foto"
-accept="image/*">
-
-<small>
-📸 Toque acima para tirar uma foto ou selecionar uma imagem da galeria
-</small>
-
-
-<img
-id="previewFoto"
-style="
-max-width:100%;
-margin-top:10px;
-border-radius:10px;
-display:none;
-">
-
-<label>Atividade</label>
-<input id="atividade">
-
-<label>Função</label>
-<input id="funcao">
-
-<label>Avaliador</label>
-<input id="avaliador">
-
-<label>Data</label>
-<input id="data" type="date">
-
-<h2>Ergonomia</h2>
-
-<div id="perguntas"></div>
-
-<label>Observações Gerais</label>
-<textarea id="obs"></textarea>
-<h2>Plano de Ação</h2>
-
-<label>Ação recomendada</label>
-<textarea id="acao"></textarea>
-
-<label>Responsável</label>
-<input id="responsavel">
-
-<label>Prazo</label>
-<input id="prazo" type="date">
-
-<label>Prioridade</label>
-<select id="prioridade">
-<option>Baixa</option>
-<option>Média</option>
-<option>Alta</option>
-<option>Imediata</option>
-</select>
-
-<button onclick="avaliar()">
-Finalizar Avaliação
-</button>
-
-<div id="resultado"></div>
-
-<div id="relatorio"></div>
- <button id="btnIA" onclick="analisarComIA()" style="background:#004F3D;">🤖 Analisar com IA</button>
-<div id="analiseIA"></div>
-
-<button onclick="window.print()">
-📄 Imprimir / Salvar PDF
-</button>
-
-
-</div>
-
-<div class="card">
-<h2>Histórico</h2>
-<div id="historico"></div>
-</div>
+<div id="rodape" class="rodape no-print" hidden></div>
+<noscript><p style="padding:20px">Este aplicativo precisa de JavaScript.</p></noscript>
 
 <script>
-
-const perguntas = [
-
-"Postura do tronco durante a atividade",
-"Postura dos membros superiores",
-"Movimentos repetitivos",
-"Esforço físico exigido",
-"Manipulação de cargas",
-"Fadiga física percebida",
-"Condição de iluminação",
-"Condição de ruído",
-"Condição térmica",
-"Possibilidade de recuperação durante a jornada",
-
-"Pressão de tempo para execução",
-"Distrações ou interrupções",
-"Clareza das instruções",
-"Comunicação entre envolvidos",
-"Probabilidade de erro humano",
-"Nível de atenção necessário",
-"Complexidade da atividade",
-"Fadiga mental percebida",
-"Variabilidade da tarefa",
-"Disponibilidade de recursos"
-
+"use strict";
+/* =====================================================================
+   MODELO — domínios, itens e critérios de triagem
+   Níveis do item: 0 Adequado · 1 Baixa · 2 Moderada · 3 Alta
+   Os critérios são de TRIAGEM (inspirados na literatura); não substituem
+   método quantitativo validado nem avaliação especializada.
+   ===================================================================== */
+const VERSAO_MODELO = 2;
+const GRUPOS = {
+  erg: "Ergonomia · saúde e conforto",
+  fh:  "Fatores humanos · desempenho e segurança"
+};
+const NIVEIS = [
+  {curto:"Baixa",    ico:"🟢"},
+  {curto:"Moderada", ico:"🟡"},
+  {curto:"Alta",     ico:"🟠"},
+  {curto:"Crítica",  ico:"🔴"}
 ];
-
- 
-
-const opcoes = [
-"Adequado",
-"Baixa exposição",
-"Média exposição",
-"Alta exposição"
+const ROT_ITEM = ["Adequado","Baixa","Moderada","Alta"];
+const PROXIMO_PASSO = [
+  "Manter e monitorar. Registrar e reavaliar se houver mudança na atividade.",
+  "Melhoria local com a equipe (nível Observação): corrigir o que é simples e acompanhar.",
+  "Aprofundar (nível Análise): aplicar método específico e envolver SESMT/ergonomia.",
+  "Acionar especialista (nível Perícia/AET) e definir contenção imediata enquanto isso."
 ];
-
-let html="";
-
-perguntas.forEach((p,i)=>{
-if(i===10){
-html+=`<h2>Fatores Humanos</h2>`;
-}
-
-html+=`
-<label>${i+1}. ${p}</label>
-
-<select id="q${i}">
-<option value="0">${opcoes[0]}</option>
-<option value="1">${opcoes[1]}</option>
-<option value="2">${opcoes[2]}</option>
-<option value="3">${opcoes[3]}</option>
-</select>
-
-<textarea
-id="obs${i}"
-placeholder="Observação da pergunta">
-</textarea>
-`;
-});
-
-
-document.getElementById("perguntas").innerHTML=html;
-
-document.getElementById("data").value =
-new Date().toISOString().substring(0,10);
-
-carregarHistorico();
-
-function avaliar(){
-
-let ergonomia = 0;
-let fatoresHumanos = 0;
-
-for(let i=0;i<10;i++){
-ergonomia += Number(
-document.getElementById("q"+i).value
-);
-}
-
-for(let i=10;i<20;i++){
-fatoresHumanos += Number(
-document.getElementById("q"+i).value
-);
-}
-
-let total = ergonomia + fatoresHumanos;
-
-
-let texto="";
-let cor="";
-
-let media = total / 20;
-
-if(media < 0.5){
-texto="🟢 Baixa Exposição";
-cor="#dff5df";
-}
-else if(media < 1.5){
-texto="🟡 Exposição Moderada";
-cor="#fff7d6";
-}
-else if(media < 2.25){
-texto="🟠 Alta Exposição";
-cor="#ffe4c7";
-}
-else{
-texto="🔴 Exposição Crítica";
-cor="#ffd9d9";
-}
-
-
-document.getElementById("resultado").innerHTML=
-`
-<div class="resultado" style="background:${cor}">
-
-<b>ERGONOMIA</b><br>
-${ergonomia} pontos<br><br>
-
-<b>FATORES HUMANOS</b><br>
-${fatoresHumanos} pontos<br><br>
-
-<b>TOTAL</b><br>
-${total} pontos<br><br>
-
-<b>MÉDIA DAS RESPOSTAS</b><br>
-${media.toFixed(2).replace(".", ",")}<br><br>
-
-${texto}
-
-
-</div>
-`;
-document.getElementById("relatorio").innerHTML=
-`
-<div class="card">
-
-<h2>RELATÓRIO ERGOCONTEXTO</h2>
-
-<b>Unidade:</b> ${document.getElementById("unidade").value}<br>
-<b>Área:</b> ${document.getElementById("area").value}<br>
-<b>Local:</b> ${document.getElementById("local").value}<br><br>
-
-<b>Atividade:</b> ${document.getElementById("atividade").value}<br>
-<b>Função:</b> ${document.getElementById("funcao").value}<br>
-<b>Avaliador:</b> ${document.getElementById("avaliador").value}<br>
-<b>Data:</b> ${document.getElementById("data").value}<br><br>
-
-<b>Ergonomia:</b> ${ergonomia} pontos<br>
-<b>Fatores Humanos:</b> ${fatoresHumanos} pontos<br>
-<b>Total:</b> ${total} pontos<br><br>
-
-<b>Resultado:</b> ${texto}<br><br>
-<b>Foto da Atividade:</b><br>
-
-
-<br><br>
-
-
-<b>PLANO DE AÇÃO</b><br>
-<b>Ação:</b> ${document.getElementById("acao").value}<br>
-<b>Responsável:</b> ${document.getElementById("responsavel").value}<br>
-<b>Prazo:</b> ${document.getElementById("prazo").value.split("-").reverse().join("/")}<br>
-<b>Prioridade:</b> ${document.getElementById("prioridade").value}<br><br>
-
-<b>Observações Gerais:</b><br>
-${document.getElementById("obs").value}
-
-</div>
-`;
- const fotoOrigem = document.getElementById("previewFoto");
-
-if (fotoOrigem && fotoOrigem.src && fotoOrigem.style.display !== "none") {
-  const fotoRelatorio = document.createElement("img");
-  fotoRelatorio.src = fotoOrigem.src;
-  fotoRelatorio.style.maxWidth = "100%";
-  fotoRelatorio.style.borderRadius = "10px";
-  fotoRelatorio.style.marginTop = "10px";
-  document.querySelector("#relatorio .card").appendChild(fotoRelatorio);
-}
-
-salvarHistorico(
-texto,
-total,
-ergonomia,
-fatoresHumanos
-);
-
-}
-
-function salvarHistorico(
-resultado,
-pontos,
-ergonomia,
-fatoresHumanos
-){
-
-
-let lista =
-JSON.parse(
-localStorage.getItem("historicoErgo")
-|| "[]"
-);
-
-lista.unshift({
-
-data:new Date().toLocaleString(),
-
-atividade:
-document.getElementById(
-"atividade"
-).value,
-
-funcao:
-document.getElementById(
-"funcao"
-).value,
-
-resultado:resultado,
-pontos:pontos,
-ergonomia:ergonomia,
-fatoresHumanos:fatoresHumanos,
-
-unidade:
-document.getElementById(
-"unidade"
-).value,
-
-
-area:
-document.getElementById(
-"area"
-).value,
-
-local:
-document.getElementById(
-"local"
-).value,
-
-avaliador:
-document.getElementById(
-"avaliador"
-).value,
-
-
-});
-
-localStorage.setItem(
-"historicoErgo",
-JSON.stringify(lista)
-);
-
-carregarHistorico();
-
-}
-
-function carregarHistorico(){
-
-let lista =
-JSON.parse(
-localStorage.getItem("historicoErgo")
-|| "[]"
-);
-
-let html="";
-
-html += `
-<button onclick="limparHistorico()"
-style="
-background:#c62828;
-margin-bottom:15px;
-">
-Limpar Histórico
-</button>
-`;
-
-lista.forEach(item=>{
-
-html+=`
-<div class="itemHistorico">
-
-<b>${item.atividade}</b><br><br>
-
-Unidade: ${item.unidade}<br>
-Área: ${item.area}<br>
-Local: ${item.local}<br><br>
-
-Função: ${item.funcao}<br>
-Avaliador: ${item.avaliador}<br><br>
-
-Ergonomia: ${item.ergonomia} pontos<br>
-Fatores Humanos: ${item.fatoresHumanos} pontos<br>
-Pontuação Total: ${item.pontos} pontos<br><br>
-
-${item.resultado}<br><br>
-
-${item.data}
-
-</div>
-`;
-
-
-
-});
-
-document.getElementById(
-"historico"
-).innerHTML=html;
-
-}
-function limparHistorico(){
-
-if(confirm("Deseja apagar todo o histórico?")){
-
-localStorage.removeItem(
-"historicoErgo"
-);
-
-carregarHistorico();
-
-}
-
-}
-let fotoBase64 = "";
-
- document.getElementById("foto").addEventListener("change", function(event){
-
-
-  const arquivo = event.target.files[0];
-  if (!arquivo) return;
-
-  const leitor = new FileReader();
-
-  leitor.onload = function(e){
-    fotoBase64 = e.target.result;
-
-    let preview = document.getElementById("previewFotoJS");
-    if (!preview) {
-      preview = document.createElement("img");
-      preview.id = "previewFotoJS";
-      preview.style.maxWidth = "100%";
-      preview.style.borderRadius = "10px";
-      preview.style.marginTop = "10px";
-      document.getElementById("foto").after(preview);
+const PRIOS = ["Baixa","Média","Alta","Imediata"];
+const STATUS = ["Aberta","Em andamento","Concluída"];
+const CONTROLES = [
+  "Eliminar o perigo / fator",
+  "Substituir (processo, material, ferramenta)",
+  "Engenharia / organização do trabalho",
+  "Administrativo (procedimento, treino, rodízio)",
+  "EPI / apoio individual"
+];
+const GRAVIDADES = ["Leve (sem afastamento)","Moderada (lesão leve / retrabalho)","Grave (afastamento / dano relevante)","Muito grave (lesão severa / dano crítico)"];
+const EXPOSICOES = ["Menos de 2 h","2 a 4 h","4 a 6 h","Mais de 6 h"];
+
+const DOMINIOS = [
+{ id:"fis", grupo:"erg", ico:"🦾", nome:"Ergonomia física", curto:"Física",
+  pergunta:"A atividade impõe carga biomecânica que pode causar dor, desconforto ou lesão?",
+  desfecho:["Saúde musculoesquelética"],
+  ref:"ISO 11226, ISO 11228 (1-3), NIOSH, OCRA, RULA/REBA, NR-17",
+  aprofundar:"REBA/RULA (postura), NIOSH/ISO 11228-1 (cargas), OCRA/ISO 11228-3 (repetitividade)",
+  itens:[
+  {id:"f1",t:"Tronco e pescoço",d:"Observe inclinação, torção e flexão do pescoço durante o ciclo de trabalho.",
+   c:["Posição neutra: tronco ereto e cabeça alinhada",
+      "Inclinação ou torção leve, ocasional (menos de 1/3 do tempo)",
+      "Flexão do tronco acima de ~20°, torção ou pescoço fletido por 1/3 a 2/3 do tempo",
+      "Flexão acima de ~60°, tronco torcido/inclinado ou pescoço muito fletido por mais de 2/3 do tempo, ou posição mantida sem apoio"]},
+  {id:"f2",t:"Ombros e braços",d:"Altura das mãos em relação ao ombro e distância do corpo.",
+   c:["Braços junto ao corpo, cotovelos apoiados, trabalho na altura do tronco",
+      "Elevação ou afastamento do braço ocasional (menos de 1/3 do tempo)",
+      "Mãos na altura ou acima dos ombros, ou braços afastados do corpo por 1/3 a 2/3 do tempo",
+      "Braços elevados acima dos ombros ou longe do corpo por mais de 2/3 do tempo, sem apoio"]},
+  {id:"f3",t:"Punhos e mãos",d:"Desvio do punho, tipo de pega e adequação da ferramenta à mão.",
+   c:["Punho neutro, pega confortável, sem pinça fina",
+      "Desvio leve do punho ou pega em pinça ocasional",
+      "Desvio do punho, pinça ou ferramenta mal ajustada com frequência",
+      "Desvio acentuado do punho, pinça forçada ou ferramenta inadequada à mão de forma predominante"]},
+  {id:"f4",t:"Pernas, pés e posição geral",d:"Em pé, sentado, agachado: duração e possibilidade de alternar.",
+   c:["Alterna posturas livremente; apoio de pés/assento adequado",
+      "Posição fixa por períodos curtos (até ~30 min) com apoio razoável",
+      "Em pé parado ou sentado sem bom apoio por 30 a 60 min, ou agachar/ajoelhar com frequência",
+      "Permanência estática acima de 1 h, agachado/ajoelhado ou sem possibilidade de alternar"]},
+  {id:"f5",t:"Repetitividade",d:"Ciclos curtos (menos de ~30 s) ou o mesmo gesto repetido ao longo da jornada.",
+   c:["Tarefas variadas, sem ciclos repetitivos relevantes",
+      "Ciclos repetitivos curtos apenas de forma ocasional",
+      "Ciclo repetitivo curto ou o mesmo gesto por 1/3 a 2/3 da jornada",
+      "Mesmo gesto ou ciclo muito curto por mais de 2/3 da jornada, sem variação"]},
+  {id:"f6",t:"Força e esforço físico",d:"Empurrar, puxar, apertar, segurar. Pergunte ao trabalhador (escala de Borg ajuda).",
+   c:["Esforço leve, sem uso de força perceptível",
+      "Esforço leve a moderado e ocasional",
+      "Esforço moderado frequente (empurrar, puxar, apertar com força perceptível)",
+      "Esforço intenso, de pico ou sustentado; trabalhador o descreve como muito pesado"]},
+  {id:"f7",t:"Manuseio de cargas",d:"Peso, frequência, distância do corpo, altura de pega e deposição.",
+   c:["Sem levantamento ou transporte manual relevante",
+      "Cargas leves, perto do corpo e ocasionais",
+      "Cargas moderadas, frequentes, ou pega afastada do corpo / abaixo do joelho / acima do ombro",
+      "Cargas próximas ou acima do limite de referência (NIOSH), frequentes, assimétricas ou de difícil pega"]},
+  {id:"f8",t:"Recuperação e pausas",d:"Pausas, rodízio e variação de tarefas ao longo do turno.",
+   c:["Pausas e rodízio suficientes; o ritmo permite recuperar",
+      "Pausas existem, mas pouco aproveitáveis em alguns momentos",
+      "Pausas insuficientes ou irregulares; pouca variação entre tarefas",
+      "Sem pausas efetivas nem rodízio; exposição contínua em turno longo ou com horas extras"]}
+  ]},
+{ id:"amb", grupo:"erg", ico:"🌡️", nome:"Ambiente de trabalho", curto:"Ambiente",
+  pergunta:"As condições físicas do ambiente e do posto favorecem ou prejudicam a execução e o conforto?",
+  desfecho:["Saúde e conforto"],
+  ref:"NR-15, NR-17, NHO (Fundacentro), ISO 7730, ABNT NBR ISO/CIE 8995-1",
+  aprofundar:"Medições quantitativas: dosimetria de ruído, IBUTG, luxímetro e avaliação de vibração (NHO/Fundacentro, NR-15)",
+  itens:[
+  {id:"a1",t:"Iluminação e ofuscamento",d:"Adequação à tarefa (precisão visual), sombras e reflexos.",
+   c:["Adequada à tarefa, sem sombras nem reflexos",
+      "Pequenas deficiências localizadas",
+      "Insuficiente para tarefa de precisão, ou sombras e reflexos frequentes",
+      "Muito insuficiente ou ofuscamento severo; o trabalhador força a visão ou muda de postura para enxergar"]},
+  {id:"a2",t:"Ruído",d:"Pergunte se é possível conversar sem elevar a voz.",
+   c:["Conversa normal possível; ruído baixo",
+      "Ruído perceptível, sem dificuldade para se comunicar",
+      "É preciso elevar a voz a ~1 m, ou há ruído intermitente alto",
+      "Comunicação inviável sem gritar ou ruído de impacto; confirmar com avaliação quantitativa (dosimetria)"]},
+  {id:"a3",t:"Ambiente térmico",d:"Calor, frio, fontes radiantes, ventilação e hidratação.",
+   c:["Conforto térmico",
+      "Desconforto leve e ocasional",
+      "Calor ou frio frequentes com desconforto ou suor intenso; ventilação/hidratação aquém do ideal",
+      "Calor ou frio extremo, fontes radiantes ou sintomas relatados; confirmar com avaliação quantitativa (IBUTG)"]},
+  {id:"a4",t:"Vibração",d:"Ferramentas manuais, veículos, pisos ou máquinas.",
+   c:["Sem exposição perceptível a vibração",
+      "Vibração ocasional e leve",
+      "Vibração frequente (ferramenta, veículo, piso) em parte relevante da jornada",
+      "Vibração intensa ou contínua (mão-braço ou corpo inteiro); confirmar com avaliação quantitativa"]},
+  {id:"a5",t:"Layout, espaço e acessos",d:"Alturas, alcances, ajustes do posto e circulação.",
+   c:["Espaço livre, alcances confortáveis, alturas adequadas, circulação desobstruída",
+      "Pequenas inadequações sem efeito na postura",
+      "Alcances ou alturas obrigam a posturas inadequadas; espaço apertado",
+      "Posto sem ajuste, espaço confinado ou acesso difícil que força posturas extremas ou improvisos"]}
+  ]},
+{ id:"cog", grupo:"erg", ico:"🧠", nome:"Carga cognitiva", curto:"Cognitiva",
+  pergunta:"Qual é a demanda mental da atividade e ela é compatível com o tempo e a informação disponíveis?",
+  desfecho:["Fadiga mental","Desempenho"],
+  ref:"ISO 10075, NASA-TLX (dimensões), Rasmussen (habilidade-regra-conhecimento), IEA (ergonomia cognitiva)",
+  aprofundar:"NASA-TLX, análise da atividade com observação e verbalização, ISO 10075",
+  itens:[
+  {id:"c1",t:"Atenção e vigilância sustentada",d:"Tempo contínuo exigindo atenção e consequência de um lapso.",
+   c:["Atenção comum, com pausas naturais",
+      "Atenção focada por períodos curtos",
+      "Atenção contínua por períodos longos ou monitoramento de vários pontos",
+      "Vigilância ininterrupta de eventos raros ou críticos; um lapso tem consequência imediata"]},
+  {id:"c2",t:"Complexidade e tomada de decisão",d:"Variáveis, exceções às regras e incerteza.",
+   c:["Tarefa simples e rotineira, decisões previsíveis",
+      "Algumas decisões simples, com regras claras",
+      "Decisões frequentes com várias variáveis ou regras com exceções",
+      "Decisões complexas sob incerteza ou pressão, sem regras claras ou apoio"]},
+  {id:"c3",t:"Informação, sinalização e interfaces",d:"Painéis, telas, etiquetas, comandos e alarmes.",
+   c:["Informação clara, no momento certo; comandos intuitivos",
+      "Pequenas dificuldades de leitura ou entendimento",
+      "Informação excessiva ou ambígua; comandos ou sinais fáceis de confundir",
+      "Informação ausente, contraditória ou ilegível; comandos que induzem ao erro"]},
+  {id:"c4",t:"Interrupções e multitarefa",d:"Frequência de interrupções e dificuldade de retomar a sequência.",
+   c:["Trabalho sem interrupções relevantes",
+      "Interrupções ocasionais, retomada fácil",
+      "Interrupções frequentes ou alternância de tarefas que quebra a sequência",
+      "Interrupções constantes em etapas críticas; difícil retomar do ponto certo"]},
+  {id:"c5",t:"Monotonia ou subcarga",d:"Tarefa pouco estimulante que exige manter-se alerta.",
+   c:["Trabalho com variedade e sentido",
+      "Períodos curtos de monotonia",
+      "Tarefa monótona por longos períodos, com risco de desatenção",
+      "Monotonia extrema exigindo alerta; sonolência ou desligamento relatados"]},
+  {id:"c6",t:"Fadiga mental percebida",d:"Pergunte ao trabalhador como se sente ao longo do turno.",
+   c:["Sem relato de cansaço mental",
+      "Cansaço leve ao final da jornada",
+      "Cansaço mental frequente ao longo do turno",
+      "Fadiga mental intensa, com perda de concentração ou erros relatados"]}
+  ]},
+{ id:"org", grupo:"fh", ico:"🏭", nome:"Organização do trabalho", curto:"Organização",
+  pergunta:"A organização do trabalho dá condições para executar com segurança e qualidade, sem sobrecarga?",
+  desfecho:["Desempenho e segurança","Saúde psicossocial"],
+  ref:"SEIPS 3.0 (Carayon), modelo demanda-controle (Karasek), JD-R, ISO 45003, NR-1 (GRO)",
+  aprofundar:"Questionários psicossociais validados (COPSOQ, JD-R), análise da organização do trabalho e do GRO (NR-1)",
+  itens:[
+  {id:"o1",t:"Pressão de tempo e ritmo",d:"Prazos, metas e folga para absorver imprevistos.",
+   c:["Prazos e ritmo compatíveis, com folga para ajustes",
+      "Picos ocasionais de ritmo",
+      "Ritmo frequentemente acima do confortável; metas apertadas",
+      "Ritmo imposto e contínuo, sem folga; as metas induzem atalhos"]},
+  {id:"o2",t:"Dimensionamento e cobertura da equipe",d:"Pessoas suficientes, inclusive em férias e faltas.",
+   c:["Equipe e cobertura adequadas, inclusive em ausências",
+      "Cobertura apertada em situações pontuais",
+      "Falta de pessoal recorrente ou acúmulo de funções",
+      "Subdimensionamento crônico; a atividade é feita com pessoas ou habilidades insuficientes"]},
+  {id:"o3",t:"Jornada, turnos e descanso",d:"Horas extras, turnos noturnos/rotativos e intervalo entre turnos.",
+   c:["Jornada regular, intervalos e descansos respeitados",
+      "Hora extra ou turno atípico ocasional",
+      "Turnos noturnos/rotativos ou horas extras frequentes",
+      "Jornadas longas, descanso insuficiente entre turnos ou horas extras em sequência"]},
+  {id:"o4",t:"Comunicação e passagem de turno",d:"Fluxo de informação entre pessoas, áreas e turnos.",
+   c:["Fluxo claro; passagem de turno estruturada e registrada",
+      "Falhas ocasionais, sem efeito relevante",
+      "Informações se perdem ou chegam tarde; passagem de turno informal",
+      "Falha de comunicação em pontos críticos; ordens contraditórias ou sem passagem de turno"]},
+  {id:"o5",t:"Apoio da liderança e da equipe",d:"Facilidade de pedir ajuda e de relatar problemas.",
+   c:["Há apoio; os trabalhadores relatam problemas e pedem ajuda sem receio",
+      "Apoio existe, mas varia entre pessoas ou momentos",
+      "Apoio limitado; relatar problemas nem sempre é bem recebido",
+      "Ausência de apoio ou receio de represália ao relatar"]},
+  {id:"o6",t:"Autonomia e controle sobre o trabalho",d:"Margem para decidir ritmo, método e sequência.",
+   c:["O trabalhador influencia ritmo, método e sequência",
+      "Autonomia parcial, com poucas restrições",
+      "Pouca margem para ajustar ritmo ou método",
+      "Nenhum controle sobre ritmo ou método, combinado a alta demanda"]},
+  {id:"o7",t:"Recursos, ferramentas e materiais",d:"Disponibilidade, estado e localização.",
+   c:["Recursos disponíveis, em bom estado e no lugar certo",
+      "Faltas ocasionais, resolvidas rapidamente",
+      "Recursos frequentemente faltam, estão quebrados ou inadequados",
+      "Insuficiência crônica; o trabalho depende de improviso"]},
+  {id:"o8",t:"Treinamento e competência para a tarefa",d:"Formação, prática supervisionada e atualização.",
+   c:["Treinamento adequado, atualizado e com prática supervisionada",
+      "Pequenas lacunas, cobertas por orientação",
+      "Treinamento incompleto ou desatualizado; aprende na prática, sem estrutura",
+      "Sem treinamento formal para tarefa crítica; novatos sem acompanhamento"]}
+  ]},
+{ id:"wad", grupo:"fh", ico:"🔍", nome:"Trabalho prescrito × real e confiabilidade", curto:"Prescrito×real",
+  pergunta:"O trabalho como está prescrito é o trabalho que se consegue fazer? O sistema tolera e aprende com a variabilidade e o erro?",
+  desfecho:["Desempenho e segurança"],
+  ref:"Ergonomia da atividade (Guérin, Daniellou), Safety-II (Hollnagel), Reason, SPAR-H/HEART (fatores de desempenho)",
+  aprofundar:"Análise do trabalho real (AET/NR-17), análise hierárquica de tarefas, SPAR-H/HEART, análise de eventos sob a ótica Safety-II",
+  itens:[
+  {id:"w1",t:"Executabilidade do procedimento",d:"O procedimento escrito é executável nas condições reais?",
+   c:["O procedimento escrito é executável como está, nas condições reais",
+      "Diferenças pequenas, sem efeito",
+      "Passos frequentemente inviáveis ou incompletos nas condições reais",
+      "Procedimento inexecutável ou desatualizado; só se faz de outro jeito"]},
+  {id:"w2",t:"Clareza e acesso às instruções",d:"Instruções legíveis, atualizadas e disponíveis no ponto de uso.",
+   c:["Claras, atualizadas e acessíveis no ponto de uso",
+      "Pequenas dúvidas, resolvidas rapidamente",
+      "Ambíguas, longas ou difíceis de encontrar durante a tarefa",
+      "Inexistentes ou contraditórias; cada um faz de um jeito"]},
+  {id:"w3",t:"Variabilidade das condições e da tarefa",d:"Material, equipamento, demanda e clima mudam com frequência?",
+   c:["Condições estáveis e previsíveis",
+      "Variações ocasionais, previstas no procedimento",
+      "Variações frequentes (material, equipamento, demanda), pouco previstas",
+      "Condições muito variáveis e imprevisíveis; exige improvisar o tempo todo"]},
+  {id:"w4",t:"Adaptações e atalhos necessários",d:"O que as pessoas fazem para 'dar conta' e por quê.",
+   c:["Não há adaptações para dar conta da tarefa",
+      "Ajustes pontuais e seguros",
+      "Adaptações frequentes para compensar falhas do sistema",
+      "Atalhos ou improvisos rotineiros, tolerados ou incentivados, com exposição a risco"]},
+  {id:"w5",t:"Tolerância a erro e barreiras",d:"Detecção e recuperação do erro antes do dano; verificação independente.",
+   c:["Erros são detectados e corrigidos antes de causar dano; há barreiras e verificação",
+      "Barreiras existem, com pontos pouco protegidos",
+      "Poucos mecanismos de detecção; o resultado depende da atenção individual",
+      "Um erro simples leva a consequência grave; sem barreiras nem verificação independente"]},
+  {id:"w6",t:"Aprendizado organizacional",d:"Registro e análise de desvios, quase-acidentes e incidentes.",
+   c:["Desvios e quase-acidentes são registrados, analisados e retornam às equipes",
+      "Há registro, com retorno irregular",
+      "Poucos relatos; pouca análise ou melhoria resultante",
+      "Ocorrências recorrentes sem análise de causas nem ação; foco em culpar pessoas"]}
+  ]}
+];
+const ITENS = {};
+DOMINIOS.forEach(d=>d.itens.forEach(q=>{ITENS[q.id]={...q,dom:d.id}}));
+const TOTAL_ITENS = Object.keys(ITENS).length;
+
+/* =====================================================================
+   PONTUAÇÃO — por domínio, sem soma global
+   ===================================================================== */
+function nivelDaMedia(m){return m<0.5?0:m<1.5?1:m<2.25?2:3}
+function valorItem(resp,id){const r=resp[id];return r&&typeof r.n==="number"?r.n:null}
+
+function calcular(resp){
+  const doms=DOMINIOS.map(d=>{
+    const vals=d.itens.map(q=>valorItem(resp,q.id)).filter(v=>v!==null);
+    const total=d.itens.length;
+    const insuf=vals.length<Math.ceil(total/2);
+    let media=null,nivel=null,elevado=false;
+    const n3=vals.filter(v=>v===3).length;
+    if(!insuf){
+      media=vals.reduce((a,b)=>a+b,0)/vals.length;
+      nivel=nivelDaMedia(media);
+      // regra anti-diluição: um item Alto garante ao menos nível Alta; três itens Altos, Crítica
+      const piso=n3>=3?3:n3>=1?2:0;
+      if(piso>nivel){nivel=piso;elevado=true}
     }
-    preview.src = fotoBase64;
-  };
-
-  leitor.readAsDataURL(arquivo);
-});
-const URL_IA = "https://ergocontexto-ia.raul-almeida-siqueira.workers.dev/api/ergo";
-let analiseIA = "";
-
-async function analisarComIA(){
-  const caixa = document.getElementById("analiseIA");
-  const botao = document.getElementById("btnIA");
-  let erg = 0, fh = 0;
-  const respostas = perguntas.map((p, i) => {
-    const v = Number(document.getElementById("q" + i).value);
-    if (i < 10) erg += v; else fh += v;
-    const o = document.getElementById("obs" + i);
-    return { n: i + 1, pergunta: p, resposta: opcoes[v], observacao: o ? o.value.trim() : "" };
+    return {id:d.id,media,nivel,elevado,respondidos:vals.length,total,insuf,n3};
   });
-  const total = erg + fh, media = total / 20;
-  const classe = media < 0.5 ? "Baixa" : media < 1.5 ? "Moderada" : media < 2.25 ? "Alta" : "Crítica";
-  const dados = {
-    atividade: document.getElementById("atividade").value,
-    funcao: document.getElementById("funcao").value,
-    ergonomia: erg, fatoresHumanos: fh, total: total,
-    media: media.toFixed(2), classificacao: classe,
-    observacoesGerais: document.getElementById("obs").value,
-    respostas: respostas
-  };
-  botao.disabled = true;
-  botao.textContent = "⏳ Analisando...";
-  try {
-    const r = await fetch(URL_IA, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(dados) });
-    const j = await r.json();
-    if (!r.ok || !j.analise) throw new Error();
-    analiseIA = j.analise;
-    caixa.innerHTML = '<div class="card" style="margin:15px 0"><h3>🤖 Análise assistida por IA</h3><div id="txtIA" style="white-space:pre-wrap;line-height:1.5"></div><small>Sugestões para validação do avaliador. Não alteram pontuação nem classificação.</small><button style="background:#E46F2A" onclick="copiarIA()">Copiar sugestões para o plano de ação</button></div>';
-    document.getElementById("txtIA").textContent = analiseIA;
-  } catch (e) {
-    caixa.textContent = "Não foi possível gerar a análise. Verifique a internet e tente novamente.";
-  } finally {
-    botao.disabled = false;
-    botao.textContent = "🤖 Analisar com IA";
+  const validos=doms.filter(x=>!x.insuf);
+  const pior=validos.length?Math.max(...validos.map(x=>x.nivel)):null;
+  const resp_=doms.reduce((a,x)=>a+x.respondidos,0);
+  return {doms,pior,respondidos:resp_,total:TOTAL_ITENS};
+}
+
+function prioridadeSugerida(calc,ctx){
+  if(calc.pior===null)return {prio:null,porGravidade:false};
+  let p=calc.pior,porGravidade=false;
+  const grav=ctx.gravidade===""||ctx.gravidade==null?null:Number(ctx.gravidade);
+  const fhMax=Math.max(-1,...calc.doms.filter(x=>!x.insuf&&DOMINIOS.find(d=>d.id===x.id).grupo==="fh").map(x=>x.nivel));
+  if(grav!==null&&grav>=2&&fhMax>=2&&p<3){p+=1;porGravidade=true}
+  return {prio:p,porGravidade};
+}
+
+function itensAtencao(resp,min=2){
+  const out=[];
+  DOMINIOS.forEach(d=>d.itens.forEach(q=>{const n=valorItem(resp,q.id);if(n!==null&&n>=min)out.push({dom:d,q,n})}));
+  return out.sort((a,b)=>b.n-a.n);
+}
+
+/* =====================================================================
+   UTILITÁRIOS
+   ===================================================================== */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const hojeISO=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const fmtData=iso=>iso?iso.split("-").reverse().join("/"):"";
+const fmtDH=ts=>ts?new Date(ts).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"";
+const fmtMedia=m=>m===null||m===undefined?"—":m.toFixed(2).replace(".",",");
+const norm=s=>String(s||"").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+const gerarId=()=>"ERG-"+hojeISO().replace(/-/g,"")+"-"+Math.random().toString(36).slice(2,6).toUpperCase();
+const itemBadge=n=>`<span class="bd n${n}">${ROT_ITEM[n]}</span>`;
+const badge=n=>n===null||n===undefined?'<span class="bd nd">Dados insuficientes</span>':`<span class="bd n${n}">${NIVEIS[n].ico} ${NIVEIS[n].curto}</span>`;
+const lerJSON=(k,pad)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):pad}catch(e){return pad}};
+function gravarJSON(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
+
+/* =====================================================================
+   ESTADO E ARMAZENAMENTO
+   ===================================================================== */
+const CH_LISTA="ergocontexto_v2_avaliacoes", CH_RASC="ergocontexto_v2_rascunho";
+let lista=lerJSON(CH_LISTA,[]);
+let estado=novoEstado();
+
+function novoEstado(base){
+  return {id:gerarId(),criadoEm:null,passo:0,fase:"wizard",
+    ctx:Object.assign({unidade:"",area:"",local:"",atividade:"",funcao:"",avaliador:"",data:hojeISO(),gravidade:"",exposicao:"",obs:""},base||{}),
+    resp:{},dom:{},acoes:[],ia:"",foto:""};
+}
+function salvarLista(){
+  if(!gravarJSON(CH_LISTA,lista)){
+    // cota cheia: tenta liberar espaço removendo fotos das avaliações antigas
+    const copia=lista.map((a,i)=>i===0?a:{...a,foto:""});
+    if(gravarJSON(CH_LISTA,copia)){lista=copia;aviso("Armazenamento quase cheio: fotos de avaliações antigas foram removidas. Faça um backup em Histórico.")}
+    else aviso("Não foi possível salvar. Exporte um backup em Histórico e libere espaço.");
   }
 }
-
-function copiarIA(){
-  const ini = analiseIA.indexOf("SUGESTÕES DE AÇÃO:");
-  const fim = analiseIA.indexOf("NECESSIDADE DE AVALIAÇÃO");
-  let t = analiseIA;
-  if (ini >= 0) t = analiseIA.substring(ini + 18, fim > ini ? fim : undefined).trim();
-  const c = document.getElementById("acao");
-  c.value = (c.value ? c.value + "\n" : "") + t;
-  c.focus();
+let tmrSalvar=null;
+function agendarSalvar(){clearTimeout(tmrSalvar);tmrSalvar=setTimeout(salvarRascunho,500)}
+function salvarRascunho(){
+  if(estado.fase!=="wizard")return;
+  if(!rascunhoSujo())return;
+  if(!gravarJSON(CH_RASC,estado)){const s={...estado,foto:""};gravarJSON(CH_RASC,s)}
+}
+function rascunhoSujo(){
+  const c=estado.ctx;
+  return Object.keys(estado.resp).length>0||estado.acoes.length>0||c.atividade||c.local||c.unidade||c.area||c.funcao||c.avaliador||c.obs||estado.foto;
+}
+function aviso(msg){
+  const el=document.createElement("div");
+  el.className="alerta no-print";el.textContent=msg;
+  el.style.cssText="position:fixed;left:10px;right:10px;top:90px;z-index:50;max-width:600px;margin:auto;box-shadow:0 4px 14px rgba(0,0,0,.25)";
+  document.body.appendChild(el);setTimeout(()=>el.remove(),5500);
 }
 
+/* =====================================================================
+   NAVEGAÇÃO
+   ===================================================================== */
+function irPara(v){
+  $$(".view").forEach(s=>s.classList.toggle("on",s.id==="v-"+v));
+  $$("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  if(v==="historico")renderHistorico();
+  if(v==="painel")renderPainel();
+  if(v==="sobre")renderSobre();
+  if(v==="avaliar")render();
+  else $("#rodape").hidden=true;
+  window.scrollTo(0,0);
+}
+
+/* =====================================================================
+   WIZARD
+   ===================================================================== */
+const PASSOS=["Contexto",...DOMINIOS.map(d=>d.id),"Plano"];
+function render(){
+  renderBanner();
+  if(estado.fase==="resultado"){renderResultado();$("#rodape").hidden=true;return}
+  const palco=$("#palco");
+  palco.innerHTML=htmlChips()+htmlPasso();
+  atualizarProgresso();
+  renderRodape();
+}
+function htmlChips(){
+  const chips=PASSOS.map((p,i)=>{
+    const d=DOMINIOS.find(x=>x.id===p);
+    const ico=i===0?"📋":p==="Plano"?"✅":d.ico;
+    const rot=i===0?"Contexto":p==="Plano"?"Plano":d.curto;
+    return `<button class="chip${i===estado.passo?" on":""}" data-acao="passo" data-i="${i}" ${i===estado.passo?'aria-current="step"':""}><span class="ci">${ico}</span><span>${esc(rot)}</span>${d?`<small data-prog="${d.id}"></small>`:"<small>&nbsp;</small>"}</button>`;
+  }).join("");
+  return `<div class="chips no-print" role="navigation" aria-label="Etapas">${chips}</div>`;
+}
+function atualizarProgresso(){
+  DOMINIOS.forEach(d=>{
+    const n=d.itens.filter(q=>estado.resp[q.id]&&estado.resp[q.id].n!==null&&estado.resp[q.id].n!==undefined).length;
+    $$(`[data-prog="${d.id}"]`).forEach(el=>{el.textContent=`${n}/${d.itens.length}`;el.closest(".chip")?.classList.toggle("ok",n===d.itens.length)});
+  });
+}
+function htmlPasso(){
+  const p=PASSOS[estado.passo];
+  if(p==="Contexto")return htmlContexto();
+  if(p==="Plano")return htmlPlano();
+  return htmlDominio(DOMINIOS.find(d=>d.id===p));
+}
+function bind(path,tipo,extra=""){
+  const v=path.split(".").reduce((o,k)=>o&&o[k],estado);
+  return `data-bind="${path}" ${tipo==="date"?'type="date"':""} value="${esc(v)}" ${extra}`;
+}
+function selectBind(path,opcoes,vazio){
+  const v=path.split(".").reduce((o,k)=>o&&o[k],estado);
+  return `<select data-bind="${path}"><option value="">${esc(vazio)}</option>${opcoes.map((o,i)=>`<option value="${i}" ${String(v)===String(i)?"selected":""}>${esc(o)}</option>`).join("")}</select>`;
+}
+function htmlContexto(){
+  return `
+  <div class="card">
+    <div class="aviso">⚠️ Ferramenta de <b>triagem</b> ergonômica e de fatores humanos. Não substitui análise ergonômica formal (AET), avaliação especializada nem medições quantitativas.</div>
+    <h2 style="margin-top:14px">Contexto da avaliação</h2>
+    <div class="grid2">
+      <div><label class="campo">Unidade<input ${bind("ctx.unidade")}></label></div>
+      <div><label class="campo">Área<input ${bind("ctx.area")}></label></div>
+      <div><label class="campo">Local / posto<input ${bind("ctx.local")}></label></div>
+      <div><label class="campo">Data<input ${bind("ctx.data","date")}></label></div>
+      <div><label class="campo">Atividade avaliada<input ${bind("ctx.atividade")} placeholder="Ex.: abastecimento manual da linha 3"></label></div>
+      <div><label class="campo">Função<input ${bind("ctx.funcao")}></label></div>
+      <div><label class="campo">Avaliador<input ${bind("ctx.avaliador")}></label></div>
+      <div><label class="campo">Tempo de exposição na jornada${selectBind("ctx.exposicao",EXPOSICOES,"Não informado")}</label></div>
+    </div>
+    <label class="campo">Gravidade potencial de uma falha nesta atividade
+      ${selectBind("ctx.gravidade",GRAVIDADES,"Não informada")}
+    </label>
+    <small>Usada para elevar a prioridade quando os fatores humanos estão em nível Alto ou Crítico. Não altera a pontuação.</small>
+    <label class="campo">Foto da atividade (opcional)
+      <input type="file" id="foto" accept="image/*">
+    </label>
+    <small>📸 Tire uma foto ou escolha da galeria. Evite rostos identificáveis.</small>
+    <div id="fotoBox">${estado.foto?`<img class="foto-rel" src="${esc(estado.foto)}" alt="Foto da atividade"><button class="btn sec peq" data-acao="rmfoto">Remover foto</button>`:""}</div>
+  </div>
+  <div class="card">
+    <h3>Como funciona</h3>
+    <p class="mut" style="font-size:.9rem">São 5 domínios, avaliados <b>separadamente</b>, cada um com critérios objetivos por nível. Não existe nota total: o resultado é um perfil, e o domínio mais crítico define a prioridade. Itens que você não observou podem ficar como <i>não avaliado</i>.</p>
+    <p class="mut" style="font-size:.9rem">Marque também a <b>fonte</b> de cada resposta (observado, relatado pelo trabalhador ou estimado). Isso mostra a confiança dos dados.</p>
+  </div>`;
+}
+function htmlDominio(d){
+  const idx=DOMINIOS.indexOf(d);
+  const itens=d.itens.map((q,i)=>{
+    const r=estado.resp[q.id]||{};
+    const n=r.n;
+    const op=[0,1,2,3].map(k=>`<label class="opt n${k}"><input type="radio" name="r_${q.id}" value="${k}" ${n===k?"checked":""}><span class="otx"><b>${ROT_ITEM[k]}</b>${esc(q.c[k])}</span></label>`).join("");
+    const na=`<label class="opt na"><input type="radio" name="r_${q.id}" value="na" ${n==="na"?"checked":""}><span>Não se aplica / não avaliado</span></label>`;
+    const ev=["Observado","Relatado","Estimado"].map(e=>`<label><input type="radio" name="e_${q.id}" value="${e}" ${r.ev===e?"checked":""}>${e}</label>`).join("");
+    return `<fieldset class="item" style="min-width:0"><legend><span class="num">${i+1}</span>${esc(q.t)}</legend>
+      <p class="dica">${esc(q.d)}</p>${op}${na}
+      <div class="ev"><span>Fonte:</span>${ev}</div>
+      <details class="nota" ${r.obs?"open":""}><summary>＋ Observação</summary><textarea data-obs="${q.id}" placeholder="O que você viu ou ouviu">${esc(r.obs||"")}</textarea></details>
+    </fieldset>`;
+  }).join("");
+  const dm=estado.dom[d.id]||{};
+  const percOp=["Sem incômodo","Pouco incômodo","Incômodo moderado","Muito incômodo"];
+  return `
+  <div class="card domhead">
+    <span class="tag">${esc(GRUPOS[d.grupo])}</span>${d.desfecho.map(x=>`<span class="tag">${esc(x)}</span>`).join("")}
+    <h2>${d.ico} ${idx+1}. ${esc(d.nome)}</h2>
+    <p>${esc(d.pergunta)}</p>
+    <small>Referências: ${esc(d.ref)}</small>
+  </div>
+  ${itens}
+  <div class="card">
+    <h3>Visão dos trabalhadores e fatores de proteção</h3>
+    <label class="campo">Como os trabalhadores percebem este aspecto do trabalho?
+      <select data-dom="${d.id}.perc"><option value="">Não coletada</option>${percOp.map((o,i)=>`<option value="${i}" ${String(dm.perc)===String(i)?"selected":""}>${o}</option>`).join("")}</select>
+    </label>
+    <label class="campo">O que sustenta o trabalho aqui? (fatores de proteção, boas práticas)
+      <textarea data-dom="${d.id}.prot" placeholder="Ex.: rodízio informal que funciona, equipe experiente, ferramenta bem ajustada">${esc(dm.prot||"")}</textarea>
+    </label>
+  </div>`;
+}
+function htmlPlano(){
+  const sug=itensAtencao(estado.resp).slice(0,8);
+  const sugHtml=sug.length?sug.map(s=>`<div class="sug"><span>${itemBadge(s.n)} <b>${esc(s.q.t)}</b><br><small>${esc(s.dom.nome)}</small></span><button class="btn sec peq" data-acao="acao-de-item" data-q="${s.q.id}">＋ Criar ação</button></div>`).join(""):`<p class="mut">Nenhum item com nível Moderada ou Alta até agora.</p>`;
+  return `
+  <div class="card">
+    <h2>✅ Plano de ação</h2>
+    <p class="mut" style="font-size:.9rem">Priorize pela hierarquia de controles: quanto mais acima (eliminar, substituir, engenharia), mais robusta a ação. Treinamento e EPI, sozinhos, são os controles mais fracos.</p>
+    <h3 style="margin-top:12px">Itens que pedem atenção</h3>${sugHtml}
+    <h3 style="margin-top:16px">Ações</h3>
+    <div id="listaAcoes">${estado.acoes.map((a,i)=>htmlAcao(a,i)).join("")||'<p class="mut">Nenhuma ação ainda.</p>'}</div>
+    <button class="btn sec" data-acao="nova-acao">＋ Adicionar ação</button>
+  </div>
+  <div class="card">
+    <label class="campo" style="margin-top:0">Observações gerais<textarea data-bind="ctx.obs"></textarea></label>
+  </div>`;
+}
+function htmlAcao(a,i){
+  const optDom=`<option value="">Geral</option>`+DOMINIOS.map(d=>`<option value="${d.id}" ${a.dom===d.id?"selected":""}>${esc(d.nome)}</option>`).join("");
+  const sel=(arr,v,campo)=>`<select data-ac="${i}.${campo}">${arr.map(x=>`<option ${x===v?"selected":""}>${esc(x)}</option>`).join("")}</select>`;
+  const tipo=`<option value="">Tipo de controle</option>`+CONTROLES.map(c=>`<option ${a.tipo===c?"selected":""}>${esc(c)}</option>`).join("");
+  return `<div class="acao">
+    ${a.origem&&ITENS[a.origem]?`<small>Origem: ${esc(ITENS[a.origem].t)}</small>`:""}
+    <label class="campo" style="margin-top:6px">Ação recomendada<textarea data-ac="${i}.acao" placeholder="O que será feito, de forma específica e verificável">${esc(a.acao)}</textarea></label>
+    <div class="grid2">
+      <div><label class="campo">Domínio<select data-ac="${i}.dom">${optDom}</select></label></div>
+      <div><label class="campo">Tipo de controle<select data-ac="${i}.tipo">${tipo}</select></label></div>
+      <div><label class="campo">Responsável<input data-ac="${i}.resp" value="${esc(a.resp)}"></label></div>
+      <div><label class="campo">Prazo<input type="date" data-ac="${i}.prazo" value="${esc(a.prazo)}"></label></div>
+      <div><label class="campo">Prioridade${sel(PRIOS,a.prio,"prio")}</label></div>
+      <div><label class="campo">Status${sel(STATUS,a.status,"status")}</label></div>
+    </div>
+    <button class="btn perigo peq" style="margin-top:10px" data-acao="rm-acao" data-i="${i}">Remover</button>
+  </div>`;
+}
+function renderRodape(){
+  const r=$("#rodape");r.hidden=false;
+  const ultimo=estado.passo===PASSOS.length-1;
+  r.innerHTML=`<button class="btn sec" data-acao="voltar" ${estado.passo===0?"disabled":""}>← Voltar</button>`+
+    (ultimo?`<button class="btn verde" data-acao="finalizar">Finalizar avaliação</button>`:`<button class="btn" data-acao="avancar">Avançar →</button>`);
+}
+function irPasso(i){
+  estado.passo=Math.max(0,Math.min(PASSOS.length-1,i));
+  render();window.scrollTo(0,0);agendarSalvar();
+}
+function renderBanner(){
+  const b=$("#banner");
+  const rasc=lerJSON(CH_RASC,null);
+  if(estado.fase==="wizard"&&!rascunhoSujo()&&rasc&&rasc.ctx){
+    b.innerHTML=`<div class="banner"><b>Há uma avaliação em andamento</b><br><small>${esc(rasc.ctx.atividade||"(sem atividade)")} · ${esc(rasc.ctx.local||"")}</small>
+    <div class="linha" style="margin-top:8px"><button class="btn peq" data-acao="retomar">Retomar</button><button class="btn sec peq" data-acao="descartar">Descartar</button></div></div>`;
+  } else b.innerHTML="";
+}
+
+/* ---------- Eventos do wizard ---------- */
+function setPath(path,val){
+  const ks=path.split(".");let o=estado;
+  for(let i=0;i<ks.length-1;i++){o[ks[i]]=o[ks[i]]||{};o=o[ks[i]]}
+  o[ks[ks.length-1]]=val;
+}
+function onCampo(e){
+  const t=e.target;
+  if(t.id==="foto"&&e.type==="change"){tratarFoto(t.files[0]);return}
+  if(t.type==="radio"){
+    if(t.name.startsWith("r_")){
+      const id=t.name.slice(2);estado.resp[id]=estado.resp[id]||{};
+      estado.resp[id].n=t.value==="na"?"na":Number(t.value);
+      atualizarProgresso();agendarSalvar();
+    } else if(t.name.startsWith("e_")){
+      const id=t.name.slice(2);estado.resp[id]=estado.resp[id]||{};
+      estado.resp[id].ev=t.value;agendarSalvar();
+    }
+    return;
+  }
+  if(t.dataset.bind){setPath(t.dataset.bind,t.value);agendarSalvar();return}
+  if(t.dataset.obs){const id=t.dataset.obs;estado.resp[id]=estado.resp[id]||{};estado.resp[id].obs=t.value;agendarSalvar();return}
+  if(t.dataset.dom){const [id,c]=t.dataset.dom.split(".");estado.dom[id]=estado.dom[id]||{};estado.dom[id][c]=t.value;agendarSalvar();return}
+  if(t.dataset.ac){const [i,c]=t.dataset.ac.split(".");if(estado.acoes[i]){estado.acoes[i][c]=t.value;agendarSalvar()}return}
+}
+function tratarFoto(arq){
+  if(!arq)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      const M=1000,esc_=Math.min(1,M/Math.max(img.width,img.height));
+      const c=document.createElement("canvas");c.width=Math.round(img.width*esc_);c.height=Math.round(img.height*esc_);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      estado.foto=c.toDataURL("image/jpeg",0.72);
+      $("#fotoBox").innerHTML=`<img class="foto-rel" src="${esc(estado.foto)}" alt="Foto da atividade"><button class="btn sec peq" data-acao="rmfoto">Remover foto</button>`;
+      agendarSalvar();
+    };
+    img.onerror=()=>aviso("Não foi possível ler essa imagem.");
+    img.src=rd.result;
+  };
+  rd.readAsDataURL(arq);
+}
+function novaAcao(extra){
+  estado.acoes.push(Object.assign({dom:"",tipo:"",acao:"",resp:"",prazo:"",prio:"Média",status:"Aberta",origem:""},extra||{}));
+}
+
+/* =====================================================================
+   FINALIZAR E RESULTADO
+   ===================================================================== */
+function finalizar(){
+  const calc=calcular(estado.resp);
+  if(calc.respondidos===0){aviso("Responda pelo menos alguns itens antes de finalizar.");return}
+  const insuf=calc.doms.filter(x=>x.insuf).map(x=>DOMINIOS.find(d=>d.id===x.id).nome);
+  if(insuf.length&&!confirm("Estes domínios têm menos da metade dos itens avaliados e ficarão como \"dados insuficientes\":\n\n• "+insuf.join("\n• ")+"\n\nFinalizar mesmo assim?"))return;
+  if(!estado.ctx.atividade&&!confirm("A atividade não foi informada. Finalizar mesmo assim?"))return;
+  estado.acoes=estado.acoes.filter(a=>a.acao.trim());
+  const agora=Date.now();
+  if(!estado.criadoEm)estado.criadoEm=agora;
+  const pr=prioridadeSugerida(calc,estado.ctx);
+  const av={id:estado.id,versao:VERSAO_MODELO,criadoEm:estado.criadoEm,atualizadoEm:agora,
+    ctx:{...estado.ctx},resp:JSON.parse(JSON.stringify(estado.resp)),dom:JSON.parse(JSON.stringify(estado.dom)),
+    acoes:JSON.parse(JSON.stringify(estado.acoes)),ia:estado.ia||"",foto:estado.foto||"",
+    resultado:{doms:calc.doms,pior:calc.pior,prio:pr.prio,porGravidade:pr.porGravidade,respondidos:calc.respondidos,total:calc.total}};
+  const i=lista.findIndex(a=>a.id===av.id);
+  if(i>=0)lista[i]=av;else lista.unshift(av);
+  salvarLista();
+  try{localStorage.removeItem(CH_RASC)}catch(e){}
+  estado.fase="resultado";
+  render();window.scrollTo(0,0);
+}
+function avAtual(){return lista.find(a=>a.id===estado.id)}
+
+function anterior(av){
+  const k=norm(av.ctx.atividade)+"|"+norm(av.ctx.local);
+  if(!norm(av.ctx.atividade))return null;
+  return lista.filter(a=>!a.legado&&a.id!==av.id&&a.criadoEm<av.criadoEm&&(norm(a.ctx.atividade)+"|"+norm(a.ctx.local))===k)
+    .sort((a,b)=>b.criadoEm-a.criadoEm)[0]||null;
+}
+
+function radarSvg(res,ant){
+  const W=380,H=310,cx=190,cy=158,R=100,n=DOMINIOS.length;
+  const ang=i=>-Math.PI/2+i*2*Math.PI/n;
+  const pt=(i,v)=>[cx+R*(v/3)*Math.cos(ang(i)),cy+R*(v/3)*Math.sin(ang(i))];
+  let s=`<svg class="radar" viewBox="0 0 ${W} ${H}" role="img" aria-label="Perfil de exposição por domínio">`;
+  [1,2,3].forEach(r=>{s+=`<polygon class="anel" points="${DOMINIOS.map((_,i)=>pt(i,r).map(v=>v.toFixed(1)).join(",")).join(" ")}"/>`});
+  DOMINIOS.forEach((d,i)=>{
+    const [x,y]=pt(i,3);s+=`<line class="eixo" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`;
+    const [lx,ly]=pt(i,3.42),c=Math.cos(ang(i));
+    s+=`<text x="${lx.toFixed(1)}" y="${(ly+4).toFixed(1)}" text-anchor="${c>0.3?"start":c<-0.3?"end":"middle"}">${esc(d.curto)}</text>`;
+  });
+  [1,2,3].forEach(r=>{s+=`<text class="esc" x="${cx+3}" y="${(cy-R*r/3+10).toFixed(1)}">${r}</text>`});
+  if(ant){
+    const pts=ant.resultado.doms.map((x,i)=>pt(i,x.media??0).map(v=>v.toFixed(1)).join(",")).join(" ");
+    s+=`<polygon class="ant" points="${pts}"/>`;
+  }
+  const cor=res.pior===null?"var(--nd)":`var(--n${res.pior})`;
+  const pts=res.doms.map((x,i)=>pt(i,x.media??0).map(v=>v.toFixed(1)).join(",")).join(" ");
+  s+=`<polygon class="area" points="${pts}" fill="${cor}" stroke="${cor}"/>`;
+  res.doms.forEach((x,i)=>{const [px,py]=pt(i,x.media??0);s+=`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="${x.nivel===null?"var(--nd)":`var(--n${x.nivel})`}" stroke="#fff" stroke-width="1.5"><title>${esc(DOMINIOS[i].nome)}: ${fmtMedia(x.media)}</title></circle>`});
+  return s+"</svg>";
+}
+function mapaCalor(resp){
+  const linhas=DOMINIOS.map(d=>`<div class="mc-linha"><span class="mc-rot">${esc(d.curto)}</span><span class="mc-cel">${d.itens.map(q=>{const n=valorItem(resp,q.id);return `<i class="mc ${n===null?"nd":"n"+n}" title="${esc(q.t)}: ${n===null?"não avaliado":ROT_ITEM[n]}"></i>`}).join("")}</span></div>`).join("");
+  return linhas+`<div class="leg"><span><i style="background:var(--n0)"></i>Adequado</span><span><i style="background:var(--n1)"></i>Baixa</span><span><i style="background:var(--n2)"></i>Moderada</span><span><i style="background:var(--n3)"></i>Alta</span><span><i style="border:1px dashed var(--nd)"></i>Não avaliado</span></div>`;
+}
+function divergencia(av,id){
+  const p=av.dom&&av.dom[id]&&av.dom[id].perc;
+  const r=av.resultado.doms.find(x=>x.id===id);
+  if(p===""||p===undefined||r.media===null)return false;
+  return Math.abs(Number(p)-r.media)>=1.5;
+}
+
+function relatorioHtml(av){
+  const res=av.resultado,c=av.ctx;
+  const ant=anterior(av);
+  const prio=res.prio===null?"—":PRIOS[res.prio];
+  const linhasDom=DOMINIOS.map((d,i)=>{
+    const r=res.doms[i];
+    const div=divergencia(av,d.id);
+    const delta=ant&&r.media!==null&&ant.resultado.doms[i].media!==null?(r.media-ant.resultado.doms[i].media):null;
+    const dTxt=delta===null?"":(Math.abs(delta)<0.05?" (=)":delta<0?` <span style="color:var(--n0t)">▼ ${fmtMedia(Math.abs(delta))}</span>`:` <span style="color:var(--n3t)">▲ ${fmtMedia(delta)}</span>`);
+    return `<tr><td data-l="Domínio"><b>${esc(d.nome)}</b><br><small>${esc(GRUPOS[d.grupo])}</small></td><td data-l="Média (0–3)">${fmtMedia(r.media)}${dTxt}</td><td data-l="Nível">${badge(r.nivel)}${r.elevado?"<br><small>elevado por item Alto</small>":""}</td><td data-l="Itens avaliados">${r.respondidos}/${r.total}</td><td data-l="Próximo passo (lógica SOBANE)">${r.nivel===null?"Completar a avaliação deste domínio.":esc(PROXIMO_PASSO[r.nivel])}${r.nivel!==null&&r.nivel>=2?`<br><small>Métodos: ${esc(d.aprofundar)}</small>`:""}${div?`<br><small style="color:var(--n2t)">⚠ A percepção dos trabalhadores diverge da observação. Vale conversar e investigar.</small>`:""}</td></tr>`;
+  }).join("");
+  const atenc=itensAtencao(av.resp,2);
+  const linhasItens=atenc.map(x=>{
+    const r=av.resp[x.q.id]||{};
+    return `<tr><td data-l="Domínio">${esc(x.dom.curto)}</td><td data-l="Item"><b>${esc(x.q.t)}</b></td><td data-l="Nível">${itemBadge(x.n)}</td><td data-l="Critério e observação">${esc(x.q.c[x.n])}${r.obs?`<br><i>${esc(r.obs)}</i>`:""}</td><td data-l="Fonte">${esc(r.ev||"—")}</td></tr>`;
+  }).join("");
+  const protecao=DOMINIOS.filter(d=>av.dom&&av.dom[d.id]&&(av.dom[d.id].prot||(av.dom[d.id].perc!==""&&av.dom[d.id].perc!==undefined)));
+  const percTxt=["Sem incômodo","Pouco incômodo","Incômodo moderado","Muito incômodo"];
+  const linhasProt=protecao.map(d=>{const x=av.dom[d.id];return `<tr><td data-l="Domínio"><b>${esc(d.curto)}</b></td><td data-l="Percepção">${x.perc!==""&&x.perc!==undefined?esc(percTxt[x.perc]):"—"}</td><td data-l="O que sustenta o trabalho">${esc(x.prot||"—")}</td></tr>`}).join("");
+  const acoes=av.acoes.map(a=>`<tr><td data-l="Ação">${esc(a.acao)}${a.origem&&ITENS[a.origem]?`<br><small>Origem: ${esc(ITENS[a.origem].t)}</small>`:""}</td><td data-l="Domínio">${esc(a.dom?DOMINIOS.find(d=>d.id===a.dom).curto:"Geral")}</td><td data-l="Tipo de controle">${esc(a.tipo||"—")}</td><td data-l="Responsável">${esc(a.resp||"—")}</td><td data-l="Prazo">${esc(fmtData(a.prazo)||"—")}</td><td data-l="Prioridade">${esc(a.prio)}</td><td data-l="Status">${esc(a.status)}</td></tr>`).join("");
+  return `<div class="rel">
+  <h2 class="titulo">RELATÓRIO ERGOCONTEXTO · Triagem ergonômica e de fatores humanos</h2>
+  <div class="kv">
+    <b>Avaliação</b><span>${esc(av.id)}</span>
+    <b>Data</b><span>${esc(fmtData(c.data))}</span>
+    <b>Unidade / Área</b><span>${esc(c.unidade)} ${c.area?" · "+esc(c.area):""}</span>
+    <b>Local / Posto</b><span>${esc(c.local)}</span>
+    <b>Atividade</b><span>${esc(c.atividade)}</span>
+    <b>Função</b><span>${esc(c.funcao)}</span>
+    <b>Avaliador</b><span>${esc(c.avaliador)}</span>
+    <b>Exposição / jornada</b><span>${c.exposicao!==""&&c.exposicao!=null?esc(EXPOSICOES[c.exposicao]):"Não informada"}</span>
+    <b>Gravidade potencial</b><span>${c.gravidade!==""&&c.gravidade!=null?esc(GRAVIDADES[c.gravidade]):"Não informada"}</span>
+  </div>
+  ${av.foto?`<img class="foto-rel" src="${esc(av.foto)}" alt="Foto da atividade">`:""}
+  <h3>Resumo</h3>
+  <div class="resumo">
+    <div><small>Domínio mais crítico</small><strong>${res.pior===null?"—":badge(res.pior)}</strong></div>
+    <div><small>Prioridade sugerida</small><strong>${esc(prio)}</strong>${res.porGravidade?"<small>elevada pela gravidade potencial</small>":""}</div>
+    <div><small>Itens avaliados</small><strong>${res.respondidos}/${res.total}</strong></div>
+  </div>
+  <h3>Perfil por domínio</h3>
+  ${radarSvg(res,ant)}
+  ${ant?`<p style="text-align:center"><small>Linha tracejada: avaliação anterior desta atividade (${esc(fmtData(ant.ctx.data))}).</small></p>`:""}
+  <div><table class="resp"><thead><tr><th>Domínio</th><th>Média (0–3)</th><th>Nível</th><th>Itens</th><th>Próximo passo (lógica SOBANE)</th></tr></thead><tbody>${linhasDom}</tbody></table></div>
+  <h3>Mapa de itens</h3>${mapaCalor(av.resp)}
+  ${linhasItens?`<h3>Itens de atenção (Moderada ou Alta)</h3><div><table class="resp"><thead><tr><th>Domínio</th><th>Item</th><th>Nível</th><th>Critério e observação</th><th>Fonte</th></tr></thead><tbody>${linhasItens}</tbody></table></div>`:""}
+  ${linhasProt?`<h3>Visão dos trabalhadores e fatores de proteção</h3><div><table class="resp"><thead><tr><th>Domínio</th><th>Percepção</th><th>O que sustenta o trabalho</th></tr></thead><tbody>${linhasProt}</tbody></table></div>`:""}
+  ${c.obs?`<h3>Observações gerais</h3><p style="white-space:pre-wrap">${esc(c.obs)}</p>`:""}
+  ${av.ia?`<h3>Análise assistida por IA</h3><div class="ia-txt">${esc(av.ia)}</div><p><small>Sugestões para validação do avaliador. A IA não altera pontuação nem classificação.</small></p>`:""}
+  <h3>Plano de ação</h3>
+  ${acoes?`<div><table class="resp"><thead><tr><th>Ação</th><th>Domínio</th><th>Tipo de controle</th><th>Responsável</th><th>Prazo</th><th>Prior.</th><th>Status</th></tr></thead><tbody>${acoes}</tbody></table></div>`:"<p>Nenhuma ação registrada.</p>"}
+  <div class="assin"><div>Avaliador</div><div>Responsável da área</div></div>
+  <p style="margin-top:18px"><small>Triagem baseada em critérios simplificados, inspirada em métodos reconhecidos. Não constitui AET, laudo ergonômico, avaliação quantitativa ou avaliação especializada, e não declara conformidade legal. Modelo v${VERSAO_MODELO}. Gerado em ${esc(fmtDH(av.atualizadoEm))}.</small></p>
+  </div>`;
+}
+
+function renderResultado(){
+  const av=avAtual();
+  if(!av){estado.fase="wizard";render();return}
+  const acoesEd=av.acoes.length?`<div class="card no-print"><h3>Acompanhamento das ações</h3>${av.acoes.map((a,i)=>`<div class="sug"><span>${esc(a.acao.slice(0,90))}${a.acao.length>90?"…":""}<br><small>${esc(a.resp||"sem responsável")} · prazo ${esc(fmtData(a.prazo)||"—")}</small></span><select data-status="${i}" style="width:auto">${STATUS.map(s=>`<option ${s===a.status?"selected":""}>${s}</option>`).join("")}</select></div>`).join("")}</div>`:"";
+  $("#palco").innerHTML=`
+  <div class="card no-print"><div class="linha">
+    <button class="btn" data-acao="imprimir">📄 Imprimir / Salvar PDF</button>
+    <button class="btn sec" data-acao="editar">✏️ Editar respostas</button>
+    <button class="btn sec" data-acao="nova">＋ Nova avaliação</button>
+  </div></div>
+  <div class="card">${relatorioHtml(av)}</div>
+  <div class="card no-print" id="blocoIA">
+    <h3>🤖 Análise assistida por IA</h3>
+    <p class="mut" style="font-size:.88rem">Gera uma leitura por domínio, perguntas para aprofundar e sugestões de ação, para você validar. Envia as respostas, critérios e observações. <b>Não envia</b> unidade, local, avaliador nem a foto. Evite citar nomes de pessoas nas observações.</p>
+    <div class="linha"><button class="btn verde" id="btnIA" data-acao="ia">Analisar com IA</button>
+    ${av.ia?`<button class="btn sec" data-acao="ia-para-plano">Adicionar sugestões ao plano</button>`:""}</div>
+    <div id="msgIA"></div>
+  </div>
+  ${acoesEd}`;
+}
+
+/* ---------- IA ---------- */
+const URL_IA="https://ergocontexto-ia.raul-almeida-siqueira.workers.dev/api/ergo";
+function payloadIA(av){
+  const monta=(simples)=>({
+    versao:VERSAO_MODELO,
+    atividade:av.ctx.atividade,funcao:av.ctx.funcao,
+    gravidadePotencial:av.ctx.gravidade!==""&&av.ctx.gravidade!=null?GRAVIDADES[av.ctx.gravidade]:"não informada",
+    exposicaoJornada:av.ctx.exposicao!==""&&av.ctx.exposicao!=null?EXPOSICOES[av.ctx.exposicao]:"não informada",
+    prioridadeSugerida:av.resultado.prio===null?"indefinida":PRIOS[av.resultado.prio],
+    observacoesGerais:(av.ctx.obs||"").slice(0,600),
+    dominios:DOMINIOS.map((d,i)=>{
+      const r=av.resultado.doms[i],dm=(av.dom&&av.dom[d.id])||{};
+      return {dominio:d.nome,grupo:GRUPOS[d.grupo],media:r.media===null?null:Number(r.media.toFixed(2)),
+        nivel:r.nivel===null?"dados insuficientes":NIVEIS[r.nivel].curto,itensAvaliados:`${r.respondidos}/${r.total}`,
+        percepcaoTrabalhadores:dm.perc!==""&&dm.perc!==undefined?["sem incômodo","pouco incômodo","incômodo moderado","muito incômodo"][dm.perc]:"não coletada",
+        fatoresProtecao:(dm.prot||"").slice(0,300),
+        itensAtencao:d.itens.map(q=>({q,n:valorItem(av.resp,q.id)})).filter(x=>x.n!==null&&x.n>=2).map(x=>{
+          const r2=av.resp[x.q.id]||{};
+          const o={item:x.q.t,nivel:ROT_ITEM[x.n],fonte:r2.ev||"não informada",observacao:(r2.obs||"").slice(0,300)};
+          if(!simples)o.criterio=x.q.c[x.n];
+          return o;
+        })};
+    })
+  });
+  let p=monta(false);
+  if(JSON.stringify(p).length>18000)p=monta(true);
+  return p;
+}
+async function analisarIA(){
+  const av=avAtual();if(!av)return;
+  const btn=$("#btnIA"),msg=$("#msgIA");
+  btn.disabled=true;btn.textContent="⏳ Analisando...";msg.innerHTML="";
+  try{
+    const r=await fetch(URL_IA,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payloadIA(av))});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.analise)throw new Error(j.erro||"falha");
+    av.ia=j.analise;av.atualizadoEm=Date.now();salvarLista();
+    const y=window.scrollY;renderResultado();window.scrollTo(0,y);
+    $("#blocoIA").scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(e){
+    msg.innerHTML=`<div class="alerta">Não foi possível gerar a análise. Verifique a internet e tente novamente.${e.message&&e.message!=="falha"?" ("+esc(e.message)+")":""}</div>`;
+    btn.disabled=false;btn.textContent="Analisar com IA";
+  }
+}
+function iaParaPlano(){
+  const av=avAtual();if(!av||!av.ia)return;
+  const ini=av.ia.indexOf("SUGESTÕES DE AÇÃO:"),fim=av.ia.indexOf("NECESSIDADE DE AVALIAÇÃO");
+  if(ini<0){aviso("Não encontrei a seção de sugestões na análise.");return}
+  const bloco=av.ia.substring(ini+18,fim>ini?fim:undefined);
+  const linhas=bloco.split("\n").map(l=>l.replace(/^\s*(?:[-•*–]|\d+[.)])\s*/,"").trim()).filter(l=>l.length>8);
+  if(!linhas.length){aviso("Nenhuma sugestão identificada.");return}
+  linhas.slice(0,5).forEach(l=>av.acoes.push({dom:"",tipo:"",acao:l+" (sugestão da IA, validar)",resp:"",prazo:"",prio:"Média",status:"Aberta",origem:""}));
+  av.atualizadoEm=Date.now();salvarLista();renderResultado();aviso(linhas.slice(0,5).length+" sugestões adicionadas ao plano. Edite em Editar respostas → Plano.");
+}
+
+/* =====================================================================
+   HISTÓRICO
+   ===================================================================== */
+function migrarLegado(){
+  try{
+    if(localStorage.getItem("ergocontexto_v2_migrado"))return;
+    const velho=lerJSON("historicoErgo",[]);
+    if(Array.isArray(velho)&&velho.length){
+      velho.forEach((h,i)=>lista.push({id:"V1-"+i+"-"+String(h.data||"").replace(/\W/g,""),legado:true,criadoEm:0,atualizadoEm:0,
+        ctx:{unidade:h.unidade||"",area:h.area||"",local:h.local||"",atividade:h.atividade||"",funcao:h.funcao||"",avaliador:h.avaliador||"",data:""},
+        legadoInfo:{data:h.data,resultado:h.resultado,pontos:h.pontos,ergonomia:h.ergonomia,fh:h.fatoresHumanos}}));
+      salvarLista();
+    }
+    localStorage.setItem("ergocontexto_v2_migrado","1");
+  }catch(e){}
+}
+function renderHistorico(){
+  const v=$("#v-historico");
+  const termo=norm(v.dataset.q||"");
+  const itens=lista.filter(a=>!termo||norm([a.ctx.atividade,a.ctx.local,a.ctx.unidade,a.ctx.area,a.ctx.funcao,a.id].join(" ")).includes(termo));
+  v.innerHTML=`
+  <div class="card no-print">
+    <h2>Histórico</h2>
+    <input id="busca" placeholder="Buscar por atividade, local, unidade, função…" value="${esc(v.dataset.q||"")}">
+    <div class="linha" style="margin-top:10px">
+      <button class="btn sec peq" data-acao="exp-json">Backup (JSON)</button>
+      <button class="btn sec peq" data-acao="exp-csv-av">Avaliações (CSV)</button>
+      <button class="btn sec peq" data-acao="exp-csv-ac">Ações (CSV)</button>
+      <button class="btn sec peq" data-acao="imp-json">Importar backup</button>
+      <input type="file" id="impArq" accept="application/json,.json" hidden>
+    </div>
+    <small>Os dados ficam só neste aparelho/navegador. Faça backup com frequência.</small>
+  </div>
+  ${itens.map(a=>cartaoHist(a)).join("")||'<div class="card"><p class="mut">Nenhuma avaliação encontrada.</p></div>'}
+  ${lista.length?`<div class="card no-print"><button class="btn perigo peq" data-acao="limpar">Apagar todo o histórico</button></div>`:""}`;
+  const b=$("#busca");if(b){b.addEventListener("input",()=>{v.dataset.q=b.value;const pos=b.selectionStart;renderHistorico();const nb=$("#busca");nb.focus();nb.setSelectionRange(pos,pos)})}
+  const imp=$("#impArq");if(imp)imp.addEventListener("change",()=>importarJSON(imp.files[0]));
+}
+function cartaoHist(a){
+  const titulo=`<b>${esc(a.ctx.atividade||"(sem atividade)")}</b><br><small>${esc([a.ctx.unidade,a.ctx.area,a.ctx.local].filter(Boolean).join(" · "))}</small>`;
+  if(a.legado){
+    const l=a.legadoInfo;
+    return `<div class="hist">${titulo}<p><small>Avaliação do modelo anterior (v1): ${esc(l.resultado||"")} · ${esc(l.pontos)} pontos · ${esc(l.data||"")}. Não comparável com o modelo atual.</small></p>
+    <div class="linha no-print"><button class="btn perigo peq" data-acao="del" data-id="${esc(a.id)}">Excluir</button></div></div>`;
+  }
+  const abertas=a.acoes.filter(x=>x.status!=="Concluída").length;
+  return `<div class="hist">${titulo}
+    <div class="dots" title="Perfil por domínio">${a.resultado.doms.map((r,i)=>`<i class="${r.nivel===null?"":"n"+r.nivel}" title="${esc(DOMINIOS[i].curto)}: ${r.nivel===null?"insuficiente":NIVEIS[r.nivel].curto}"></i>`).join("")}</div>
+    <div class="linha">${badge(a.resultado.pior)}<small>Prioridade: <b>${a.resultado.prio===null?"—":PRIOS[a.resultado.prio]}</b> · ${esc(fmtData(a.ctx.data))} · ${abertas} ação(ões) em aberto</small></div>
+    <div class="linha no-print" style="margin-top:8px">
+      <button class="btn sec peq" data-acao="abrir" data-id="${esc(a.id)}">Abrir relatório</button>
+      <button class="btn sec peq" data-acao="editar-h" data-id="${esc(a.id)}">Editar</button>
+      <button class="btn sec peq" data-acao="reavaliar" data-id="${esc(a.id)}">Reavaliar</button>
+      <button class="btn perigo peq" data-acao="del" data-id="${esc(a.id)}">Excluir</button>
+    </div></div>`;
+}
+function carregarParaEstado(a,fase){
+  estado={id:a.id,criadoEm:a.criadoEm,passo:0,fase,ctx:{...a.ctx},resp:JSON.parse(JSON.stringify(a.resp)),dom:JSON.parse(JSON.stringify(a.dom||{})),
+    acoes:JSON.parse(JSON.stringify(a.acoes||[])),ia:a.ia||"",foto:a.foto||""};
+  irPara("avaliar");
+}
+function csv(rows){
+  const cel=c=>{c=String(c??"");if(/^[=+\-@\t\r]/.test(c))c="'"+c;return /[;"\n\r]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c};
+  return "﻿"+rows.map(r=>r.map(cel).join(";")).join("\r\n");
+}
+function baixar(nome,conteudo,tipo){
+  const b=new Blob([conteudo],{type:tipo});const a=document.createElement("a");
+  a.href=URL.createObjectURL(b);a.download=nome;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},600);
+}
+function exportar(tipo){
+  const L=lista.filter(a=>!a.legado);
+  if(tipo==="json")return baixar(`ergocontexto-backup-${hojeISO()}.json`,JSON.stringify({app:"ergocontexto",versao:VERSAO_MODELO,exportadoEm:Date.now(),avaliacoes:lista}),"application/json");
+  if(tipo==="av"){
+    const cab=["ID","Data","Unidade","Área","Local","Atividade","Função","Avaliador","Prioridade sugerida","Domínio mais crítico",...DOMINIOS.flatMap(d=>[d.nome+" (média)",d.nome+" (nível)"]),"Itens avaliados"];
+    const rows=L.map(a=>[a.id,fmtData(a.ctx.data),a.ctx.unidade,a.ctx.area,a.ctx.local,a.ctx.atividade,a.ctx.funcao,a.ctx.avaliador,a.resultado.prio===null?"":PRIOS[a.resultado.prio],a.resultado.pior===null?"":NIVEIS[a.resultado.pior].curto,
+      ...a.resultado.doms.flatMap(r=>[r.media===null?"":fmtMedia(r.media),r.nivel===null?"Dados insuficientes":NIVEIS[r.nivel].curto]),`${a.resultado.respondidos}/${a.resultado.total}`]);
+    return baixar(`ergocontexto-avaliacoes-${hojeISO()}.csv`,csv([cab,...rows]),"text/csv;charset=utf-8");
+  }
+  if(tipo==="ac"){
+    const cab=["Avaliação","Atividade","Local","Domínio","Tipo de controle","Ação","Responsável","Prazo","Prioridade","Status"];
+    const rows=L.flatMap(a=>a.acoes.map(x=>[a.id,a.ctx.atividade,a.ctx.local,x.dom?DOMINIOS.find(d=>d.id===x.dom).nome:"Geral",x.tipo,x.acao,x.resp,fmtData(x.prazo),x.prio,x.status]));
+    return baixar(`ergocontexto-acoes-${hojeISO()}.csv`,csv([cab,...rows]),"text/csv;charset=utf-8");
+  }
+}
+function importarJSON(arq){
+  if(!arq)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const d=JSON.parse(rd.result);
+      if(d.app!=="ergocontexto"||!Array.isArray(d.avaliacoes))throw new Error();
+      const ids=new Set(lista.map(a=>a.id));let novos=0;
+      d.avaliacoes.forEach(a=>{
+        if(!a||!a.id||ids.has(a.id))return;
+        if(!a.legado&&(!a.resultado||!Array.isArray(a.resultado.doms)||a.resultado.doms.length!==DOMINIOS.length||!a.ctx||!a.resp||!Array.isArray(a.acoes)))return;
+        lista.push(a);ids.add(a.id);novos++;
+      });
+      lista.sort((x,y)=>(y.criadoEm||0)-(x.criadoEm||0));
+      salvarLista();renderHistorico();aviso(novos+" avaliação(ões) importada(s).");
+    }catch(e){aviso("Arquivo inválido. Use um backup gerado por este aplicativo.")}
+  };
+  rd.readAsText(arq);
+}
+
+/* =====================================================================
+   PAINEL
+   ===================================================================== */
+function renderPainel(){
+  const L=lista.filter(a=>!a.legado);
+  const v=$("#v-painel");
+  if(!L.length){v.innerHTML=`<div class="card"><h2>Painel</h2><p class="mut">Finalize avaliações para ver o painel.</p></div>`;return}
+  // última avaliação de cada atividade+local
+  const ult=new Map();
+  L.slice().sort((a,b)=>a.criadoEm-b.criadoEm).forEach(a=>ult.set(norm(a.ctx.atividade)+"|"+norm(a.ctx.local)+"|"+(norm(a.ctx.atividade)?"":a.id),a));
+  const U=[...ult.values()];
+  const dist=[0,0,0,0,0];U.forEach(a=>dist[a.resultado.pior===null?4:a.resultado.pior]++);
+  const hoje=hojeISO();
+  const todas=L.flatMap(a=>a.acoes.map((x,i)=>({a,x,i})));
+  const abertas=todas.filter(t=>t.x.status!=="Concluída");
+  const atrasadas=abertas.filter(t=>t.x.prazo&&t.x.prazo<hoje);
+  const porDom=DOMINIOS.map((d,i)=>{const c=[0,0,0,0,0];U.forEach(a=>{const r=a.resultado.doms[i];c[r.nivel===null?4:r.nivel]++});return {d,c}});
+  const stack=c=>`<div class="stack">${[0,1,2,3,4].map(n=>c[n]?`<i style="flex:${c[n]};background:${n===4?"var(--nd)":`var(--n${n})`}" title="${n===4?"Insuficiente":NIVEIS[n].curto}: ${c[n]}"></i>`:"").join("")}</div>`;
+  v.innerHTML=`
+  <div class="card"><h2>Painel</h2><small>Considera a avaliação mais recente de cada atividade/local.</small>
+    <div class="kpis" style="margin-top:10px">
+      <div class="kpi"><strong>${U.length}</strong>atividades avaliadas</div>
+      <div class="kpi"><strong style="color:var(--n3)">${dist[3]}</strong>com domínio crítico</div>
+      <div class="kpi"><strong>${abertas.length}</strong>ações em aberto</div>
+      <div class="kpi"><strong style="color:${atrasadas.length?"var(--n3)":"inherit"}">${atrasadas.length}</strong>ações atrasadas</div>
+    </div></div>
+  <div class="card"><h3>Nível por domínio</h3>
+    ${porDom.map(p=>`<div style="margin:10px 0"><div class="linha" style="justify-content:space-between"><span>${p.d.ico} <b>${esc(p.d.nome)}</b></span><small>${p.c.slice(0,4).map((n,i)=>n?`${NIVEIS[i].curto}: ${n}`:"").filter(Boolean).join(" · ")||"—"}</small></div>${stack(p.c)}</div>`).join("")}
+    <div class="leg"><span><i style="background:var(--n0)"></i>Baixa</span><span><i style="background:var(--n1)"></i>Moderada</span><span><i style="background:var(--n2)"></i>Alta</span><span><i style="background:var(--n3)"></i>Crítica</span><span><i style="background:var(--nd)"></i>Insuficiente</span></div></div>
+  <div class="card"><h3>Ações atrasadas</h3>
+    ${atrasadas.length?atrasadas.sort((p,q)=>p.x.prazo.localeCompare(q.x.prazo)).slice(0,10).map(t=>`<div class="sug"><span>${esc(t.x.acao.slice(0,100))}<br><small>${esc(t.a.ctx.atividade)} · ${esc(t.x.resp||"sem responsável")} · prazo ${esc(fmtData(t.x.prazo))}</small></span><button class="btn sec peq" data-acao="abrir" data-id="${esc(t.a.id)}">Abrir</button></div>`).join(""):'<p class="mut">Nenhuma ação atrasada.</p>'}</div>`;
+}
+
+/* =====================================================================
+   SOBRE O MÉTODO
+   ===================================================================== */
+function renderSobre(){
+  $("#v-sobre").innerHTML=`
+  <div class="card"><h2>Sobre o método</h2>
+    <p>O ErgoContexto é uma ferramenta de <b>triagem</b>: identifica onde olhar primeiro e qual o próximo passo. Não constitui AET, laudo ergonômico, avaliação quantitativa ou avaliação especializada, e não declara conformidade legal.</p>
+    <h3>Por que dois lados, em 5 domínios?</h3>
+    <p>Ergonomia e fatores humanos respondem a perguntas diferentes. A <b>ergonomia</b> pergunta o que a atividade exige do corpo e da mente e se isso pode causar adoecimento. Os <b>fatores humanos</b> perguntam o que, no sistema, torna o desempenho confiável ou propenso a erro. Por isso o resultado é um perfil de 5 domínios, sem nota total que misture coisas incomparáveis.</p>
+    <table><thead><tr><th>Domínio</th><th>Grupo</th><th>Referências</th></tr></thead><tbody>
+    ${DOMINIOS.map(d=>`<tr><td>${d.ico} <b>${esc(d.nome)}</b></td><td>${esc(GRUPOS[d.grupo])}</td><td>${esc(d.ref)}</td></tr>`).join("")}
+    </tbody></table>
+  </div>
+  <div class="card"><h3>Como a pontuação funciona</h3>
+    <ul>
+      <li>Cada item tem 4 níveis com critério objetivo: Adequado (0), Baixa (1), Moderada (2), Alta (3).</li>
+      <li>Itens marcados como <i>não avaliado</i> ficam fora da média. Se menos da metade dos itens de um domínio foi avaliada, o domínio aparece como <b>dados insuficientes</b>.</li>
+      <li>Nível do domínio pela média dos itens: <b>Baixa</b> até 0,49 · <b>Moderada</b> 0,50 a 1,49 · <b>Alta</b> 1,50 a 2,24 · <b>Crítica</b> a partir de 2,25.</li>
+      <li><b>Regra anti-diluição:</b> um item em nível Alta garante ao menos nível Alta ao domínio, e três itens Altos garantem Crítica. Assim um problema grave não some na média.</li>
+      <li><b>Prioridade sugerida:</b> vem do domínio mais crítico. Se a gravidade potencial de uma falha é Grave ou Muito grave e algum domínio de fatores humanos está em Alta ou Crítica, a prioridade sobe um nível.</li>
+      <li>Cada domínio indica o próximo passo na lógica <b>SOBANE</b> (Déparis → Observação → Análise → Perícia) e os métodos para aprofundar.</li>
+    </ul>
+    <h3>Limites</h3>
+    <p>Os critérios são versões simplificadas, inspiradas na literatura. Não herdam a validade dos instrumentos completos (RULA, REBA, NIOSH, OCRA, NASA-TLX, COPSOQ etc.). Valores quantitativos de ruído, calor, vibração e iluminação exigem medição. A percepção dos trabalhadores e os fatores de proteção entram como contexto e não alteram a pontuação.</p>
+    <h3>Análise por IA</h3>
+    <p>A IA lê o perfil e as observações e sugere pontos de atenção, perguntas e ações. Ela não altera pontuação nem classificação, não avalia o trabalhador e toda sugestão precisa ser validada pelo avaliador.</p>
+    <p><small>Modelo v${VERSAO_MODELO}</small></p>
+  </div>`;
+}
+
+/* =====================================================================
+   EVENTOS GLOBAIS
+   ===================================================================== */
+document.addEventListener("click",e=>{
+  const nav=e.target.closest("#nav button");
+  if(nav){irPara(nav.dataset.v);return}
+  const b=e.target.closest("[data-acao]");if(!b)return;
+  const id=b.dataset.id;
+  switch(b.dataset.acao){
+    case "passo":irPasso(Number(b.dataset.i));break;
+    case "avancar":irPasso(estado.passo+1);break;
+    case "voltar":irPasso(estado.passo-1);break;
+    case "finalizar":finalizar();break;
+    case "rmfoto":estado.foto="";$("#fotoBox").innerHTML="";agendarSalvar();break;
+    case "nova-acao":novaAcao();render();window.scrollTo(0,document.body.scrollHeight);agendarSalvar();break;
+    case "rm-acao":estado.acoes.splice(Number(b.dataset.i),1);render();agendarSalvar();break;
+    case "acao-de-item":{const q=ITENS[b.dataset.q];novaAcao({dom:q.dom,origem:q.id,prio:valorItem(estado.resp,q.id)===3?"Alta":"Média"});render();window.scrollTo(0,document.body.scrollHeight);agendarSalvar();break}
+    case "retomar":{const r=lerJSON(CH_RASC,null);if(r){estado=r;estado.fase="wizard";render()}break}
+    case "descartar":try{localStorage.removeItem(CH_RASC)}catch(_){}renderBanner();break;
+    case "imprimir":window.print();break;
+    case "editar":estado.fase="wizard";estado.passo=0;render();window.scrollTo(0,0);break;
+    case "nova":if(confirm("Iniciar uma nova avaliação em branco?")){estado=novoEstado();render();window.scrollTo(0,0)}break;
+    case "ia":analisarIA();break;
+    case "ia-para-plano":iaParaPlano();break;
+    case "abrir":{const a=lista.find(x=>x.id===id);if(a)carregarParaEstado(a,"resultado");break}
+    case "editar-h":{const a=lista.find(x=>x.id===id);if(a)carregarParaEstado(a,"wizard");break}
+    case "reavaliar":{const a=lista.find(x=>x.id===id);if(a){const c={...a.ctx,data:hojeISO()};estado=novoEstado(c);estado.foto="";irPara("avaliar")}break}
+    case "del":if(confirm("Excluir esta avaliação?")){lista=lista.filter(x=>x.id!==id);salvarLista();renderHistorico()}break;
+    case "limpar":if(confirm("Apagar TODAS as avaliações deste aparelho? Faça backup antes.")){lista=[];salvarLista();renderHistorico()}break;
+    case "exp-json":exportar("json");break;
+    case "exp-csv-av":exportar("av");break;
+    case "exp-csv-ac":exportar("ac");break;
+    case "imp-json":$("#impArq").click();break;
+  }
+});
+$("#palco").addEventListener("input",onCampo);
+$("#palco").addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset&&t.dataset.status!==undefined){
+    const av=avAtual();if(av&&av.acoes[t.dataset.status]){av.acoes[t.dataset.status].status=t.value;av.atualizadoEm=Date.now();salvarLista();aviso("Status atualizado.")}
+    return;
+  }
+  onCampo(e);
+});
+window.addEventListener("beforeunload",salvarRascunho);
+
+/* =====================================================================
+   INÍCIO
+   ===================================================================== */
+migrarLegado();
+render();
+if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
 </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "ErgoContexto — Triagem ergonômica e fatores humanos",
+  "short_name": "ErgoContexto",
+  "description": "Triagem ergonômica e de fatores humanos por domínio, com plano de ação e relatório.",
+  "lang": "pt-BR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#004F3D",
+  "theme_color": "#004F3D",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
