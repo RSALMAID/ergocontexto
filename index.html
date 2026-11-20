@@ -1926,7 +1926,7 @@ async function carregarPerfil(){
     const r=await sbA(`/rest/v1/perfis?id=eq.${sessao.user.id}&select=nome,papel,equipe_id,equipes(nome,codigo)`);
     const p=r&&r[0];
     if(p){perfil={nome:p.nome||sessao.user.email,papel:p.papel,equipe_id:p.equipe_id};equipeInfo=p.equipes||null;gravarJSON("ergocontexto_perfil",perfil)}
-    if(perfil&&perfil.equipe_id){membros=await sbA(`/rest/v1/perfis?equipe_id=eq.${perfil.equipe_id}&select=nome,email,papel&order=nome`)||[]}else membros=[];
+    if(perfil&&perfil.equipe_id){membros=await sbA(`/rest/v1/perfis?equipe_id=eq.${perfil.equipe_id}&select=id,nome,email,papel&order=nome`)||[]}else membros=[];
   }catch(e){}
   if(estado.fase==="wizard"&&!estado.ctx.avaliador&&perfil)estado.ctx.avaliador=perfil.nome;
   atualizarChip();
@@ -2055,7 +2055,8 @@ function renderConta(){
   const eq=equipeInfo&&perfil&&perfil.equipe_id
     ?`<p><b>${esc(equipeInfo.nome)}</b> · você é <b>${admin?"administrador":"avaliador"}</b></p>
       <p>Código para convidar colegas: <span class="codigo">${esc(equipeInfo.codigo)}</span></p>
-      <h4 style="margin-top:14px">Membros (${membros.length})</h4>${membros.map(m=>`<div class="sug"><span>${esc(m.nome||"")}<br><small>${esc(m.email||"")}</small></span><span class="bd ${m.papel==="admin"?"n2":"nd"}">${m.papel==="admin"?"admin":"avaliador"}</span></div>`).join("")}
+      <h4 style="margin-top:14px">Membros (${membros.length})</h4>${membros.map(m=>`<div class="sug"><span>${esc(m.nome||"")}<br><small>${esc(m.email||"")}</small></span>${admin&&m.id!==sessao.user.id?`<select class="sel-papel" data-papel-membro="${esc(m.id)}" aria-label="Papel de ${esc(m.nome||"")}">${Object.keys(PAPEIS).map(k=>`<option value="${k}" ${m.papel===k?"selected":""}>${PAPEIS[k]}</option>`).join("")}</select>`:`<span class="bd ${m.papel==="admin"?"n2":"nd"}">${PAPEIS[m.papel]||m.papel}</span>`}</div>`).join("")}
+      <details style="margin-top:8px"><summary>O que cada papel pode fazer</summary><p class="mut" style="font-size:.84rem"><b>Administrador:</b> tudo, inclusive reabrir registros aprovados e definir papéis. <b>Aprovador:</b> aprova e bloqueia registros. <b>Revisor:</b> avalia e registra a revisão técnica. <b>Avaliador:</b> cria e edita as próprias avaliações. <b>Leitor:</b> somente consulta. Para aprovar, é preciso uma revisão feita por outra pessoa da equipe.</p></details>
       <p class="mut" style="font-size:.84rem">Todos da equipe veem as avaliações uns dos outros. Só o autor (ou um administrador) edita cada avaliação.</p>
       <button class="btn sec peq" data-acao="equipe-sair">Sair da equipe</button>`
     :`<p class="mut">Você ainda não está em uma equipe. Crie uma, ou entre com o código que um colega passou.</p>
@@ -2133,7 +2134,28 @@ function regGravar(r,agora){
 }
 function regExcluir(id){const r=REG.find(x=>x.id===id);if(!r)return;r.excluido=true;regGravar(r)}
 const quemEdita=()=>perfil&&perfil.papel==="admin";
-const travado=d=>d&&d.status==="aprovada";
+const PAPEIS={admin:"Administrador",aprovador:"Aprovador",revisor:"Revisor",avaliador:"Avaliador",leitor:"Leitor"};
+const quemAprova=()=>perfil&&(perfil.papel==="admin"||perfil.papel==="aprovador");
+const quemRevisa=()=>perfil&&["admin","aprovador","revisor"].includes(perfil.papel);
+const soLeitura=()=>!!(perfil&&perfil.papel==="leitor");
+const travado=d=>d&&(d.status==="aprovada"||soLeitura());
+// SHA-256 síncrono (FIPS 180-4) para a assinatura de integridade
+const sha256=(()=>{const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const rr=(x,n)=>(x>>>n)|(x<<(32-n));
+  return s=>{const b=Array.from(new TextEncoder().encode(s)),L=b.length;b.push(0x80);while(b.length%64!==56)b.push(0);
+    const hi=Math.floor(L*8/4294967296),lo=(L*8)>>>0;for(const v of [hi,lo])b.push(v>>>24&255,v>>>16&255,v>>>8&255,v&255);
+    let H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+    for(let i=0;i<b.length;i+=64){const w=[];for(let t=0;t<16;t++)w[t]=(b[i+4*t]<<24)|(b[i+4*t+1]<<16)|(b[i+4*t+2]<<8)|b[i+4*t+3];
+      for(let t=16;t<64;t++){const s0=rr(w[t-15],7)^rr(w[t-15],18)^(w[t-15]>>>3),s1=rr(w[t-2],17)^rr(w[t-2],19)^(w[t-2]>>>10);w[t]=(w[t-16]+s0+w[t-7]+s1)|0}
+      let [a,bb,c,d,e,f,g,h]=H;
+      for(let t=0;t<64;t++){const S1=rr(e,6)^rr(e,11)^rr(e,25),ch=(e&f)^(~e&g),t1=(h+S1+ch+K[t]+w[t])|0,S0=rr(a,2)^rr(a,13)^rr(a,22),mj=(a&bb)^(a&c)^(bb&c),t2=(S0+mj)|0;h=g;g=f;f=e;e=(d+t1)|0;d=c;c=bb;bb=a;a=(t1+t2)|0}
+      H=[a,bb,c,d,e,f,g,h].map((v,k)=>(H[k]+v)|0)}
+    return H.map(v=>(v>>>0).toString(16).padStart(8,"0")).join("")}})();
+const canon=o=>o===null||typeof o!=="object"?JSON.stringify(o):Array.isArray(o)?"["+o.map(canon).join(",")+"]":"{"+Object.keys(o).sort().map(k=>JSON.stringify(k)+":"+canon(o[k])).join(",")+"}";
+// o hash cobre o conteúdo técnico do registro (não cobre status, histórico, assinatura nem os bytes dos anexos)
+const hashDoc=d=>{const {aprov,hist,status,versao,evid,revisao,_autor,_criadoEm,...c}=d;return sha256(canon(c))};
+const autorReg=()=>{const r=G.ed&&regGet(G.ed.id);return r&&r.autor?r.autor.id:null};
+const faltaRevisao=d=>{if(!perfil||(typeof membros!=="undefined"&&membros.length<2))return false;const a=autorReg();return !(d.revisao&&d.revisao.porId&&d.revisao.porId!==a)};
 
 /* ---------- sincronização dos registros ---------- */
 async function sincronizarReg(manual){
@@ -2443,8 +2465,9 @@ function bloco(titulo,corpo,aberto){return `<details class="bloco" ${aberto?"ope
 const T=(p,rot,dis,rows,ph)=>`<label class="campo">${rot}<textarea data-g="${p}" rows="${rows||3}" ${ph?`placeholder="${esc(ph)}"`:""} ${dis}>${esc(gget(G.ed.d,p)||"")}</textarea></label>`;
 const I=(p,rot,dis,tipo)=>`<label class="campo">${rot}<input data-g="${p}" type="${tipo||"text"}" value="${esc(gget(G.ed.d,p)||"")}" ${dis}></label>`;
 function htmlGovernanca(dis){
-  const d=G.ed.d,tp=G.ed.tipo,lock=travado(d),cl=tp==="aep"?aepClasse(d):null,adm=quemEdita();
+  const d=G.ed.d,tp=G.ed.tipo,lock=travado(d),cl=tp==="aep"?aepClasse(d):null,adm=quemEdita(),apv=quemAprova();
   const bloqueios=[];
+  if(!lock&&faltaRevisao(d))bloqueios.push("falta a revisão por outra pessoa da equipe (princípio dos quatro olhos)");
   if(tp==="aep"){
     if(!d.postoId&&!d.atividadeId)bloqueios.push("vincule um posto ou atividade");
     if(!(d.obs.prescrita||"").trim()||!(d.obs.realizada||"").trim())bloqueios.push("registre a atividade prescrita e a realizada");
@@ -2458,13 +2481,15 @@ function htmlGovernanca(dis){
   if(!(d.evid||[]).length)avisos.push("Sem evidência anexada (foto, croqui ou documento).");
   return `<div class="grid2"><label class="campo">Status<input value="${STATUS_REG[d.status]||d.status}" disabled></label><label class="campo">Versão<input value="v${d.versao||1}" disabled></label></div>
   ${avisos.map(a=>`<div class="alerta">${esc(a)}</div>`).join("")}
+  ${d.revisao&&!lock?`<p class="mut">Revisada por <b>${esc(d.revisao.por)}</b> em ${dataBR(d.revisao.em)}</p>`:""}
   ${d.aprov?`<p class="mut">Aprovada por <b>${esc(d.aprov.por)}</b> em ${dataBR(d.aprov.em)}${d.aprov.obs?" · "+esc(d.aprov.obs):""}</p>`:""}
   ${bloqueios.length&&!lock?`<div class="alerta">Para aprovar: ${bloqueios.map(esc).join("; ")}.</div>`:""}
   <div class="linha" style="margin-top:10px">
+   ${lock||!quemRevisa()?"":`<button class="btn sec" data-g-acao="reg-revisar">Registrar revisão</button>`}
    ${lock?"":`<button class="btn sec" data-g-acao="reg-revisao" ${d.status==="revisao"?"disabled":""}>Enviar para revisão</button>`}
-   ${!lock?`<button class="btn verde" data-g-acao="reg-aprovar" ${adm?"":"disabled"} title="${adm?"":"Somente administrador"}">Aprovar e bloquear</button>`:`<button class="btn sec" data-g-acao="reg-reabrir" ${adm?"":"disabled"}>Reabrir (administrador)</button>`}
+   ${!lock?`<button class="btn verde" data-g-acao="reg-aprovar" ${apv?"":"disabled"} title="${apv?"":"Somente administrador ou aprovador"}">Aprovar e bloquear</button>`:`<button class="btn sec" data-g-acao="reg-reabrir" ${adm?"":"disabled"}>Reabrir (administrador)</button>`}
    <button class="btn sec" data-g-acao="reg-rel">Relatório / PDF</button>
-  </div>${!adm&&!lock?`<small class="mut">Só o administrador da equipe aprova. Entre numa equipe em Conta.</small>`:""}
+  </div>${!adm&&!lock?`<small class="mut">Só administrador ou aprovador aprova. Entre numa equipe em Conta.</small>`:""}
   ${(d.hist||[]).length?`<details style="margin-top:10px"><summary>Histórico de alterações de status (${d.hist.length})</summary>${d.hist.map(h=>`<div class="sug"><span>${dataBR(h.em)} · <b>${esc(h.acao)}</b> · ${esc(h.por)}${h.motivo?"<br><small>"+esc(h.motivo)+"</small>":""}</span></div>`).join("")}</details>`:""}`;
 }
 function htmlRegEd(){
@@ -2519,14 +2544,15 @@ function mudarStatus(acao,novo,motivo){
   const r=regGet(G.ed.id);if(!r)return;
   const d=G.ed.d;d.status=novo;
   (d.hist=d.hist||[]).push({em:hojeISO(),acao,por:(autorAtual()||{}).nome||"",motivo:motivo||""});
-  if(novo==="aprovada")d.aprov={por:(autorAtual()||{}).nome||"",em:hojeISO(),obs:motivo||""};
+  if(novo==="aprovada")d.aprov={por:(autorAtual()||{}).nome||"",porId:(autorAtual()||{}).id||"",papel:(perfil&&perfil.papel)||"",em:hojeISO(),emHora:new Date().toISOString(),obs:motivo||"",algoritmo:"SHA-256",hash:hashDoc(d)};
   if(acao==="Reaberta"){d.versao=(d.versao||1)+1;delete d.aprov}
   r.d=JSON.parse(JSON.stringify(d));regGravar(r);
 }
 function aprovarReg(){
   const d=G.ed.d;
-  if(!quemEdita()){aviso("Somente o administrador aprova.");return}
+  if(!quemAprova()){aviso("Somente administrador ou aprovador aprova.");return}
   const msgs=[];
+  if(faltaRevisao(d))msgs.push("registre a revisão por outra pessoa da equipe");
   const tp=G.ed.tipo;
   if(tp==="aep"){const c=aepClasse(d);
     if(!d.postoId&&!d.atividadeId)msgs.push("vincule um posto ou atividade");
@@ -4342,6 +4368,90 @@ renderDash=function(){
   div.innerHTML=`<h3>Exposição por turno e por empresa</h3>${gs.length?`<p class="mut">Trabalhadores expostos informados em Cadastros, em Funções e GSTS.</p>${barras(lst(porT))}<h4 style="margin-top:12px">Por equipe própria ou contratada</h4>${barras(lst(porC))}`:`<p class="mut">Cadastre funções e GSTS com turno e nº de expostos para ver este indicador.</p>`}
   <h3 style="margin-top:14px">Regiões do corpo com desconforto relatado</h3>${ql.length?barras(ql):`<p class="mut">Preencha "Regiões com desconforto" na participação do trabalhador da AEP.</p>`}`;
   el.appendChild(div);
+};
+/* =====================================================================
+   FASE 10: ASSINATURA DE INTEGRIDADE, REVISÃO, PAPÉIS E NASA-TLX
+   NASA-TLX: Hart e Staveland, 1988 (pontuação ponderada por 15 comparações
+   pareadas, conforme o manual oficial da NASA, NASA-TLX v1.0).
+   ===================================================================== */
+// ---------- assinatura de integridade ----------
+function verAssinatura(d){
+  if(!d||!d.aprov||!d.aprov.hash)return null;
+  return hashDoc(d)===d.aprov.hash;
+}
+function blocoAssin(){
+  const d=G.ed&&G.ed.d;if(!d||!d.aprov||!d.aprov.hash)return "";
+  const ok=verAssinatura(d);
+  return `<div class="card" style="box-shadow:none;border:1px solid var(--bd);margin-top:10px"><b>Assinatura de integridade</b>
+  <p class="mut" style="font-size:.84rem">Aprovado por <b>${esc(d.aprov.por)}</b>${d.aprov.papel?" ("+esc(PAPEIS[d.aprov.papel]||d.aprov.papel)+")":""} em ${esc((d.aprov.emHora||d.aprov.em||"").replace("T"," ").slice(0,16))}.<br>
+  ${d.aprov.algoritmo||"SHA-256"}: <code style="word-break:break-all">${esc(d.aprov.hash)}</code></p>
+  <p style="margin:0;${ok?"":"color:#FF3300;font-weight:700"}">${ok?"✔ Conteúdo íntegro: igual ao que foi aprovado.":"✘ Atenção: o conteúdo mudou depois da aprovação."}</p>
+  <small class="mut">O código cobre o conteúdo técnico do registro. Não cobre status, histórico nem o arquivo dos anexos.</small></div>`;
+}
+const _htmlGov17=htmlGovernanca;
+htmlGovernanca=function(dis){return _htmlGov17(dis)+blocoAssin()};
+const _htmlRel17=htmlRelatorio;
+htmlRelatorio=function(){
+  const h=_htmlRel17(),d=G.ed&&G.ed.d;if(!d||!d.aprov)return h;
+  const ok=verAssinatura(d);
+  return h+`<h3>Aprovação e integridade</h3><p>Aprovado por <b>${esc(d.aprov.por)}</b>${d.aprov.papel?" ("+esc(PAPEIS[d.aprov.papel]||d.aprov.papel)+")":""} em ${dataBR(d.aprov.em)}.${d.revisao?` Revisão técnica por <b>${esc(d.revisao.por)}</b> em ${dataBR(d.revisao.em)}.`:""}</p>${d.aprov.hash?`<p style="font-size:.8rem;word-break:break-all">${d.aprov.algoritmo||"SHA-256"}: ${esc(d.aprov.hash)}<br>${ok?"Conferência na emissão: conteúdo íntegro.":"Conferência na emissão: CONTEÚDO ALTERADO após a aprovação."}</p>`:""}`;
+};
+document.addEventListener("click",e=>{
+  const b=e.target.closest('[data-g-acao="reg-revisar"]');if(!b||!G.ed)return;
+  const a=autorAtual()||{};
+  if(autorReg()&&a.id&&a.id===autorReg()&&typeof membros!=="undefined"&&membros.length>1){aviso("A revisão deve ser feita por outra pessoa da equipe, não pelo autor.");return}
+  G.ed.d.revisao={por:a.nome||"",porId:a.id||"",em:hojeISO()};
+  mudarStatus("Revisada",G.ed.d.status,"");reRender();aviso("Revisão registrada.");
+});
+// troca de papel (administrador)
+document.addEventListener("change",async e=>{
+  const s=e.target.closest("[data-papel-membro]");if(!s)return;
+  try{await sbA("/rest/v1/rpc/definir_papel",{method:"POST",body:{p_user:s.dataset.papelMembro,p_papel:s.value}});await carregarPerfil();renderConta();aviso("Papel atualizado.")}
+  catch(err){aviso((err&&err.message)||"Não foi possível alterar o papel.");renderConta()}
+});
+
+// ---------- NASA-TLX ----------
+const TLX_ESC=[
+ ["md","Demanda mental","Quanta atividade mental e perceptiva foi exigida (pensar, decidir, calcular, lembrar, observar)? A tarefa foi fácil ou difícil, simples ou complexa?","Baixa","Alta"],
+ ["fd","Demanda física","Quanta atividade física foi exigida (empurrar, puxar, girar, controlar)? A tarefa foi leve ou pesada, lenta ou rápida, tranquila ou extenuante?","Baixa","Alta"],
+ ["td","Demanda temporal","Quanta pressão de tempo foi sentida pelo ritmo da tarefa? O ritmo foi lento e calmo ou rápido e frenético?","Baixa","Alta"],
+ ["dc","Desempenho","Quão bem-sucedido foi em atingir os objetivos da tarefa? Quão satisfeito ficou com o próprio desempenho?","Bom","Ruim"],
+ ["es","Esforço","Quanto teve de trabalhar, mental e fisicamente, para chegar ao nível de desempenho?","Baixo","Alto"],
+ ["fr","Frustração","Quão inseguro, desanimado, irritado, estressado e incomodado se sentiu, em comparação com seguro, satisfeito, relaxado e contente?","Baixa","Alta"]];
+const TLX_PARES=[];for(let i=0;i<6;i++)for(let j=i+1;j<6;j++)TLX_PARES.push([i,j]);
+function tlx(v){
+  const r=TLX_ESC.map(([k])=>NG(v["r_"+k])),bruto=r.reduce((a,b)=>a+b,0)/6;
+  const w=Array(6).fill(0);let completo=true;
+  TLX_PARES.forEach(([i,j],n)=>{const c=v["p"+n];if(c==="i")w[i]++;else if(c==="j")w[j]++;else completo=false});
+  const pond=completo?r.reduce((a,x,i)=>a+x*w[i],0)/15:null;
+  return {r,bruto,w,completo,pond};
+}
+const _desenharMetodo17=desenharMetodo;
+desenharMetodo=function(){
+  if(M.tipo!=="tlx")return _desenharMetodo17();
+  const el=$("#metodoModal");if(!el)return;
+  const corpo=`<h2>NASA-TLX (carga de trabalho percebida)</h2><p class="mut" style="font-size:.86rem">Aplique ao trabalhador logo após a tarefa. <b>Parte 1:</b> ele dá uma nota de 0 a 100 para cada dimensão. <b>Parte 2 (opcional, recomendada):</b> em cada par, ele indica qual dimensão mais contribuiu para a carga. Sem a parte 2, o resultado é o TLX bruto (média simples).</p>
+  <h4>Parte 1: notas de 0 a 100</h4>${TLX_ESC.map(([k,r,def,a,b])=>`<label class="campo"><b>${r}</b> <small>(${a} = 0, ${b} = 100)</small><small class="mut" style="display:block">${def}</small><input data-mt="r_${k}" inputmode="numeric" value="${esc(M.v["r_"+k]??"")}" placeholder="0 a 100"></label>`).join("")}
+  <h4>Parte 2: qual contribuiu mais?</h4><div class="grid2">${TLX_PARES.map(([i,j],n)=>`<label class="campo">${TLX_ESC[i][1]} ou ${TLX_ESC[j][1]}<select data-mt="p${n}"><option value="">—</option><option value="i" ${M.v["p"+n]==="i"?"selected":""}>${TLX_ESC[i][1]}</option><option value="j" ${M.v["p"+n]==="j"?"selected":""}>${TLX_ESC[j][1]}</option></select></label>`).join("")}</div>`;
+  el.innerHTML=`<div class="modal-fundo" data-mt-fechar="1"></div><div class="modal-caixa" role="dialog" aria-modal="true"><button type="button" class="modal-x" data-mt-fechar="1" aria-label="Fechar">×</button>${corpo}<div id="metodoRes"></div></div>`;
+  atualizarMetodo();
+};
+const _resultadoMetodo17=resultadoMetodo;
+resultadoMetodo=function(){
+  if(M.tipo!=="tlx")return _resultadoMetodo17();
+  const t=tlx(M.v);
+  if(t.r.some(x=>isNaN(x)||x<0||x>100))return null;
+  const res=t.completo?`TLX ponderado ${nf(t.pond,1)} (de 0 a 100) · TLX bruto ${nf(t.bruto,1)}`:`TLX bruto ${nf(t.bruto,1)} (de 0 a 100; sem comparações pareadas)`;
+  const dim=TLX_ESC.map(([,n],i)=>n+" "+nf(t.r[i],0)+(t.completo?" (peso "+t.w[i]+")":"")).join("; ");
+  return {nome:"NASA-TLX",versao:"Hart e Staveland, 1988 (NASA Task Load Index v1.0)",
+    resultado:res,parametros:dim+".",
+    limites:"Mede a carga de trabalho percebida pelo trabalhador, não o risco em si. A NASA não define faixas oficiais de classificação: use para comparar tarefas, postos ou antes e depois de uma melhoria, sempre com o mesmo grupo e o mesmo procedimento. Depende do relato; aplique logo após a tarefa.",
+    html:`<table class="tab"><tr><th>Dimensão</th><th>Nota</th>${t.completo?"<th>Peso</th><th>Nota × peso</th>":""}</tr>${TLX_ESC.map(([,n],i)=>`<tr><td>${n}</td><td>${nf(t.r[i],0)}</td>${t.completo?`<td>${t.w[i]}</td><td>${nf(t.r[i]*t.w[i],0)}</td>`:""}</tr>`).join("")}</table><p><b>${esc(res)}</b>${t.completo?"<br><small>Ponderado = soma de (nota × peso) ÷ 15.</small>":""}</p>`};
+};
+const _htmlClasse17=htmlClasse;
+htmlClasse=function(c,dis){
+  const h=_htmlClasse17(c,dis);
+  return dis?h:h.replace('data-mt-abrir="si">Calcular Strain Index</button>','data-mt-abrir="si">Calcular Strain Index</button><button type="button" class="btn sec peq" data-mt-abrir="tlx">Calcular NASA-TLX</button>');
 };
 /* =====================================================================
    INÍCIO
