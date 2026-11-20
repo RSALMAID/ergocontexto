@@ -290,6 +290,35 @@ body.com-login #navConta{display:inline-block!important}
 body.sem-acesso .topo,body.sem-acesso .wrap{display:none}
 .codigo{display:inline-block;font:800 1.3rem ui-monospace,monospace;letter-spacing:.2em;background:var(--soft);border:1px dashed var(--verde2);border-radius:10px;padding:4px 14px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---- gestão (fase 1) ---- */
+.subtabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.subtabs button{border:1.5px solid var(--bd);background:var(--card);color:var(--tx);border-radius:999px;padding:6px 14px;font-weight:600;font-size:.86rem}
+.subtabs button.on{background:var(--verde);color:#fff;border-color:var(--verde)}
+.linha{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+@media(max-width:620px){.grid3{grid-template-columns:1fr}}
+details.bloco{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);margin:0 0 14px}
+details.bloco>summary{cursor:pointer;padding:14px 18px;font-weight:700;list-style:none}
+details.bloco>summary::-webkit-details-marker{display:none}
+details.bloco>summary::after{content:"▾";float:right;color:var(--mut)}
+details.bloco[open]>summary::after{content:"▴"}
+.bloco-c{padding:0 18px 18px}
+details.sub{border-top:1px dashed var(--bd);padding:8px 0}
+details.sub>summary{cursor:pointer;font-weight:600;padding:6px 0}
+.frow{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--soft);font-size:.9rem}
+.frow select{max-width:150px}
+.chk{display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:.9rem}
+.chk input{width:auto;margin-top:3px}
+.res-aep{display:flex;gap:28px;flex-wrap:wrap;margin:6px 0 10px}
+.evid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.evi{border:1px solid var(--bd);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.evi img{width:100%;height:120px;object-fit:cover;border-radius:8px}
+.evi .pdf{height:120px;display:grid;place-items:center;background:var(--soft);border-radius:8px;font-weight:800;color:var(--mut)}
+.metodo{border:1px solid var(--bd);border-radius:12px;padding:8px;margin:8px 0}
+.tab{width:100%;border-collapse:collapse;margin:6px 0 10px;font-size:.88rem}
+.tab th,.tab td{border:1px solid var(--bd);padding:5px 8px;text-align:left;vertical-align:top}
+.evid-print{display:flex;flex-wrap:wrap;gap:10px}.evid-print figure{margin:0;width:200px}.evid-print img{width:100%}
 @media print{
   :root{--bg:#fff;--card:#fff;--tx:#000;--mut:#444;--bd:#bbb;--soft:#f3f3f3;--fig:#222;
     --n0b:#e3f5e9;--n0t:#14532d;--n1b:#fff4cc;--n1t:#6b4e00;--n2b:#ffe4cf;--n2t:#7a3300;--n3b:#ffdada;--n3t:#7f1212;--ndb:#eceff1;--ndt:#455a64}
@@ -316,6 +345,8 @@ body.sem-acesso .topo,body.sem-acesso .wrap{display:none}
     </div>
     <nav id="nav" aria-label="Seções">
       <button data-v="avaliar" class="on">Avaliar</button>
+      <button data-v="demandas">Demandas</button>
+      <button data-v="cadastros">Cadastros</button>
       <button data-v="historico">Histórico</button>
       <button data-v="painel">Painel</button>
       <button data-v="sobre">Sobre o método</button>
@@ -330,6 +361,8 @@ body.sem-acesso .topo,body.sem-acesso .wrap{display:none}
     <div id="banner" class="no-print"></div>
     <div id="palco"></div>
   </section>
+  <section id="v-demandas" class="view"></section>
+  <section id="v-cadastros" class="view"></section>
   <section id="v-historico" class="view"></section>
   <section id="v-painel" class="view"></section>
   <section id="v-sobre" class="view sobre"></section>
@@ -726,6 +759,8 @@ function irPara(v){
   if(v==="painel")renderPainel();
   if(v==="sobre")renderSobre();
   if(v==="conta")renderConta();
+  if(v==="demandas")renderDemandas();
+  if(v==="cadastros")renderCadastros();
   if(v==="avaliar")render();
   window.scrollTo(0,0);
 }
@@ -1016,6 +1051,7 @@ function htmlFotoBox(){
 }
 function htmlContexto(){
   return `
+  ${typeof htmlVinculoTriagem==="function"?htmlVinculoTriagem():""}
   <div class="card">
     <div class="aviso">⚠️ Ferramenta de <b>triagem</b> ergonômica e de fatores humanos. Não substitui análise ergonômica formal (AET), avaliação especializada nem medições quantitativas.</div>
     <h2 style="margin-top:14px">Contexto da avaliação</h2>
@@ -2027,6 +2063,579 @@ let authSessaoApos=null;
 window.addEventListener("online",()=>sincronizar());
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)sincronizar()});
 setInterval(()=>sincronizar(),180000);
+
+/* =====================================================================
+   GESTÃO ERGONÔMICA (fase 1): cadastros, demandas, AEP, AET, evidências
+   Registros ficam no aparelho (offline) e sincronizam com a tabela
+   "registros" do Supabase quando há login. Numeração única vem do servidor.
+   ===================================================================== */
+const CH_REG="ergocontexto_reg",CH_REGSY="ergocontexto_reg_sync";
+let REG=lerJSON(CH_REG,[]);
+const G={cadTab:"posto",cadEd:null,demFiltro:"abertas",ed:null,rel:false,hist:null,verDem:null};
+const regOf=t=>REG.filter(r=>r.tipo===t&&!r.excluido);
+const regGet=id=>REG.find(r=>r.id===id&&!r.excluido);
+const rid=()=>"R"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const gget=(o,p)=>p.split(".").reduce((x,k)=>x==null?x:x[k],o);
+function gset(o,p,v){const ks=p.split(".");let x=o;ks.slice(0,-1).forEach((k,i)=>{if(x[k]==null)x[k]=/^\d+$/.test(ks[i+1])?[]:{};x=x[k]});x[ks[ks.length-1]]=v}
+const sel1=(arr,v)=>arr.map(o=>{const [val,rot]=Array.isArray(o)?o:[o,o];return `<option value="${esc(val)}" ${String(v)===String(val)?"selected":""}>${esc(rot)}</option>`}).join("");
+const dataBR=s=>s?String(s).split("-").reverse().join("/"):"";
+function regGravar(r,agora){
+  r.atualizadoEm=agora||Date.now();
+  if(!r.criadoEm)r.criadoEm=r.atualizadoEm;
+  if(!r.autor&&typeof autorAtual==="function")r.autor=autorAtual();
+  const i=REG.findIndex(x=>x.id===r.id);
+  if(i>=0)REG[i]=r;else REG.unshift(r);
+  if(!gravarJSON(CH_REG,REG))aviso("Armazenamento do aparelho cheio. Sincronize e libere espaço.");
+  if(typeof agendarSync==="function")agendarSync();
+}
+function regExcluir(id){const r=REG.find(x=>x.id===id);if(!r)return;r.excluido=true;regGravar(r)}
+const quemEdita=()=>perfil&&perfil.papel==="admin";
+const travado=d=>d&&d.status==="aprovada";
+
+/* ---------- sincronização dos registros ---------- */
+async function sincronizarReg(manual){
+  if(!SB_ON||!sessao||!navigator.onLine)return;
+  try{
+    const sy=lerJSON(CH_REGSY,{}),eq=perfil&&perfil.equipe_id?perfil.equipe_id:null;
+    const sobe=REG.filter(r=>(r.atualizadoEm||0)>(sy[r.id]||0));
+    for(const r of sobe){
+      const corpo={id:r.id,tipo:r.tipo,equipe_id:eq,dados:{...r.d,_autor:r.autor,_criadoEm:r.criadoEm},atualizado_em:r.atualizadoEm,excluido:!!r.excluido};
+      try{
+        const res=await sbA("/rest/v1/registros?on_conflict=id",{method:"POST",body:corpo,headers:{Prefer:"resolution=merge-duplicates,return=representation"}});
+        const row=res&&res[0];
+        if(row&&row.dados&&row.dados.numero&&r.d.numero!==row.dados.numero)r.d.numero=row.dados.numero;
+        sy[r.id]=r.atualizadoEm;delete r.erroSync;
+      }catch(e){r.erroSync=e.message}
+    }
+    const rows=await sbA("/rest/v1/registros?select=id,tipo,dados,atualizado_em,excluido&order=atualizado_em.desc&limit=3000")||[];
+    rows.forEach(w=>{
+      const {_autor,_criadoEm,...d}=w.dados||{};
+      const i=REG.findIndex(x=>x.id===w.id),loc=i>=0?REG[i]:null;
+      if(!loc){REG.push({id:w.id,tipo:w.tipo,d,autor:_autor||null,criadoEm:_criadoEm||w.atualizado_em,atualizadoEm:w.atualizado_em,excluido:!!w.excluido});sy[w.id]=w.atualizado_em}
+      else if((w.atualizado_em||0)>(loc.atualizadoEm||0)){REG[i]={...loc,d,autor:_autor||loc.autor,atualizadoEm:w.atualizado_em,excluido:!!w.excluido};sy[w.id]=w.atualizado_em}
+      else if(w.dados&&w.dados.numero&&!loc.d.numero)loc.d.numero=w.dados.numero;
+    });
+    gravarJSON(CH_REG,REG);gravarJSON(CH_REGSY,sy);
+    const v=$(".view.on");
+    if(v&&!G.ed&&(v.id==="v-demandas"||v.id==="v-cadastros"))irPara(v.id.slice(2));
+  }catch(e){if(manual)aviso("Falha ao sincronizar registros: "+e.message)}
+}
+const _syncBase=sincronizar;
+sincronizar=async function(m){await _syncBase(m);await sincronizarReg(m)};
+
+/* ---------- evidências (Supabase Storage) ---------- */
+function comprimirImagem(file,max,q){
+  return new Promise((ok,err)=>{
+    const img=new Image(),u=URL.createObjectURL(file);
+    img.onload=()=>{const k=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>b?ok({blob:b,url:c.toDataURL("image/jpeg",.6)}):err(new Error("falha ao comprimir")),"image/jpeg",q)};
+    img.onerror=()=>{URL.revokeObjectURL(u);err(new Error("Imagem inválida."))};
+    img.src=u;
+  });
+}
+async function anexarEvidencia(file,regId){
+  const eh=/^image\//.test(file.type);
+  if(!eh&&file.type!=="application/pdf")throw new Error("Use foto (JPG/PNG) ou PDF.");
+  if(file.size>15e6)throw new Error("Arquivo grande demais (máx. 15 MB).");
+  let blob=file,mini="";
+  if(eh){const c=await comprimirImagem(file,1400,.72);blob=c.blob;const m=await comprimirImagem(file,200,.6);mini=m.url}
+  if(blob.size>5242880)throw new Error("Arquivo maior que 5 MB depois de comprimir.");
+  const ev={nome:file.name,tipo:blob.type,mini,em:Date.now(),por:(autorAtual()||{}).nome||"",legenda:""};
+  if(SB_ON&&sessao){
+    if(!navigator.onLine)throw new Error("Sem internet. Envie a evidência quando voltar a conexão.");
+    const t=await tokenValido();if(!t)throw new Error("Sessão expirada. Entre de novo.");
+    const pasta=(perfil&&perfil.equipe_id)||sessao.user.id,ext=eh?"jpg":"pdf";
+    const path=`${pasta}/${regId}/${Date.now()}-${Math.random().toString(36).slice(2,6)}.${ext}`;
+    const r=await fetch(`${SB_URL}/storage/v1/object/evidencias/${path}`,{method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+t,"Content-Type":blob.type},body:blob});
+    if(!r.ok){let j={};try{j=await r.json()}catch(e){}throw new Error(j.message||j.error||"Falha no envio ("+r.status+")")}
+    ev.path=path;
+  }else ev.local=true;
+  return ev;
+}
+async function abrirEvidencia(i){
+  const ev=G.ed&&G.ed.d.evid&&G.ed.d.evid[i];if(!ev)return;
+  if(!ev.path){if(ev.mini){const w=window.open("");if(w)w.document.write(`<img src="${ev.mini}" style="max-width:100%">`)}return}
+  try{
+    const t=await tokenValido();
+    const r=await fetch(`${SB_URL}/storage/v1/object/sign/evidencias/${ev.path}`,{method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+t,"Content-Type":"application/json"},body:JSON.stringify({expiresIn:600})});
+    const j=await r.json();if(!r.ok||!j.signedURL)throw new Error(j.message||"Sem acesso");
+    window.open(SB_URL+"/storage/v1"+j.signedURL,"_blank");
+  }catch(e){aviso("Não foi possível abrir: "+e.message)}
+}
+function htmlEvid(bloqueado){
+  const d=G.ed.d,ev=d.evid||[];
+  return `<div class="evid">${ev.map((e,i)=>`<div class="evi">${e.mini?`<img src="${esc(e.mini)}" alt="">`:`<div class="pdf">PDF</div>`}<input data-g="evid.${i}.legenda" value="${esc(e.legenda||"")}" placeholder="Legenda (antes/depois, ponto marcado…)" ${bloqueado?"disabled":""}><small>${esc(e.nome)}${e.local?" · só neste aparelho":""}</small><span class="linha"><button type="button" class="btn sec peq" data-g-acao="evid-abrir" data-i="${i}">Abrir</button>${bloqueado?"":`<button type="button" class="btn sec peq" data-g-acao="evid-rm" data-i="${i}">Remover</button>`}</span></div>`).join("")||`<p class="mut">Nenhuma evidência anexada.</p>`}</div>
+  ${bloqueado?"":`<label class="btn sec peq" style="margin-top:8px">📷 Adicionar foto ou PDF<input type="file" id="evidIn" accept="image/*,application/pdf" capture="environment" hidden multiple></label><small class="mut"> Fotos são reduzidas antes do envio. Evite rostos identificáveis.</small>`}`;
+}
+
+/* =====================================================================
+   CADASTROS
+   ===================================================================== */
+const TIPOS_TRAB=["Operação","Manutenção","Administrativo","Laboratório","Logística","Movimentação de materiais","Sala de controle","Atividade eventual","Home office","Atividade de empresa contratada"];
+const NIVEIS_ORG=["Unidade","Diretoria","Gerência","Coordenação","Área"];
+const CAD={
+  planta:{rot:"Plantas",um:"planta",pai:[],campos:[["nome","Planta / unidade *"],["empresa","Empresa"],["diretoria","Diretoria"],["gerencia","Gerência"]]},
+  area:{rot:"Áreas",um:"área",pai:["planta","area"],campos:[["nome","Nome *"],["nivel","Nível",{op:NIVEIS_ORG}],["responsavel","Responsável"]]},
+  posto:{rot:"Postos e equipamentos",um:"posto",pai:["area"],campos:[["nome","Nome do posto ou equipamento *"],["tag","TAG"],["local","Local exato"],["equipamento","Equipamento"]]},
+  atividade:{rot:"Atividades",um:"atividade",pai:["posto"],campos:[["nome","Atividade *"],["processo","Processo"],["subprocesso","Subprocesso"],["tipoTrabalho","Tipo de trabalho",{op:TIPOS_TRAB}],["turno","Turno"],["jornada","Jornada"],["escala","Escala"]]},
+  gsts:{rot:"Funções e GSTS",um:"função",pai:["area","planta"],campos:[["nome","Função *"],["cargo","Cargo"],["gsts","GSTS (grupo de situações de trabalho similares)"],["nExpostos","Nº de trabalhadores expostos",{tipo:"number"}],["turno","Turno"],["contratada","Empresa contratada (se houver)"]]},
+  contratada:{rot:"Contratadas",um:"contratada",pai:[],campos:[["nome","Empresa *"],["responsavel","Responsável pelo contrato"]]}
+};
+const CAD_ORD=["planta","area","posto","atividade","gsts","contratada"];
+const cads=t=>regOf("cad").filter(r=>r.d.tc===t).sort((a,b)=>(a.d.nome||"").localeCompare(b.d.nome||"","pt"));
+function caminho(id){const o=[];let r=regGet(id),n=0;while(r&&n++<8){o.unshift(r.d.nome);r=r.d.pai?regGet(r.d.pai):null}return o.join(" › ")}
+function filhos(id){return regOf("cad").filter(r=>r.d.pai===id)}
+function renderCadastros(){
+  const el=$("#v-cadastros");if(!el)return;
+  const t=G.cadTab,def=CAD[t],itens=cads(t);
+  const abas=CAD_ORD.map(k=>`<button type="button" class="${k===t?"on":""}" data-g-acao="cad-tab" data-t="${k}">${CAD[k].rot} <small>${cads(k).length}</small></button>`).join("");
+  let corpo;
+  if(G.hist){corpo=htmlHistPosto(G.hist)}
+  else{
+    const ed=G.cadEd;
+    const paiOps=def.pai.length?regOf("cad").filter(r=>def.pai.includes(r.d.tc)).map(r=>[r.id,caminho(r.id)]).sort((a,b)=>a[1].localeCompare(b[1],"pt")):[];
+    const form=ed?`<div class="card"><h3>${ed.id?"Editar":"Novo"} cadastro: ${def.um}</h3><form data-g-form="cad"><div class="grid2">
+      ${def.pai.length?`<label class="campo">Vinculado a ${def.pai.map(p=>CAD[p].um).join(" ou ")}<select name="pai"><option value="">${def.pai.includes("planta")&&t==="area"?"—":"(nenhum)"}</option>${sel1(paiOps,ed.d.pai||"")}</select></label>`:""}
+      ${def.campos.map(([k,r,o])=>`<label class="campo">${r}${o&&o.op?`<select name="${k}"><option value=""></option>${sel1(o.op,ed.d[k]||"")}</select>`:`<input name="${k}" type="${o&&o.tipo||"text"}" value="${esc(ed.d[k]||"")}" ${k==="nome"?"required":""}>`}</label>`).join("")}
+      </div><div class="linha" style="margin-top:12px"><button class="btn verde">Salvar</button><button type="button" class="btn sec" data-g-acao="cad-cancel">Cancelar</button></div></form></div>`:"";
+    const lin=itens.map(r=>{
+      const x=r.d,ex=[x.tag&&"TAG "+x.tag,x.local,x.nivel,x.tipoTrabalho,x.gsts,x.nExpostos&&x.nExpostos+" expostos",x.responsavel,x.empresa].filter(Boolean).join(" · ");
+      return `<div class="sug"><span><b>${esc(x.nome)}</b>${x.pai?`<br><small>${esc(caminho(x.pai))}</small>`:""}${ex?`<br><small>${esc(ex)}</small>`:""}</span><span class="linha">${t==="posto"?`<button class="btn sec peq" data-g-acao="hist-posto" data-id="${r.id}">Histórico</button>`:""}<button class="btn sec peq" data-g-acao="cad-edit" data-id="${r.id}">Editar</button><button class="btn sec peq" data-g-acao="cad-del" data-id="${r.id}">Excluir</button></span></div>`}).join("")||`<p class="mut">Nada cadastrado aqui ainda.</p>`;
+    corpo=`${form}<div class="card"><div class="linha" style="justify-content:space-between"><h3 style="margin:0">${def.rot}</h3>${ed?"":`<button class="btn peq" data-g-acao="cad-novo">+ Novo</button>`}</div>${lin}</div>`;
+  }
+  el.innerHTML=`<div class="card"><h2>Cadastros</h2><p class="mut">Base única do sistema. Toda avaliação deve ficar vinculada a uma <b>situação real de trabalho</b> (posto, equipamento e atividade), e não só ao nome do cargo. Ordem sugerida: planta → área → posto → atividade → função/GSTS.</p><div class="subtabs">${abas}</div></div>${corpo}`;
+}
+function salvarCad(f){
+  const def=CAD[G.cadTab],ed=G.cadEd,fd=new FormData(f),d={tc:G.cadTab};
+  def.campos.forEach(([k])=>{d[k]=(fd.get(k)||"").toString().trim()});
+  if(def.pai.length)d.pai=fd.get("pai")||"";
+  if(!d.nome){aviso("Informe o nome.");return}
+  if(G.cadTab==="posto"&&!d.pai&&!confirm("Posto sem área vinculada. Salvar mesmo assim?"))return;
+  if(G.cadTab==="atividade"&&!d.pai&&!confirm("Atividade sem posto vinculado. Salvar mesmo assim?"))return;
+  const r=ed.id?regGet(ed.id):{id:rid(),tipo:"cad",d:{}};
+  r.d=d;regGravar(r);G.cadEd=null;renderCadastros();aviso("Cadastro salvo.");
+}
+function usadoPor(id){
+  return filhos(id).length+regOf("dem").filter(r=>r.d.postoId===id||r.d.atividadeId===id).length+regOf("aep").concat(regOf("aet")).filter(r=>r.d.postoId===id||r.d.atividadeId===id).length+lista.filter(a=>a.ctx&&(a.ctx.postoId===id||a.ctx.atividadeId===id)).length;
+}
+function htmlHistPosto(id){
+  const p=regGet(id);if(!p)return "";
+  const ev=[];
+  regOf("dem").filter(r=>r.d.postoId===id).forEach(r=>ev.push({t:r.d.data||"",k:"Demanda",n:r.d.numero||"(pendente)",x:r.d.origem+" · "+(ST_DEM.find(s=>s[0]===r.d.status)||[0,""])[1],a:["abrir-dem",r.id]}));
+  lista.filter(a=>a.ctx&&a.ctx.postoId===id).forEach(a=>{const i=indice(a.resultado);ev.push({t:a.ctx.data||"",k:"Triagem",n:a.id,x:(a.ctx.atividade||"")+(i?" · índice "+i.v:""),a:null})});
+  regOf("aep").filter(r=>r.d.postoId===id).forEach(r=>ev.push({t:r.d.data||"",k:"AEP",n:r.d.numero||"(pendente)",x:"v"+(r.d.versao||1)+" · "+r.d.status,a:["abrir-reg",r.id]}));
+  regOf("aet").filter(r=>r.d.postoId===id).forEach(r=>ev.push({t:r.d.data||"",k:"AET",n:r.d.numero||"(pendente)",x:"v"+(r.d.versao||1)+" · "+r.d.status,a:["abrir-reg",r.id]}));
+  ev.sort((a,b)=>b.t.localeCompare(a.t));
+  return `<div class="card"><button class="btn sec peq" data-g-acao="hist-voltar">← Voltar</button><h3 style="margin-top:12px">Histórico do posto: ${esc(p.d.nome)}</h3><small>${esc(caminho(id))}${p.d.tag?" · TAG "+esc(p.d.tag):""}</small>${ev.map(e=>`<div class="sug"><span><b>${e.k}</b> ${esc(e.n)}<br><small>${dataBR(e.t)} · ${esc(e.x)}</small></span>${e.a?`<button class="btn sec peq" data-g-acao="${e.a[0]}" data-id="${e.a[1]}">Abrir</button>`:""}</div>`).join("")||`<p class="mut">Nenhum registro vinculado a este posto ainda.</p>`}</div>`;
+}
+
+/* =====================================================================
+   DEMANDAS
+   ===================================================================== */
+const ORIGENS=["Avaliação programada","Novo posto ou equipamento","Mudança de processo","Alteração de layout","Nova ferramenta","Queixa de trabalhador","Relato de desconforto","Indicação do PCMSO","Afastamento ou restrição","Acidente ou incidente","Desvio de segurança","Recusa ao risco","Resultado de auditoria","Solicitação da liderança","Ação judicial ou fiscalização","Inadequação identificada em AEP anterior","Verificação de eficácia de uma melhoria","Investigação de aumento de absenteísmo","Atividade de parada de manutenção"];
+const ST_DEM=[["aberta","Aberta"],["triagem","Em triagem"],["aep","AEP"],["aet","AET"],["acao","Em ação"],["concluida","Concluída"],["cancelada","Cancelada"]];
+const PRI_DEM=["Baixa","Média","Alta","Urgente"],PRAZO_DIAS=[60,30,15,3];
+const FECHADA=s=>s==="concluida"||s==="cancelada";
+const somaDias=(n)=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const vencida=d=>d.prazo&&!FECHADA(d.status)&&d.prazo<hojeISO();
+function renderDemandas(){
+  const el=$("#v-demandas");if(!el)return;
+  if(G.ed&&G.ed.tipo==="dem"){el.innerHTML=htmlDemEd();return}
+  if(G.ed&&(G.ed.tipo==="aep"||G.ed.tipo==="aet")){el.innerHTML=G.rel?htmlRelatorio():htmlRegEd();posEd();return}
+  const f=G.demFiltro,todas=regOf("dem");
+  const L=todas.filter(r=>f==="abertas"?!FECHADA(r.d.status):f==="vencidas"?vencida(r.d):f==="fechadas"?FECHADA(r.d.status):true).sort((a,b)=>(b.d.data||"").localeCompare(a.d.data||""));
+  const chips=[["abertas","Abertas"],["vencidas","Vencidas"],["fechadas","Encerradas"],["todas","Todas"]].map(([k,r])=>`<button type="button" class="${f===k?"on":""}" data-g-acao="dem-filtro" data-f="${k}">${r}${k==="vencidas"?` <small>${todas.filter(x=>vencida(x.d)).length}</small>`:""}</button>`).join("");
+  const cards=L.map(r=>{const d=r.d,st=(ST_DEM.find(s=>s[0]===d.status)||[0,d.status])[1];
+    return `<div class="sug"><span><b>${esc(d.numero||"(número após sincronizar)")}</b> · ${esc(d.origem||"")}<br><small>${esc(d.postoId?caminho(d.postoId):d.areaTxt||"")}${d.atividadeId?" · "+esc(caminho(d.atividadeId).split(" › ").pop()):""}</small><br><small>${esc((d.motivo||"").slice(0,110))}</small></span><span class="linha" style="flex-direction:column;align-items:flex-end;gap:4px"><span class="bd ${["n0","n1","n2","n3"][Number(d.prioridade)||0]}">${PRI_DEM[Number(d.prioridade)||0]}</span><span class="bd nd">${st}</span>${vencida(d)?`<span class="bd n3">Vencida ${dataBR(d.prazo)}</span>`:d.prazo?`<small>prazo ${dataBR(d.prazo)}</small>`:""}<button class="btn sec peq" data-g-acao="dem-abrir" data-id="${r.id}">Abrir</button></span></div>`}).join("")||`<p class="mut">Nenhuma demanda neste filtro.</p>`;
+  el.innerHTML=`<div class="card"><div class="linha" style="justify-content:space-between"><h2 style="margin:0">Demandas ergonômicas</h2><button class="btn" data-g-acao="dem-nova">+ Nova demanda</button></div><p class="mut">Toda avaliação nasce de uma demanda com número único, origem, prioridade e prazo. A numeração é gerada pelo servidor ao sincronizar.</p><div class="subtabs">${chips}</div></div><div class="card">${cards}</div>`;
+}
+function novaDemanda(){return {id:rid(),tipo:"dem",novo:true,d:{data:hojeISO(),origem:"",solicitante:(perfil&&perfil.nome)||"",postoId:"",atividadeId:"",areaTxt:"",motivo:"",prioridade:"1",prazo:somaDias(30),triagem:"",status:"aberta",evid:[]}}}
+function opsPosto(){return regOf("cad").filter(r=>r.d.tc==="posto").map(r=>[r.id,caminho(r.id)]).sort((a,b)=>a[1].localeCompare(b[1],"pt"))}
+function opsAtiv(postoId){return regOf("cad").filter(r=>r.d.tc==="atividade"&&(!postoId||r.d.pai===postoId)).map(r=>[r.id,r.d.nome])}
+function vinculoHtml(d,dis){
+  return `<div class="grid2"><label class="campo">Posto / equipamento<select data-g="postoId" data-re="1" ${dis}><option value="">(não vinculado)</option>${sel1(opsPosto(),d.postoId||"")}</select></label>
+  <label class="campo">Atividade<select data-g="atividadeId" ${dis}><option value="">(não vinculada)</option>${sel1(opsAtiv(d.postoId),d.atividadeId||"")}</select></label></div>
+  ${!opsPosto().length?`<small class="mut">Cadastre postos e atividades em <a href="#" data-ir="cadastros">Cadastros</a> para vincular. Enquanto isso, descreva abaixo.</small>`:""}`;
+}
+function htmlDemEd(){
+  const {d,id}=G.ed,novo=G.ed.novo,dis=FECHADA(d.status)?"":"";
+  const memb=(typeof membros!=="undefined"&&membros||[]).map(m=>m.nome).filter(Boolean);
+  const linked=!novo?htmlDemFluxo(id):"";
+  return `<div class="card no-print"><button class="btn sec peq" data-g-acao="ed-voltar">← Demandas</button><h2 style="margin-top:12px">${novo?"Nova demanda":"Demanda "+esc(d.numero||"(número após sincronizar)")}</h2>
+  <div class="grid2">
+   <label class="campo">Origem *<select data-g="origem"><option value="">Selecione…</option>${sel1(ORIGENS,d.origem)}</select></label>
+   <label class="campo">Data<input type="date" data-g="data" value="${esc(d.data)}"></label>
+   <label class="campo">Solicitante<input data-g="solicitante" value="${esc(d.solicitante)}"></label>
+   <label class="campo">Responsável pela triagem<input data-g="triagem" value="${esc(d.triagem)}" list="dlMemb"></label>
+  </div><datalist id="dlMemb">${memb.map(m=>`<option value="${esc(m)}">`).join("")}</datalist>
+  ${vinculoHtml(d,"")}
+  <label class="campo">Área ou local (texto livre, se não houver cadastro)<input data-g="areaTxt" value="${esc(d.areaTxt)}"></label>
+  <label class="campo">Motivo / descrição *<textarea data-g="motivo" rows="3">${esc(d.motivo)}</textarea></label>
+  <div class="grid2"><label class="campo">Prioridade inicial<select data-g="prioridade" data-prazo="1">${sel1(PRI_DEM.map((p,i)=>[String(i),p]),d.prioridade)}</select></label>
+  <label class="campo">Prazo de atendimento<input type="date" data-g="prazo" value="${esc(d.prazo)}"></label></div>
+  <label class="campo">Status<select data-g="status">${sel1(ST_DEM,d.status)}</select></label>
+  <h3>Anexos e evidências</h3>${htmlEvid(false)}
+  <div class="linha" style="margin-top:14px"><button class="btn verde" data-g-acao="dem-salvar">Salvar demanda</button></div></div>${linked}`;
+}
+function htmlDemFluxo(id){
+  const tri=lista.filter(a=>a.ctx&&a.ctx.demandaId===id),aeps=regOf("aep").filter(r=>r.d.demandaId===id),aets=regOf("aet").filter(r=>r.d.demandaId===id);
+  const rec=[];
+  tri.forEach(a=>{if(a.resultado&&a.resultado.prio>=2)rec.push("A triagem "+a.id+" indicou prioridade "+(PRIOS[a.resultado.prio]||"alta")+": recomenda-se AEP.")});
+  aeps.forEach(r=>{const c=aepClasse(r.d);if(c.gat.length)rec.push("AEP "+(r.d.numero||"")+": gatilhos para AET ("+c.gat.map(g=>g.rot.toLowerCase()).join("; ")+").")});
+  return `<div class="card no-print"><h3>Fluxo da demanda</h3>
+  ${rec.length?rec.map(t=>`<div class="alerta">${esc(t)}</div>`).join(""):""}
+  <div class="linha"><button class="btn sec" data-g-acao="dem-triagem" data-id="${id}">1. Triagem rápida</button><button class="btn sec" data-g-acao="reg-novo" data-t="aep" data-id="${id}">2. Nova AEP</button><button class="btn sec" data-g-acao="reg-novo" data-t="aet" data-id="${id}">3. Nova AET</button></div>
+  <h4 style="margin-top:14px">Registros desta demanda</h4>
+  ${tri.map(a=>{const i=indice(a.resultado);return `<div class="sug"><span><b>Triagem</b> ${esc(a.id)}<br><small>${dataBR(a.ctx.data)} · ${esc(a.ctx.atividade||"")}${i?" · índice "+i.v+" ("+i.rot+")":""}</small></span></div>`}).join("")}
+  ${aeps.map(r=>`<div class="sug"><span><b>AEP</b> ${esc(r.d.numero||"(pendente)")}<br><small>v${r.d.versao||1} · ${esc(r.d.status)}</small></span><button class="btn sec peq" data-g-acao="abrir-reg" data-id="${r.id}">Abrir</button></div>`).join("")}
+  ${aets.map(r=>`<div class="sug"><span><b>AET</b> ${esc(r.d.numero||"(pendente)")}<br><small>v${r.d.versao||1} · ${esc(r.d.status)}</small></span><button class="btn sec peq" data-g-acao="abrir-reg" data-id="${r.id}">Abrir</button></div>`).join("")}
+  ${!tri.length&&!aeps.length&&!aets.length?`<p class="mut">Nenhum registro ainda.</p>`:""}
+  <div class="linha" style="margin-top:12px"><button class="btn sec peq" data-g-acao="dem-del" data-id="${id}">Excluir demanda</button></div></div>`;
+}
+function salvarDem(){
+  const {d,id}=G.ed;
+  if(!d.origem||!(d.motivo||"").trim()){aviso("Informe a origem e o motivo.");return}
+  const r=G.ed.novo?{id,tipo:"dem",d}:regGet(id);r.d=d;regGravar(r);G.ed.novo=false;renderDemandas();aviso("Demanda salva.");
+}
+function abrirDem(id){const r=regGet(id);if(!r)return;G.ed={id,tipo:"dem",novo:false,d:JSON.parse(JSON.stringify(r.d))};irPara("demandas")}
+function triagemDaDemanda(id){
+  const r=regGet(id),d=r.d,p=d.postoId&&regGet(d.postoId),a=d.atividadeId&&regGet(d.atividadeId);
+  const c={demandaId:id,postoId:d.postoId||"",atividadeId:d.atividadeId||"",local:p?p.d.nome:(d.areaTxt||""),atividade:a?a.d.nome:""};
+  if(p&&p.d.pai){const ar=regGet(p.d.pai);if(ar){c.area=ar.d.nome;let u=ar.d.pai&&regGet(ar.d.pai);while(u&&u.d.tc!=="planta")u=u.d.pai&&regGet(u.d.pai);if(u)c.unidade=u.d.nome}}
+  estado=novoEstado(c);sugFoto=null;sugDesc={};G.ed=null;
+  if(d.status==="aberta"){r.d.status="triagem";regGravar(r)}
+  irPara("avaliar");
+}
+
+/* =====================================================================
+   AEP: dados do formulário
+   ===================================================================== */
+const NIV_F=["Adequado","Atenção","Alto","Crítico"];
+const CATS=[
+ {id:"bio",nome:"Biomecânica",m:"REBA",itens:["postura do tronco|REBA","postura cervical|RULA","posição dos ombros|RULA","elevação e sustentação dos braços|RULA","posição de cotovelos, punhos e mãos|RULA","postura de membros inferiores|REBA","trabalho ajoelhado ou agachado|REBA","trabalho acima da linha dos ombros|REBA","alcance horizontal e vertical|REBA","postura estática|OWAS","permanência em pé|OWAS","permanência sentada|ROSA","repetitividade|OCRA Checklist","frequência dos movimentos|OCRA Checklist","duração da exposição","força aplicada|Strain Index","tipo de pega|Strain Index","uso de ferramentas de impacto|Strain Index","vibração de mãos e braços|Medição de higiene ocupacional","vibração de corpo inteiro|Medição de higiene ocupacional","empurrar e puxar|Snook e Ciriello","levantamento e transporte manual|Equação NIOSH","movimentação de pessoas|Checklist de movimentação de pacientes","torções durante manipulação de cargas|Equação NIOSH","recuperação muscular"]},
+ {id:"org",nome:"Organização do trabalho",m:"SOBANE/Déparis",itens:["ritmo","metas","pressão de tempo","duração da jornada","horas extras","turnos","trabalho noturno","pausas","alternância de tarefas","monotonia","simultaneidade","retrabalho","interrupções","autonomia","previsibilidade","disponibilidade de recursos","dimensionamento de equipe","necessidade de improvisação"]},
+ {id:"cog",nome:"Fatores cognitivos e humanos",m:"EWA",itens:["carga mental|NASA-TLX","necessidade de atenção continuada","quantidade de informações","complexidade das decisões","memória exigida","alarmes","interfaces homem-máquina","clareza das instruções","qualidade dos procedimentos","comunicação","passagem de turno","distrações","possibilidade de erro","barreiras contra erro","consequências de uma decisão incorreta","fadiga mental|NASA-TLX","variabilidade da tarefa"]},
+ {id:"amb",nome:"Ambiente",m:"Medição de higiene ocupacional",itens:["iluminação","reflexos e ofuscamento","contraste","ruído interferindo na comunicação","temperatura","calor radiante","frio","ventilação","umidade","qualidade do ar","espaço disponível|QEC","circulação","piso","acesso ao posto","organização e limpeza"]},
+ {id:"mob",nome:"Mobiliário, equipamentos e ferramentas",m:"QEC",itens:["cadeira|ROSA","mesa|ROSA","bancada","apoios","altura de trabalho","regulagens","monitores|ROSA","dispositivos de comando","pedais","ferramentas","peso das ferramentas","empunhadura","manutenção","compatibilidade com luvas","acesso para operação e manutenção","adequação antropométrica"]}
+];
+CATS.forEach(c=>{c.itens=c.itens.map((t,i)=>{const [n,m]=t.split("|");return {k:c.id+"_"+i,t:n[0].toUpperCase()+n.slice(1),m:m||""}})});
+const CRIT=["Postura extrema ou sustentada","Força elevada","Carga sem recurso auxiliar","Ausência de recuperação","Queixa recorrente","Possível agravamento de saúde","Consequência grave","Improvisação crítica","Falta de recurso essencial","Risco de erro com consequência crítica","Orientação do PCMSO","Relação indicada em investigação de acidente","Inadequação persistente após ação anterior"];
+const GAT=[["g0","Necessidade de avaliação aprofundada"],["g1","Inadequação ou insuficiência da ação implantada"],["g2","Indicação do acompanhamento de saúde"],["g3","Possível relação entre acidente/doença e condição de trabalho"],["g4","Situação complexa ou multifatorial"],["g5","Divergência entre resultados"],["g6","Exposição crítica"],["g7","Mudança relevante de processo"]];
+const ENC=[["medicao","Medição"],["metodo","Método ergonômico específico"],["aepdet","AEP detalhada"],["higiene","Higiene ocupacional"],["engenharia","Engenharia"],["saude","Saúde ocupacional"],["psico","Psicologia organizacional"],["fisio","Fisioterapia"],["ergonomista","Profissional ergonomista"],["evento","Investigação de evento"]];
+const PRIOF=[["freq","Frequência"],["dur","Duração da exposição"],["int","Intensidade"],["rec","Falta de recuperação"],["cons","Consequência potencial"]];
+const NIVEL_P=["P4 · Monitorar","P3 · Planejar","P2 · Priorizar","P1 · Imediata"];
+function aepClasse(d){
+  const f=d.f||{},cats=CATS.map(c=>{
+    let resp=0,pior=-1;const cont=[0,0,0,0],itens=[];
+    c.itens.forEach(i=>{const v=f[i.k];if(v===undefined||v===""||v==="na")return;const n=Number(v);resp++;cont[n]++;if(n>pior)pior=n;if(n>=2)itens.push({k:i.k,t:i.t,m:i.m,n})});
+    return {id:c.id,nome:c.nome,total:c.itens.length,resp,pior,cont,itens};
+  });
+  const crit=Object.keys(d.crit||{}).filter(k=>d.crit[k]).map(k=>CRIT[Number(k.slice(1))]);
+  const base=Math.max(-1,...cats.map(c=>c.pior));
+  const motivos=[];
+  cats.forEach(c=>c.itens.filter(i=>i.n===3).forEach(i=>motivos.push(`Item crítico em ${c.nome}: ${i.t}`)));
+  let nivel=base;
+  if(crit.length&&nivel<2){nivel=2;motivos.push("Regra de prevalência: condição crítica marcada ("+crit[0]+(crit.length>1?" e outras":"")+")")}
+  const alto=cats.filter(c=>c.pior>=2).length;
+  const pontos=PRIOF.reduce((s,[k])=>s+(Number((d.prio||{})[k])||0),0),nExp=Number(d.nExpostos)||0;
+  let p=nivel<0?-1:nivel;
+  if(p>=0){if(pontos>=7&&p<3)p+=1;else if(nExp>=10&&p<3&&p>=1)p+=1}
+  const gat=[];
+  if(nivel===3)gat.push({id:"g6",rot:"Exposição crítica"});
+  if(alto>=2)gat.push({id:"g4",rot:"Situação complexa ou multifatorial ("+alto+" categorias em Alto/Crítico)"});
+  if(d.crit&&d.crit.c12)gat.push({id:"g1",rot:"Inadequação persistente após ação anterior"});
+  if(d.crit&&d.crit.c10)gat.push({id:"g2",rot:"Indicação do PCMSO / acompanhamento de saúde"});
+  if(d.crit&&d.crit.c11)gat.push({id:"g3",rot:"Possível relação com acidente/doença"});
+  Object.keys(d.gat||{}).filter(k=>d.gat[k]&&!gat.some(g=>g.id===k)).forEach(k=>{const g=GAT.find(x=>x[0]===k);if(g)gat.push({id:k,rot:g[1]+" (manual)"})});
+  const mets={};
+  cats.forEach((c,ci)=>c.itens.forEach(i=>{const m=i.m||CATS[ci].m;(mets[m]=mets[m]||[]).push(i.t)}));
+  const metodos=Object.keys(mets).map(m=>({m,itens:mets[m]}));
+  if(((d.part||{}).regioes||"").trim())metodos.push({m:"Mapa Corporal de Corlett",itens:["desconforto relatado pelos trabalhadores"]});
+  const totResp=cats.reduce((s,c)=>s+c.resp,0),tot=cats.reduce((s,c)=>s+c.total,0);
+  return {cats,nivel,p,motivos,gat,metodos,crit,totResp,tot,pontos};
+}
+
+/* =====================================================================
+   AEP e AET: criação, edição, aprovação
+   ===================================================================== */
+const AET_SEC=[
+ ["Demanda e contexto",[["demanda","Demanda e motivo"],["contexto","Contexto"],["populacao","População abrangida"]]],
+ ["Processo e organização",[["processo","Descrição do processo"],["organizacao","Descrição da organização do trabalho"]]],
+ ["Atividade",[["prescrita","Atividade prescrita"],["real","Atividade real"],["campo","Observação em campo"],["entrevistas","Entrevistas"],["variabilidade","Variabilidade"],["estrategias","Estratégias operatórias"],["determinantes","Determinantes da atividade"]]],
+ ["Exigências e condições",[["fisicas","Exigências físicas"],["cognitivas","Exigências cognitivas"],["organizacionais","Exigências organizacionais"],["ambientais","Condições ambientais"],["saude","Dados de saúde coletivos (sem exposição individual)"]]],
+ ["Métodos, resultados e diagnóstico",[["metodos","Métodos empregados"],["resultados","Resultados"],["diagnostico","Diagnóstico ergonômico"]]],
+ ["Recomendações e acompanhamento",[["recomendacoes","Recomendações"],["prioridades","Prioridades"],["cronograma","Cronograma"],["eficacia","Critérios de eficácia"],["responsaveis","Responsáveis"],["acompanhamento","Plano de acompanhamento"],["conclusao","Conclusão"]]]
+];
+function novoReg(tipo,demId){
+  const dem=demId&&regGet(demId),base={data:hojeISO(),demandaId:demId||"",postoId:dem?dem.d.postoId:"",atividadeId:dem?dem.d.atividadeId:"",status:"rascunho",versao:1,hist:[],evid:[],avaliadores:(perfil&&perfil.nome)||"",f:{},crit:{},gat:{},enc:{},prio:{},obs:{},part:{},etapas:[{n:"",dur:"",freq:""}],metodosAp:[],sec:{},resp:{}};
+  if(tipo==="aet"){
+    const aep=regOf("aep").filter(r=>r.d.demandaId===demId&&demId).sort((a,b)=>b.atualizadoEm-a.atualizadoEm)[0];
+    if(aep){base.aepId=aep.id;const c=aepClasse(aep.d);
+      base.sec.demanda=(dem?dem.d.origem+": "+dem.d.motivo:"");
+      base.sec.prescrita=aep.d.obs.prescrita||"";base.sec.real=aep.d.obs.realizada||"";base.sec.estrategias=aep.d.obs.estrategias||"";
+      base.sec.fisicas=c.cats[0].itens.map(i=>"• "+i.t+" ("+NIV_F[i.n]+")").join("\n");
+      base.sec.organizacionais=c.cats[1].itens.map(i=>"• "+i.t+" ("+NIV_F[i.n]+")").join("\n");
+      base.sec.cognitivas=c.cats[2].itens.map(i=>"• "+i.t+" ("+NIV_F[i.n]+")").join("\n");
+      base.sec.ambientais=c.cats[3].itens.map(i=>"• "+i.t+" ("+NIV_F[i.n]+")").join("\n");
+      base.sec.metodos=c.metodos.map(m=>"• "+m.m).join("\n");}
+    base.resp={nome:(perfil&&perfil.nome)||"",qualificacao:"",registro:""};
+  }
+  return {id:rid(),tipo,novo:true,d:base};
+}
+function criarReg(tipo,demId){
+  const r=novoReg(tipo,demId);delete r.novo;regGravar(r);
+  const dm=demId&&regGet(demId);if(dm&&(dm.d.status==="aberta"||dm.d.status==="triagem")){dm.d.status=tipo;regGravar(dm)}
+  G.ed={id:r.id,tipo,d:JSON.parse(JSON.stringify(r.d))};G.rel=false;irPara("demandas");
+}
+function abrirReg(id){const r=regGet(id);if(!r)return;G.ed={id,tipo:r.tipo,d:JSON.parse(JSON.stringify(r.d))};G.rel=false;irPara("demandas")}
+function gravarEd(){
+  if(!G.ed||G.ed.tipo==="dem")return;
+  const r=regGet(G.ed.id);if(!r)return;
+  if(travado(r.d))return;
+  r.d=JSON.parse(JSON.stringify(G.ed.d));regGravar(r);
+}
+let tmrEd=null;const agendarEd=()=>{clearTimeout(tmrEd);tmrEd=setTimeout(gravarEd,700)};
+function posEd(){}
+const STATUS_REG={rascunho:"Rascunho",revisao:"Em revisão",aprovada:"Aprovada"};
+function bloco(titulo,corpo,aberto){return `<details class="bloco" ${aberto?"open":""}><summary>${titulo}</summary><div class="bloco-c">${corpo}</div></details>`}
+const T=(p,rot,dis,rows,ph)=>`<label class="campo">${rot}<textarea data-g="${p}" rows="${rows||3}" ${ph?`placeholder="${esc(ph)}"`:""} ${dis}>${esc(gget(G.ed.d,p)||"")}</textarea></label>`;
+const I=(p,rot,dis,tipo)=>`<label class="campo">${rot}<input data-g="${p}" type="${tipo||"text"}" value="${esc(gget(G.ed.d,p)||"")}" ${dis}></label>`;
+function htmlGovernanca(dis){
+  const d=G.ed.d,tp=G.ed.tipo,lock=travado(d),cl=tp==="aep"?aepClasse(d):null,adm=quemEdita();
+  const bloqueios=[];
+  if(tp==="aep"){
+    if(!d.postoId&&!d.atividadeId)bloqueios.push("vincule um posto ou atividade");
+    if(!(d.obs.prescrita||"").trim()||!(d.obs.realizada||"").trim())bloqueios.push("registre a atividade prescrita e a realizada");
+    if(cl.totResp<cl.tot/2)bloqueios.push("avalie ao menos metade dos itens ("+cl.totResp+"/"+cl.tot+")");
+    if(cl.nivel===3&&!(d.provisoria||"").trim())bloqueios.push("exposição crítica exige medida provisória");
+  }else{
+    if(!(d.sec.diagnostico||"").trim()||!(d.sec.recomendacoes||"").trim())bloqueios.push("preencha diagnóstico e recomendações");
+    if(!(d.resp.nome||"").trim()||!(d.resp.qualificacao||"").trim())bloqueios.push("informe responsável técnico e qualificação");
+  }
+  const avisos=[];
+  if(!(d.evid||[]).length)avisos.push("Sem evidência anexada (foto, croqui ou documento).");
+  return `<div class="grid2"><label class="campo">Status<input value="${STATUS_REG[d.status]||d.status}" disabled></label><label class="campo">Versão<input value="v${d.versao||1}" disabled></label></div>
+  ${avisos.map(a=>`<div class="alerta">${esc(a)}</div>`).join("")}
+  ${d.aprov?`<p class="mut">Aprovada por <b>${esc(d.aprov.por)}</b> em ${dataBR(d.aprov.em)}${d.aprov.obs?" · "+esc(d.aprov.obs):""}</p>`:""}
+  ${bloqueios.length&&!lock?`<div class="alerta">Para aprovar: ${bloqueios.map(esc).join("; ")}.</div>`:""}
+  <div class="linha" style="margin-top:10px">
+   ${lock?"":`<button class="btn sec" data-g-acao="reg-revisao" ${d.status==="revisao"?"disabled":""}>Enviar para revisão</button>`}
+   ${!lock?`<button class="btn verde" data-g-acao="reg-aprovar" ${adm?"":"disabled"} title="${adm?"":"Somente administrador"}">Aprovar e bloquear</button>`:`<button class="btn sec" data-g-acao="reg-reabrir" ${adm?"":"disabled"}>Reabrir (administrador)</button>`}
+   <button class="btn sec" data-g-acao="reg-rel">Relatório / PDF</button>
+  </div>${!adm&&!lock?`<small class="mut">Só o administrador da equipe aprova. Entre numa equipe em Conta.</small>`:""}
+  ${(d.hist||[]).length?`<details style="margin-top:10px"><summary>Histórico de alterações de status (${d.hist.length})</summary>${d.hist.map(h=>`<div class="sug"><span>${dataBR(h.em)} · <b>${esc(h.acao)}</b> · ${esc(h.por)}${h.motivo?"<br><small>"+esc(h.motivo)+"</small>":""}</span></div>`).join("")}</details>`:""}`;
+}
+function htmlRegEd(){
+  const {d,tipo}=G.ed,lock=travado(d),dis=lock?"disabled":"";
+  const dem=d.demandaId&&regGet(d.demandaId);
+  const ident=`<label class="campo">Demanda vinculada<select data-g="demandaId" ${dis}><option value="">(sem demanda)</option>${sel1(regOf("dem").map(r=>[r.id,(r.d.numero||"(pendente)")+" · "+r.d.origem]),d.demandaId||"")}</select></label>
+   ${vinculoHtml(d,dis)}
+   <div class="grid2">${I("data","Data",dis,"date")}${I("avaliadores","Avaliador(es)",dis)}</div>
+   ${tipo==="aep"?`<div class="grid2">${I("nExpostos","Nº de trabalhadores expostos",dis,"number")}${I("turno","Turno / jornada",dis)}</div>${I("funcoes","Funções / GSTS envolvidos",dis)}`:`<div class="grid2">${I("resp.nome","Responsável técnico",dis)}${I("resp.qualificacao","Qualificação",dis)}</div>${I("resp.registro","Registro profissional (conselho / número)",dis)}`}`;
+  let corpo=bloco("1. Identificação e vínculo",ident,true);
+  if(tipo==="aep"){
+    const o=d.obs;
+    const etapas=(d.etapas||[]).map((e,i)=>`<div class="grid3"><input data-g="etapas.${i}.n" value="${esc(e.n)}" placeholder="Etapa da tarefa" ${dis}><input data-g="etapas.${i}.dur" value="${esc(e.dur)}" placeholder="Duração" ${dis}><input data-g="etapas.${i}.freq" value="${esc(e.freq)}" placeholder="Frequência / ciclos" ${dis}></div>`).join("");
+    corpo+=bloco("2. Observação da atividade real",
+      T("obs.prescrita","Atividade prescrita (o que o procedimento diz)",dis,3)+T("obs.realizada","Atividade efetivamente realizada",dis,3)+
+      `<h4>Etapas, duração e frequência</h4>${etapas}${lock?"":`<button type="button" class="btn sec peq" data-g-acao="etapa-add">+ Etapa</button>`}`+
+      T("obs.variacoes","Variações normais",dis,2)+T("obs.pior","Pior condição razoavelmente previsível",dis,2)+T("obs.emergencia","Situações de emergência",dis,2)+T("obs.turnos","Diferenças entre turnos",dis,2)+T("obs.interferencias","Interferências operacionais",dis,2)+T("obs.recursos","Recursos utilizados",dis,2)+T("obs.improvisacoes","Improvisações",dis,2)+T("obs.dificuldades","Dificuldades",dis,2)+T("obs.estrategias","Estratégias adotadas pelo trabalhador",dis,2)+T("obs.procReal","Diferença entre o procedimento e o trabalho real",dis,2),true);
+    const c=aepClasse(d);
+    corpo+=bloco(`3. Fatores avaliados <span class="bd nd">${c.totResp}/${c.tot}</span>`,CATS.map((cat,ci)=>`<details class="sub" ${ci===0?"open":""}><summary>${cat.nome} <span class="bd ${c.cats[ci].pior<0?"nd":"n"+c.cats[ci].pior}">${c.cats[ci].pior<0?"sem dados":NIV_F[c.cats[ci].pior]}</span> <small>${c.cats[ci].resp}/${c.cats[ci].total}</small></summary>${cat.itens.map(i=>`<div class="frow"><span>${esc(i.t)}</span><select data-g="f.${i.k}" data-re="1" ${dis}><option value="">—</option>${NIV_F.map((n,v)=>`<option value="${v}" ${String(d.f[i.k])===String(v)?"selected":""}>${n}</option>`).join("")}<option value="na" ${d.f[i.k]==="na"?"selected":""}>Não se aplica</option></select></div>`).join("")}${T("fn."+cat.id,"Observações de "+cat.nome.toLowerCase(),dis,2)}</details>`).join(""),true);
+    corpo+=bloco("4. Participação do trabalhador",`<p class="mut">O foco é a situação de trabalho, não o desempenho, o comportamento ou a capacidade individual.</p>`+T("part.comoE","Como a atividade realmente é feita (relato dos executantes)",dis,3)+T("part.dificuldades","Principais dificuldades percebidas",dis,2)+T("part.regioes","Regiões do corpo com desconforto (consolidado, sem identificar pessoas)",dis,2)+T("part.momento","Momento da jornada em que o desconforto aparece",dis,2)+T("part.sugestoes","Sugestões dos executantes",dis,2)+`<label class="campo">Executantes validaram a descrição da atividade?<select data-g="part.validou" ${dis}><option value=""></option>${sel1(["Sim","Parcialmente","Não"],d.part.validou||"")}</select></label>`+T("part.divergencia","Divergências entre avaliador e trabalhadores",dis,2)+T("part.consulta","Consulta coletiva por equipe (quem participou)",dis,2)+T("part.devolutiva","Devolutiva da avaliação aos trabalhadores",dis,2),false);
+    corpo+=bloco("5. Evidências",htmlEvid(lock),false);
+    corpo+=bloco("6. Condições que se sobrepõem à média",`<p class="mut">Se qualquer uma estiver marcada, o resultado nunca fica abaixo de <b>Alto</b>, mesmo com média boa.</p>${CRIT.map((t,i)=>`<label class="chk"><input type="checkbox" data-g="crit.c${i}" data-re="1" ${d.crit["c"+i]?"checked":""} ${dis}> ${t}</label>`).join("")}<h4>Fatores de priorização (0 baixo · 1 médio · 2 alto)</h4><div class="grid3">${PRIOF.map(([k,r])=>`<label class="campo">${r}<select data-g="prio.${k}" data-re="1" ${dis}><option value="0">0</option><option value="1" ${d.prio[k]==="1"?"selected":""}>1</option><option value="2" ${d.prio[k]==="2"?"selected":""}>2</option></select></label>`).join("")}</div>`,false);
+    corpo+=bloco("7. Classificação, gatilhos e métodos",htmlClasse(c,dis),true);
+  }else{
+    corpo+=AET_SEC.map(([tit,cs],gi)=>bloco(`${gi+2}. ${tit}`,cs.map(([k,r])=>T("sec."+k,r,dis,k==="conclusao"||k==="diagnostico"||k==="recomendacoes"?5:3)).join(""),gi<2)).join("");
+    if(d.aepId&&regGet(d.aepId))corpo+=bloco("Origem",`<p class="mut">Pré-preenchida a partir da AEP ${esc(regGet(d.aepId).d.numero||"")}. Revise e complemente com estudo de campo, entrevistas e medições.</p>`,false);
+    corpo+=bloco("Evidências",htmlEvid(lock),false);
+  }
+  corpo+=bloco("Revisão e aprovação",htmlGovernanca(dis),true);
+  return `<div class="card no-print"><button class="btn sec peq" data-g-acao="ed-voltar">← Demandas</button><h2 style="margin-top:12px">${tipo==="aep"?"AEP":"AET"} ${esc(d.numero||"(número após sincronizar)")}${dem?` <small class="mut">· demanda ${esc(dem.d.numero||"")}</small>`:""}</h2>${lock?`<div class="alerta">Registro aprovado e bloqueado para edição.</div>`:`<small class="mut">Salvamento automático neste aparelho.</small>`}</div>${corpo}`;
+}
+function htmlClasse(c,dis){
+  const d=G.ed.d;
+  const cor=c.nivel<0?"nd":"n"+c.nivel;
+  return `<div class="res-aep"><div><small>Classificação</small><br><span class="bd ${cor}" style="font-size:1rem">${c.nivel<0?"Dados insuficientes":NIV_F[c.nivel]}</span></div><div><small>Prioridade</small><br><b>${c.p<0?"—":NIV_PRI(c.p)}</b></div></div>
+  ${c.motivos.map(m=>`<div class="alerta">${esc(m)}</div>`).join("")}
+  <p class="mut" style="font-size:.84rem">A classificação é o pior nível encontrado: a média não esconde uma condição grave isolada. Prioridade sobe um nível com pontuação de priorização ≥ 7 ou com 10 ou mais expostos.</p>
+  <h4>Gatilhos para aprofundamento (AET)</h4>
+  ${c.gat.length?c.gat.map(g=>`<div class="alerta">${esc(g.rot)}</div>`).join("")+`<p><b>Recomendação: encaminhar para AET.</b></p>`:`<p class="mut">Nenhum gatilho detectado.</p>`}
+  <p class="mut" style="font-size:.84rem">Marque manualmente outros gatilhos:</p>
+  ${GAT.map(([k,r])=>`<label class="chk"><input type="checkbox" data-g="gat.${k}" data-re="1" ${d.gat[k]?"checked":""} ${dis}> ${r}</label>`).join("")}
+  <h4>Encaminhamentos</h4>${ENC.map(([k,r])=>`<label class="chk"><input type="checkbox" data-g="enc.${k}" ${d.enc[k]?"checked":""} ${dis}> ${r}</label>`).join("")}
+  <h4>Métodos compatíveis com o que foi encontrado</h4>
+  ${c.metodos.length?c.metodos.map(m=>`<div class="sug"><span><b>${esc(m.m)}</b><br><small>${esc(m.itens.slice(0,6).join(", "))}${m.itens.length>6?"…":""}</small></span></div>`).join(""):`<p class="mut">Avalie os fatores para receber sugestões.</p>`}
+  <h4>Métodos aplicados (registro)</h4><small class="mut">Guarde método, versão, parâmetros, resultado e limitações. Calculadoras de RULA, REBA, NIOSH, OCRA, Snook/Ciriello e ROSA chegam na próxima fase.</small>
+  ${(d.metodosAp||[]).map((m,i)=>`<div class="metodo"><div class="grid3"><input data-g="metodosAp.${i}.m" value="${esc(m.m||"")}" placeholder="Método" ${dis}><input data-g="metodosAp.${i}.v" value="${esc(m.v||"")}" placeholder="Versão" ${dis}><input data-g="metodosAp.${i}.r" value="${esc(m.r||"")}" placeholder="Resultado" ${dis}></div><textarea data-g="metodosAp.${i}.p" rows="2" placeholder="Parâmetros e memória de cálculo" ${dis}>${esc(m.p||"")}</textarea><textarea data-g="metodosAp.${i}.l" rows="2" placeholder="Interpretação e limitações" ${dis}>${esc(m.l||"")}</textarea></div>`).join("")}
+  ${dis?"":`<button type="button" class="btn sec peq" data-g-acao="metodo-add">+ Método aplicado</button>`}
+  ${T("provisoria","Medida provisória (obrigatória se a classificação for Crítica)",dis,2)}${T("conclusao","Conclusão e encaminhamento",dis,3)}`;
+}
+const NIV_PRI=p=>NIVEL_P[p]||"—";
+function mudarStatus(acao,novo,motivo){
+  const r=regGet(G.ed.id);if(!r)return;
+  const d=G.ed.d;d.status=novo;
+  (d.hist=d.hist||[]).push({em:hojeISO(),acao,por:(autorAtual()||{}).nome||"",motivo:motivo||""});
+  if(novo==="aprovada")d.aprov={por:(autorAtual()||{}).nome||"",em:hojeISO(),obs:motivo||""};
+  if(acao==="Reaberta"){d.versao=(d.versao||1)+1;delete d.aprov}
+  r.d=JSON.parse(JSON.stringify(d));regGravar(r);
+}
+function aprovarReg(){
+  const d=G.ed.d;
+  if(!quemEdita()){aviso("Somente o administrador aprova.");return}
+  const msgs=[];
+  const tp=G.ed.tipo;
+  if(tp==="aep"){const c=aepClasse(d);
+    if(!d.postoId&&!d.atividadeId)msgs.push("vincule um posto ou atividade");
+    if(!(d.obs.prescrita||"").trim()||!(d.obs.realizada||"").trim())msgs.push("registre atividade prescrita e realizada");
+    if(c.totResp<c.tot/2)msgs.push("avalie ao menos metade dos itens");
+    if(c.nivel===3&&!(d.provisoria||"").trim())msgs.push("informe a medida provisória");}
+  else{if(!(d.sec.diagnostico||"").trim()||!(d.sec.recomendacoes||"").trim())msgs.push("preencha diagnóstico e recomendações");
+    if(!(d.resp.nome||"").trim()||!(d.resp.qualificacao||"").trim())msgs.push("informe responsável técnico e qualificação");}
+  if(msgs.length){aviso("Antes de aprovar: "+msgs.join("; ")+".");return}
+  const o=prompt("Observação da aprovação (opcional):","");if(o===null)return;
+  mudarStatus("Aprovada","aprovada",o);renderDemandas();aviso("Registro aprovado e bloqueado.");
+}
+function reabrirReg(){
+  if(!quemEdita()){aviso("Somente o administrador reabre.");return}
+  const m=prompt("Motivo da reabertura (obrigatório):","");if(!m||!m.trim())return;
+  mudarStatus("Reaberta","rascunho",m.trim());renderDemandas();
+}
+
+/* ---------- relatório imprimível ---------- */
+function htmlRelatorio(){
+  const {d,tipo}=G.ed,dem=d.demandaId&&regGet(d.demandaId),c=tipo==="aep"?aepClasse(d):null;
+  const loc=d.postoId?caminho(d.postoId):"",at=d.atividadeId?caminho(d.atividadeId).split(" › ").pop():"";
+  const sec=(t,x)=>(x||"").toString().trim()?`<h3>${t}</h3><p style="white-space:pre-wrap">${esc(x)}</p>`:"";
+  let corpo="";
+  if(tipo==="aep"){
+    const o=d.obs,p=d.part;
+    corpo=`<div class="res-aep"><div><small>Classificação</small><br><span class="bd ${c.nivel<0?"nd":"n"+c.nivel}">${c.nivel<0?"Dados insuficientes":NIV_F[c.nivel]}</span></div><div><small>Prioridade</small><br><b>${c.p<0?"—":NIV_PRI(c.p)}</b></div><div><small>Itens avaliados</small><br><b>${c.totResp}/${c.tot}</b></div></div>
+    ${c.motivos.map(m=>`<p>⚠ ${esc(m)}</p>`).join("")}
+    <h3>Resumo por categoria</h3><table class="tab"><tr><th>Categoria</th><th>Avaliados</th><th>Adequado</th><th>Atenção</th><th>Alto</th><th>Crítico</th><th>Pior</th></tr>${c.cats.map(x=>`<tr><td>${x.nome}</td><td>${x.resp}/${x.total}</td>${x.cont.map(n=>`<td>${n}</td>`).join("")}<td>${x.pior<0?"—":NIV_F[x.pior]}</td></tr>`).join("")}</table>
+    <h3>Itens em Alto ou Crítico</h3>${c.cats.some(x=>x.itens.length)?`<table class="tab"><tr><th>Categoria</th><th>Item</th><th>Nível</th></tr>${c.cats.map(x=>x.itens.map(i=>`<tr><td>${x.nome}</td><td>${esc(i.t)}</td><td>${NIV_F[i.n]}</td></tr>`).join("")).join("")}</table>`:"<p>Nenhum.</p>"}
+    ${sec("Atividade prescrita",o.prescrita)}${sec("Atividade realizada",o.realizada)}
+    ${(d.etapas||[]).some(e=>e.n)?`<h3>Etapas</h3><table class="tab"><tr><th>Etapa</th><th>Duração</th><th>Frequência</th></tr>${d.etapas.filter(e=>e.n).map(e=>`<tr><td>${esc(e.n)}</td><td>${esc(e.dur)}</td><td>${esc(e.freq)}</td></tr>`).join("")}</table>`:""}
+    ${sec("Variações normais",o.variacoes)}${sec("Pior condição previsível",o.pior)}${sec("Improvisações",o.improvisacoes)}${sec("Dificuldades",o.dificuldades)}${sec("Diferença entre procedimento e trabalho real",o.procReal)}
+    ${sec("Relato dos executantes",p.comoE)}${sec("Dificuldades percebidas",p.dificuldades)}${sec("Regiões com desconforto (consolidado)",p.regioes)}${sec("Sugestões dos executantes",p.sugestoes)}${sec("Divergências",p.divergencia)}
+    ${c.gat.length?`<h3>Gatilhos para aprofundamento</h3><ul>${c.gat.map(g=>`<li>${esc(g.rot)}</li>`).join("")}</ul><p><b>Recomendação: encaminhar para AET.</b></p>`:""}
+    ${ENC.some(([k])=>d.enc[k])?`<h3>Encaminhamentos</h3><ul>${ENC.filter(([k])=>d.enc[k]).map(([,r])=>`<li>${r}</li>`).join("")}</ul>`:""}
+    ${c.metodos.length?`<h3>Métodos compatíveis</h3><ul>${c.metodos.map(m=>`<li>${esc(m.m)}</li>`).join("")}</ul>`:""}
+    ${(d.metodosAp||[]).filter(m=>m.m).length?`<h3>Métodos aplicados</h3><table class="tab"><tr><th>Método</th><th>Versão</th><th>Resultado</th><th>Parâmetros</th><th>Limitações</th></tr>${d.metodosAp.filter(m=>m.m).map(m=>`<tr><td>${esc(m.m)}</td><td>${esc(m.v||"")}</td><td>${esc(m.r||"")}</td><td>${esc(m.p||"")}</td><td>${esc(m.l||"")}</td></tr>`).join("")}</table>`:""}
+    ${sec("Medida provisória",d.provisoria)}${sec("Conclusão",d.conclusao)}`;
+  }else{
+    corpo=AET_SEC.map(([t,cs])=>`<h2 style="font-size:1.05rem">${t}</h2>`+cs.map(([k,r])=>sec(r,d.sec[k])).join("")).join("")+`<h3>Responsável técnico</h3><p>${esc(d.resp.nome||"")} · ${esc(d.resp.qualificacao||"")} · ${esc(d.resp.registro||"")}</p>`;
+  }
+  const ev=(d.evid||[]).filter(e=>e.mini);
+  return `<div class="card rel-reg"><div class="no-print linha" style="margin-bottom:12px"><button class="btn sec peq" data-g-acao="rel-voltar">← Voltar à edição</button><button class="btn" data-g-acao="rel-print">Imprimir / salvar PDF</button></div>
+  <h1 style="font-size:1.3rem;margin:0">${tipo==="aep"?"Avaliação Ergonômica Preliminar (AEP)":"Análise Ergonômica do Trabalho (AET)"}</h1>
+  <p class="mut" style="margin:4px 0 12px">Nº ${esc(d.numero||"(pendente de sincronização)")} · versão ${d.versao||1} · ${STATUS_REG[d.status]||d.status}${d.aprov?` · aprovada por ${esc(d.aprov.por)} em ${dataBR(d.aprov.em)}`:" · NÃO APROVADA"}</p>
+  <table class="tab"><tr><th>Data</th><td>${dataBR(d.data)}</td><th>Avaliador(es)</th><td>${esc(d.avaliadores||"")}</td></tr><tr><th>Local</th><td colspan="3">${esc(loc||"—")}</td></tr><tr><th>Atividade</th><td>${esc(at||"—")}</td><th>Demanda</th><td>${esc(dem?dem.d.numero+" · "+dem.d.origem:"—")}</td></tr>${tipo==="aep"?`<tr><th>Expostos</th><td>${esc(d.nExpostos||"")}</td><th>Funções / GSTS</th><td>${esc(d.funcoes||"")}</td></tr>`:""}</table>
+  ${corpo}
+  ${ev.length?`<h3>Evidências</h3><div class="evid-print">${ev.map(e=>`<figure><img src="${esc(e.mini)}"><figcaption>${esc(e.legenda||e.nome)}</figcaption></figure>`).join("")}</div>`:""}
+  <p class="mut" style="font-size:.78rem;margin-top:18px">Ferramenta de apoio. A classificação automática não substitui o julgamento do profissional responsável nem emite diagnóstico clínico. Revisão humana obrigatória.</p></div>`;
+}
+
+/* =====================================================================
+   VÍNCULO DA TRIAGEM COM O CADASTRO (bloco inserido no contexto)
+   ===================================================================== */
+function htmlVinculoTriagem(){
+  const c=estado.ctx,dem=regOf("dem").filter(r=>!FECHADA(r.d.status)),ps=opsPosto();
+  if(!dem.length&&!ps.length)return "";
+  return `<div class="card"><h3>Vínculo (opcional)</h3><p class="mut" style="font-size:.86rem">Escolha o posto e a atividade cadastrados para preencher o contexto e manter o histórico do posto.</p>
+  <div class="grid2"><label class="campo">Demanda<select data-gv="demandaId"><option value="">(sem demanda)</option>${sel1(dem.map(r=>[r.id,(r.d.numero||"(pendente)")+" · "+r.d.origem]),c.demandaId||"")}</select></label>
+  <label class="campo">Posto / equipamento<select data-gv="postoId"><option value="">(não vinculado)</option>${sel1(ps,c.postoId||"")}</select></label>
+  <label class="campo">Atividade cadastrada<select data-gv="atividadeId"><option value="">(não vinculada)</option>${sel1(opsAtiv(c.postoId),c.atividadeId||"")}</select></label></div></div>`;
+}
+function aplicarVinculo(campo,v){
+  const c=estado.ctx;c[campo]=v;
+  if(campo==="postoId"){c.atividadeId="";const p=v&&regGet(v);if(p){c.local=p.d.nome+(p.d.tag?" ("+p.d.tag+")":"");const ar=p.d.pai&&regGet(p.d.pai);if(ar){c.area=ar.d.nome;let u=ar.d.pai&&regGet(ar.d.pai);while(u&&u.d.tc!=="planta")u=u.d.pai&&regGet(u.d.pai);if(u)c.unidade=u.d.nome}}}
+  if(campo==="atividadeId"){const a=v&&regGet(v);if(a)c.atividade=a.d.nome}
+  if(campo==="demandaId"&&v){const dm=regGet(v);if(dm&&dm.d.postoId&&!c.postoId){aplicarVinculo("postoId",dm.d.postoId);if(dm.d.atividadeId)aplicarVinculo("atividadeId",dm.d.atividadeId);c.demandaId=v;return}}
+  agendarSalvar();render();
+}
+
+/* =====================================================================
+   EVENTOS
+   ===================================================================== */
+function lerCampo(t){
+  const v=t.type==="checkbox"?t.checked:t.value;
+  if(G.ed){
+    gset(G.ed.d,t.dataset.g,v);
+    if(t.dataset.g==="postoId"){G.ed.d.atividadeId=""}
+    if(t.dataset.prazo){G.ed.d.prazo=somaDias(PRAZO_DIAS[Number(v)||0])}
+    if(G.ed.tipo==="dem")return t.dataset.prazo||t.dataset.g==="postoId";
+    agendarEd();return !!(t.dataset.re);
+  }
+  return false;
+}
+function reRender(){
+  const y=window.scrollY,ab=[...document.querySelectorAll("#v-demandas details")].map(x=>x.open),foco=document.activeElement&&document.activeElement.dataset?document.activeElement.dataset.g:null;
+  renderDemandas();
+  document.querySelectorAll("#v-demandas details").forEach((x,i)=>{if(ab[i]!==undefined)x.open=ab[i]});
+  if(foco){const el=document.querySelector(`#v-demandas [data-g="${foco}"]`);if(el)el.focus({preventScroll:true})}
+  window.scrollTo(0,y);
+}
+["input","change"].forEach(ev=>document.addEventListener(ev,async e=>{
+  const t=e.target;
+  if(t.dataset&&t.dataset.gv&&ev==="change"){aplicarVinculo(t.dataset.gv,t.value);return}
+  if(t.id==="evidIn"&&ev==="change"){
+    const files=[...t.files];t.value="";
+    for(const f of files){
+      try{aviso("Enviando "+f.name+"…");const x=await anexarEvidencia(f,G.ed.id);(G.ed.d.evid=G.ed.d.evid||[]).push(x);if(G.ed.tipo!=="dem")gravarEd()}
+      catch(err){aviso(err.message);break}
+    }
+    reRender();return;
+  }
+  if(t.dataset&&t.dataset.g&&G.ed){
+    if(ev==="input"&&(t.tagName==="SELECT"||t.type==="checkbox"))return;
+    if(ev==="change"&&!(t.tagName==="SELECT"||t.type==="checkbox"||t.type==="date"))return;
+    if(lerCampo(t))reRender();
+  }
+}));
+document.addEventListener("submit",e=>{
+  const f=e.target.closest("[data-g-form]");if(!f)return;
+  e.preventDefault();if(f.dataset.gForm==="cad")salvarCad(f);
+},true);
+document.addEventListener("click",e=>{
+  const nb=e.target.closest("#nav button");
+  if(nb&&nb.dataset.v==="demandas"){if(G.ed&&G.ed.tipo!=="dem")gravarEd();G.ed=null;G.rel=false}
+  if(nb&&nb.dataset.v==="cadastros"){G.hist=null;G.cadEd=null}
+},true);
+document.addEventListener("click",e=>{
+  const ir=e.target.closest("[data-ir]");if(ir){e.preventDefault();irPara(ir.dataset.ir);return}
+  const b=e.target.closest("[data-g-acao]");if(!b)return;
+  const id=b.dataset.id,a=b.dataset.gAcao;
+  switch(a){
+    case "cad-tab":G.cadTab=b.dataset.t;G.cadEd=null;G.hist=null;renderCadastros();break;
+    case "cad-novo":G.cadEd={id:"",d:{}};renderCadastros();break;
+    case "cad-edit":{const r=regGet(id);if(r){G.cadEd={id,d:{...r.d}};renderCadastros();window.scrollTo(0,0)}break}
+    case "cad-cancel":G.cadEd=null;renderCadastros();break;
+    case "cad-del":{const n=usadoPor(id);if(n){aviso("Há "+n+" item(ns) vinculado(s) a este cadastro. Remova ou reatribua antes de excluir.");break}if(confirm("Excluir este cadastro?")){regExcluir(id);renderCadastros()}break}
+    case "hist-posto":G.hist=id;renderCadastros();window.scrollTo(0,0);break;
+    case "hist-voltar":G.hist=null;renderCadastros();break;
+    case "abrir-dem":G.hist=null;abrirDem(id);break;
+    case "abrir-reg":G.hist=null;abrirReg(id);break;
+    case "dem-filtro":G.demFiltro=b.dataset.f;renderDemandas();break;
+    case "dem-nova":G.ed=novaDemanda();irPara("demandas");break;
+    case "dem-abrir":abrirDem(id);break;
+    case "dem-salvar":salvarDem();break;
+    case "dem-triagem":triagemDaDemanda(id);break;
+    case "dem-del":if(confirm("Excluir esta demanda? Os registros vinculados permanecem.")){regExcluir(id);G.ed=null;renderDemandas()}break;
+    case "reg-novo":criarReg(b.dataset.t,id);break;
+    case "ed-voltar":if(G.ed&&G.ed.tipo!=="dem")gravarEd();G.ed=null;G.rel=false;renderDemandas();window.scrollTo(0,0);break;
+    case "etapa-add":(G.ed.d.etapas=G.ed.d.etapas||[]).push({n:"",dur:"",freq:""});reRender();break;
+    case "metodo-add":(G.ed.d.metodosAp=G.ed.d.metodosAp||[]).push({});reRender();break;
+    case "evid-abrir":abrirEvidencia(Number(b.dataset.i));break;
+    case "evid-rm":if(confirm("Remover esta evidência do registro? O arquivo enviado permanece guardado no servidor.")){G.ed.d.evid.splice(Number(b.dataset.i),1);if(G.ed.tipo!=="dem")gravarEd();reRender()}break;
+    case "reg-revisao":gravarEd();mudarStatus("Enviada para revisão","revisao");renderDemandas();aviso("Enviada para revisão.");break;
+    case "reg-aprovar":gravarEd();aprovarReg();break;
+    case "reg-reabrir":reabrirReg();break;
+    case "reg-rel":gravarEd();G.rel=true;renderDemandas();window.scrollTo(0,0);break;
+    case "rel-voltar":G.rel=false;renderDemandas();break;
+    case "rel-print":window.print();break;
+  }
+});
 /* =====================================================================
    INÍCIO
    ===================================================================== */
