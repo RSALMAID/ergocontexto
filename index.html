@@ -9545,6 +9545,35 @@ renderCausas=function(){
   const prim=el.firstElementChild;if(prim)prim.insertAdjacentHTML("afterend",bar);else el.insertAdjacentHTML("afterbegin",bar);
   if(!z.ed){const b=el.querySelector('.cp-bar [data-cp="anexar"]');if(b)b.style.display="none"}
 };
+
+/* ---------- Triagem: mesma modelo 3D (a mulher) da AEP, no lugar do boneco antigo ---------- */
+const TRI_TIT={};DOMINIOS.forEach(d=>d.itens.forEach(q=>{if(TRI_FIG[q.id])TRI_TIT[q.t]=TRI_FIG[q.id]}));
+const _cena3dDe53=cena3dDe;
+cena3dDe=function(t){return TRI_TIT[t]||_cena3dDe53(t)};
+htmlFig=function(id){
+  const f=TRI_FIG[id];if(!f)return "";
+  const chips=ROT_ITEM.map((r,n)=>`<button type="button" class="n${n}" data-t3="${n}">${r}</button>`).join("");
+  const q=DOMINIOS.reduce((a,d)=>a||d.itens.find(x=>x.id===id),null);
+  return `<div class="fig item-fig fig3" data-t3id="${id}" data-t3f="${f}" data-t3t="${esc(q?q.t:"")}"><div class="fig-top"><span>Exemplo 3D · modelo da AEP</span><button type="button" class="btn sec peq" data-t3="ampliar" style="padding:2px 8px">Ampliar e girar</button></div>
+  <canvas width="680" height="440" style="width:100%;height:auto;display:block;border-radius:8px;background:#fff" role="img" aria-label="Modelo 3D ilustrando o item"></canvas>
+  <div class="fig-cap"></div><div class="fig-chips" role="group" aria-label="Ver exemplo por nível">${chips}</div></div>`;
+};
+function tri3dNivel(el,n){
+  const f=el.dataset.t3f,cv=el.querySelector("canvas"),c=cenaPara(f,n);if(!c)return;
+  el._n=n;desenhar3d(cv,c,{yaw:0,pitch:.05,dist:3.6,tx:.25,ty:.9,tz:0},n);
+  el.querySelector(".fig-cap").textContent=c.cap||"";
+  const r=estado.resp[el.dataset.t3id],ans=r&&typeof r.n==="number"?r.n:null;
+  el.querySelectorAll(".fig-chips button").forEach(b=>{const k=Number(b.dataset.t3);b.classList.toggle("on",k===n);b.classList.toggle("ans",k===ans);b.setAttribute("aria-pressed",k===n)});
+}
+iniciarFigs=function(){
+  figInst.clear();
+  $$(".fig3").forEach(el=>{const r=estado.resp[el.dataset.t3id];tri3dNivel(el,r&&typeof r.n==="number"?r.n:0)});
+};
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-t3]");if(!b)return;const el=b.closest(".fig3");if(!el)return;
+  if(b.dataset.t3==="ampliar"){abrir3d(0,el.dataset.t3t,"",el._n||0);return}
+  tri3dNivel(el,Number(b.dataset.t3));
+});
 /* =====================================================================
    INÍCIO
    ===================================================================== */
