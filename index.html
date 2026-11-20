@@ -292,6 +292,9 @@ body.sem-acesso .topo,body.sem-acesso .wrap{display:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
 /* ---- gestão (fase 1) ---- */
+.kpis{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.kpis>div{flex:1 1 110px;background:var(--soft);border-radius:12px;padding:10px 12px;text-align:center}
+.kpis b{display:block;font-size:1.5rem;line-height:1.1}.kpis small{color:var(--mut)}
 .subtabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .subtabs button{border:1.5px solid var(--bd);background:var(--card);color:var(--tx);border-radius:999px;padding:6px 14px;font-weight:600;font-size:.86rem}
 .subtabs button.on{background:var(--verde);color:#fff;border-color:var(--verde)}
@@ -346,6 +349,8 @@ details.sub>summary{cursor:pointer;font-weight:600;padding:6px 0}
     <nav id="nav" aria-label="Seções">
       <button data-v="avaliar" class="on">Avaliar</button>
       <button data-v="demandas">Demandas</button>
+      <button data-v="acoes">Ações</button>
+      <button data-v="alertas">Alertas</button>
       <button data-v="cadastros">Cadastros</button>
       <button data-v="historico">Histórico</button>
       <button data-v="painel">Painel</button>
@@ -362,6 +367,8 @@ details.sub>summary{cursor:pointer;font-weight:600;padding:6px 0}
     <div id="palco"></div>
   </section>
   <section id="v-demandas" class="view"></section>
+  <section id="v-acoes" class="view"></section>
+  <section id="v-alertas" class="view"></section>
   <section id="v-cadastros" class="view"></section>
   <section id="v-historico" class="view"></section>
   <section id="v-painel" class="view"></section>
@@ -2636,6 +2643,303 @@ document.addEventListener("click",e=>{
     case "rel-print":window.print();break;
   }
 });
+
+/* =====================================================================
+   FASE 2: PLANO DE AÇÃO, EFICÁCIA E ALERTAS
+   "Concluída" e "eficaz" são status diferentes: a ação só vira eficaz
+   com evidência (foto antes/depois), nova observação e aprovação técnica.
+   ===================================================================== */
+const HIER=["Eliminação da exigência","Modificação do processo","Solução de engenharia","Mecanização ou automação","Redução de peso, força, alcance ou repetição","Adequação do layout","Ferramenta apropriada","Organização e alternância do trabalho","Pausas","Treinamento e orientação"];
+const ST_ACAO=[["proposta","Proposta"],["planejada","Aprovada / planejada"],["execucao","Em execução"],["concluida","Concluída (aguarda eficácia)"],["eficaz","Eficaz"],["cancelada","Cancelada"]];
+const stAcao=s=>(ST_ACAO.find(x=>x[0]===s)||[0,s])[1];
+const PRI_AC=["P4 · Monitorar","P3 · Planejar","P2 · Priorizar","P1 · Imediata"],PRAZO_AC=[90,60,30,7];
+const ABERTA_AC=s=>s==="proposta"||s==="planejada"||s==="execucao";
+const diasEntre=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
+const diasAtraso=d=>d.prazo&&ABERTA_AC(d.status)?Math.max(0,diasEntre(d.prazo,hojeISO())):0;
+function escalonar(n){return n<=0?"":n<=7?"Responsável direto":n<=15?"Liderança da área":n<=30?"Gerência e EHS":"Diretoria"}
+G.acFiltro="abertas";
+
+function novaAcao(base){
+  return {id:rid(),tipo:"acao",novo:true,d:Object.assign({data:hojeISO(),problema:"",etapa:"",causa:"",acao:"",hier:"",provisoria:"",definitiva:"",prioridade:"1",responsavel:(perfil&&perfil.nome)||"",area:"",participantes:"",custo:"",orcamento:"",prazo:somaDias(60),dataPlan:"",dataReal:"",status:"proposta",demandaId:"",postoId:"",atividadeId:"",origemId:"",origemItem:"",justTreino:"",atraso:"",escal:"",evid:[],hist:[],ef:{prevista:"",avaliador:"",reaval:"",metodo:"",comparacao:"",trabalhadores:"",efeitos:"",residual:"",decisao:"",obs:""}},base||{})};
+}
+function acoesDe(f){return regOf("acao").filter(r=>f(r.d))}
+
+/* ---------- lista ---------- */
+function renderAcoes(){
+  const el=$("#v-acoes");if(!el)return;
+  if(G.ed&&G.ed.tipo==="acao"){el.innerHTML=htmlAcaoEd();return}
+  const f=G.acFiltro,todas=regOf("acao"),hj=hojeISO();
+  const filtros={abertas:d=>ABERTA_AC(d.status),vencidas:d=>diasAtraso(d)>0,aguarda:d=>d.status==="concluida",eficazes:d=>d.status==="eficaz",todas:()=>true};
+  const L=todas.filter(r=>filtros[f](r.d)).sort((a,b)=>(a.d.prazo||"9").localeCompare(b.d.prazo||"9"));
+  const chips=[["abertas","Abertas"],["vencidas","Vencidas"],["aguarda","Aguardando eficácia"],["eficazes","Eficazes"],["todas","Todas"]].map(([k,r])=>`<button type="button" class="${f===k?"on":""}" data-g-acao="ac-filtro" data-f="${k}">${r} <small>${todas.filter(x=>filtros[k](x.d)).length}</small></button>`).join("");
+  const n=(s)=>todas.filter(x=>x.d.status===s).length;
+  const cards=L.map(r=>{const d=r.d,at=diasAtraso(d);
+    return `<div class="sug"><span><b>${esc(d.numero||"(número após sincronizar)")}</b> · ${esc((d.acao||d.problema||"").slice(0,90))}<br><small>${esc(d.postoId?caminho(d.postoId):"")}${d.responsavel?" · resp.: "+esc(d.responsavel):""}${d.hier!==""?" · "+esc(HIER[Number(d.hier)]):""}</small></span><span class="linha" style="flex-direction:column;align-items:flex-end;gap:4px"><span class="bd ${["n0","n1","n2","n3"][Number(d.prioridade)||0]}">${PRI_AC[Number(d.prioridade)||0].split(" ")[0]}</span><span class="bd ${d.status==="eficaz"?"n0":d.status==="concluida"?"n1":"nd"}">${stAcao(d.status)}</span>${at?`<span class="bd n3">${at} d de atraso</span><small>${escalonar(at)}</small>`:d.prazo&&ABERTA_AC(d.status)?`<small>prazo ${dataBR(d.prazo)}</small>`:""}<button class="btn sec peq" data-g-acao="ac-abrir" data-id="${r.id}">Abrir</button></span></div>`}).join("")||`<p class="mut">Nenhuma ação neste filtro.</p>`;
+  el.innerHTML=`<div class="card"><div class="linha" style="justify-content:space-between"><h2 style="margin:0">Plano de ação</h2><button class="btn" data-g-acao="ac-nova">+ Nova ação</button></div>
+  <p class="mut">Toda condição relevante gera uma ação rastreável. <b>Concluída não é eficaz</b>: a eficácia exige evidência e aprovação técnica.</p>
+  <div class="kpis"><div><b>${todas.filter(x=>ABERTA_AC(x.d.status)).length}</b><small>abertas</small></div><div><b style="color:#b71c1c">${todas.filter(x=>diasAtraso(x.d)>0).length}</b><small>vencidas</small></div><div><b>${n("concluida")}</b><small>aguardando eficácia</small></div><div><b style="color:#1b7f3a">${n("eficaz")}</b><small>eficazes</small></div></div>
+  <div class="subtabs">${chips}</div></div><div class="card">${cards}</div>`;
+}
+
+/* ---------- editor ---------- */
+function htmlAcaoEd(){
+  const {d,id}=G.ed,novo=G.ed.novo,lock=d.status==="eficaz"||d.status==="cancelada",dis=lock?"disabled":"";
+  const at=diasAtraso(d),adm=quemEdita();
+  const origem=d.origemId&&regGet(d.origemId);
+  const treino=Number(d.hier)===9&&d.hier!=="";
+  const efHtml=()=>{
+    const ev=d.evid||[],tem=f=>ev.some(e=>e.fase===f);
+    return `<p class="mut">Para encerrar como eficaz: foto <b>antes</b> e <b>depois</b>, nova observação, confirmação dos trabalhadores e aprovação técnica.</p>
+    <div class="grid2"><label class="campo">Data prevista para verificar<input type="date" data-g="ef.prevista" value="${esc(d.ef.prevista)}" ${dis}></label><label class="campo">Avaliador da eficácia<input data-g="ef.avaliador" value="${esc(d.ef.avaliador)}" ${dis}></label>
+    <label class="campo">Data da nova observação<input type="date" data-g="ef.reaval" value="${esc(d.ef.reaval)}" ${dis}></label><label class="campo">Método repetido (se houver)<input data-g="ef.metodo" value="${esc(d.ef.metodo)}" placeholder="Ex.: REBA, NIOSH" ${dis}></label></div>
+    ${T("ef.comparacao","Comparação da exposição antes e depois",dis,3)}
+    <div class="grid2"><label class="campo">Confirmação com os trabalhadores<select data-g="ef.trabalhadores" ${dis}><option value=""></option>${sel1(["Confirmaram a melhoria","Confirmaram em parte","Não confirmaram"],d.ef.trabalhadores)}</select></label>
+    <label class="campo">Risco residual<select data-g="ef.residual" ${dis}><option value=""></option>${sel1(["Adequado","Atenção","Alto","Crítico"],d.ef.residual)}</select></label></div>
+    ${T("ef.efeitos","Efeitos indesejados observados",dis,2)}
+    <label class="campo">Decisão<select data-g="ef.decisao" ${dis}><option value=""></option>${sel1(["Encerrar como eficaz","Reabrir a ação","Complementar com nova ação"],d.ef.decisao)}</select></label>
+    <p class="mut">Evidências: ${tem("antes")?"✔":"✘"} antes · ${tem("depois")?"✔":"✘"} depois · ${tem("conclusao")?"✔":"✘"} conclusão. Marque a fase de cada foto em <b>Evidências</b>.</p>`;
+  };
+  const dem=d.demandaId&&regGet(d.demandaId);
+  let corpo=bloco("1. Problema e causa",
+    `<label class="campo">Demanda vinculada<select data-g="demandaId" ${dis}><option value="">(sem demanda)</option>${sel1(regOf("dem").map(r=>[r.id,(r.d.numero||"(pendente)")+" · "+r.d.origem]),d.demandaId||"")}</select></label>${vinculoHtml(d,dis)}
+    ${origem?`<p class="mut">Origem: ${origem.tipo.toUpperCase()} ${esc(origem.d.numero||"")}</p>`:""}
+    ${T("problema","Problema identificado",dis,2)}${I("etapa","Etapa da atividade afetada",dis)}${T("causa","Causa ou determinante",dis,2)}`,true);
+  corpo+=bloco("2. Ação proposta",
+    `${T("acao","Ação proposta",dis,2)}
+    <label class="campo">Tipo de ação (hierarquia de soluções)<select data-g="hier" data-re="1" ${dis}><option value="">Selecione…</option>${HIER.map((h,i)=>`<option value="${i}" ${String(d.hier)===String(i)?"selected":""}>${i+1}. ${h}</option>`).join("")}</select></label>
+    <small class="mut">Prefira os primeiros níveis: eliminar a exigência e mudar o processo valem mais que orientar o trabalhador.</small>
+    ${treino?`<div class="alerta">Treinamento isolado não resolve problema de projeto, layout, peso, altura, alcance ou organização. Justifique por que esta é a medida adequada.</div>${T("justTreino","Justificativa para usar treinamento como medida",dis,2)}`:""}
+    ${T("provisoria","Medida provisória (enquanto a definitiva não vem)",dis,2)}${T("definitiva","Medida definitiva",dis,2)}`,true);
+  corpo+=bloco("3. Responsabilidades, custo e prazo",
+    `<div class="grid2"><label class="campo">Prioridade<select data-g="prioridade" data-prazo2="1" ${dis}>${sel1(PRI_AC.map((p,i)=>[String(i),p]),d.prioridade)}</select></label>${I("prazo","Prazo",dis,"date")}
+    ${I("responsavel","Responsável",dis)}${I("area","Área responsável",dis)}${I("dataPlan","Data planejada de execução",dis,"date")}${I("dataReal","Data realizada",dis,"date")}
+    ${I("custo","Custo estimado (R$)",dis)}<label class="campo">Orçamento aprovado<select data-g="orcamento" ${dis}><option value=""></option>${sel1(["Sim","Não","Não se aplica"],d.orcamento)}</select></label></div>
+    ${I("participantes","Participantes",dis)}
+    ${at?`<div class="alerta">Atrasada ${at} dia(s). Escalonamento: <b>${escalonar(at)}</b>.</div>`:""}
+    ${T("atraso","Justificativa de atraso",dis,2)}${I("escal","Escalonamento realizado (quem foi acionado)",dis)}`,true);
+  corpo+=bloco("4. Evidências (conclusão, antes e depois)",htmlEvid(lock),false);
+  corpo+=bloco("5. Verificação de eficácia",efHtml(),d.status==="concluida");
+  const bl=[];
+  if(!(d.acao||"").trim())bl.push("descreva a ação");
+  if(!(d.responsavel||"").trim())bl.push("informe o responsável");
+  if(treino&&!(d.justTreino||"").trim())bl.push("justifique o treinamento");
+  const blConc=[];
+  if(!d.dataReal)blConc.push("informe a data realizada");
+  if(!(d.evid||[]).some(e=>e.fase==="conclusao"||e.fase==="depois"))blConc.push("anexe evidência de conclusão");
+  const blEf=[];
+  if(!(d.evid||[]).some(e=>e.fase==="antes")||!(d.evid||[]).some(e=>e.fase==="depois"))blEf.push("fotos antes e depois");
+  if(!d.ef.reaval)blEf.push("data da nova observação");
+  if(!d.ef.trabalhadores)blEf.push("confirmação dos trabalhadores");
+  if(!d.ef.residual)blEf.push("risco residual");
+  if(!d.ef.decisao)blEf.push("decisão");
+  const s=d.status;
+  corpo+=bloco("6. Situação e aprovação",
+    `<div class="grid2"><label class="campo">Status<input value="${stAcao(s)}" disabled></label><label class="campo">Número<input value="${esc(d.numero||"(após sincronizar)")}" disabled></label></div>
+    ${s==="proposta"&&bl.length?`<div class="alerta">Para planejar: ${bl.join("; ")}.</div>`:""}
+    ${s==="execucao"&&blConc.length?`<div class="alerta">Para concluir: ${blConc.join("; ")}.</div>`:""}
+    ${s==="concluida"&&blEf.length?`<div class="alerta">Para decidir a eficácia: ${blEf.join("; ")}.</div>`:""}
+    <div class="linha" style="margin-top:8px">
+     ${s==="proposta"?`<button class="btn verde" data-g-acao="ac-passo" data-p="planejada">Aprovar e planejar</button>`:""}
+     ${s==="planejada"?`<button class="btn verde" data-g-acao="ac-passo" data-p="execucao">Iniciar execução</button>`:""}
+     ${s==="execucao"?`<button class="btn verde" data-g-acao="ac-passo" data-p="concluida">Marcar como concluída</button>`:""}
+     ${s==="concluida"?`<button class="btn verde" data-g-acao="ac-decidir" ${adm?"":"disabled"}>Registrar decisão de eficácia</button>`:""}
+     ${!lock&&s!=="proposta"?`<button class="btn sec" data-g-acao="ac-passo" data-p="voltar">Voltar etapa</button>`:""}
+     ${!lock?`<button class="btn sec" data-g-acao="ac-passo" data-p="cancelada">Cancelar ação</button>`:""}
+     ${s==="eficaz"&&adm?`<button class="btn sec" data-g-acao="ac-passo" data-p="reabrir">Reabrir (administrador)</button>`:""}
+    </div>${s==="concluida"&&!adm?`<small class="mut">Só o administrador aprova o encerramento técnico.</small>`:""}
+    ${(d.hist||[]).length?`<details style="margin-top:10px"><summary>Histórico (${d.hist.length})</summary>${d.hist.map(h=>`<div class="sug"><span>${dataBR(h.em)} · <b>${esc(h.acao)}</b> · ${esc(h.por)}${h.motivo?"<br><small>"+esc(h.motivo)+"</small>":""}</span></div>`).join("")}</details>`:""}`,true);
+  return `<div class="card no-print"><button class="btn sec peq" data-g-acao="ed-voltar">← Plano de ação</button><h2 style="margin-top:12px">Ação ${esc(d.numero||"(número após sincronizar)")}${dem?` <small class="mut">· demanda ${esc(dem.d.numero||"")}</small>`:""}</h2>${lock?`<div class="alerta">Ação ${stAcao(d.status).toLowerCase()}: bloqueada para edição.</div>`:`<small class="mut">Salvamento automático neste aparelho.</small>`}</div>${corpo}`;
+}
+function acaoLog(r,acao,motivo){(r.d.hist=r.d.hist||[]).push({em:hojeISO(),acao,por:(autorAtual()||{}).nome||"",motivo:motivo||""})}
+function passoAcao(p){
+  const r=regGet(G.ed.id);if(!r)return;
+  gravarEd();const d=G.ed.d,s=d.status;
+  const treino=d.hier!==""&&Number(d.hier)===9;
+  const sair=()=>{G.ed.d=JSON.parse(JSON.stringify(r.d));regGravar(r);reRender()};
+  if(p==="planejada"){
+    if(!(d.acao||"").trim()||!(d.responsavel||"").trim()){aviso("Informe a ação e o responsável.");return}
+    if(treino&&!(d.justTreino||"").trim()){aviso("Justifique o uso de treinamento como medida.");return}
+    r.d=JSON.parse(JSON.stringify(d));r.d.status="planejada";acaoLog(r,"Aprovada e planejada");sair();return}
+  if(p==="execucao"){r.d=JSON.parse(JSON.stringify(d));r.d.status="execucao";acaoLog(r,"Execução iniciada");sair();return}
+  if(p==="concluida"){
+    if(!d.dataReal){aviso("Informe a data realizada.");return}
+    if(!(d.evid||[]).some(e=>e.fase==="conclusao"||e.fase==="depois")){aviso("Anexe uma evidência de conclusão (fase Conclusão ou Depois).");return}
+    r.d=JSON.parse(JSON.stringify(d));r.d.status="concluida";if(!r.d.ef.prevista)r.d.ef.prevista=somaDias(30);acaoLog(r,"Concluída (aguarda verificação de eficácia)");sair();return}
+  if(p==="voltar"){const ant={planejada:"proposta",execucao:"planejada",concluida:"execucao"}[s];if(!ant)return;r.d=JSON.parse(JSON.stringify(d));r.d.status=ant;acaoLog(r,"Voltou para "+stAcao(ant));sair();return}
+  if(p==="cancelada"){const m=prompt("Motivo do cancelamento:","");if(!m||!m.trim())return;r.d=JSON.parse(JSON.stringify(d));r.d.status="cancelada";acaoLog(r,"Cancelada",m);sair();return}
+  if(p==="reabrir"){if(!quemEdita())return;const m=prompt("Motivo da reabertura:","");if(!m||!m.trim())return;r.d=JSON.parse(JSON.stringify(d));r.d.status="execucao";acaoLog(r,"Reaberta",m);sair()}
+}
+function decidirEficacia(){
+  if(!quemEdita()){aviso("Somente o administrador aprova a eficácia.");return}
+  gravarEd();const r=regGet(G.ed.id),d=G.ed.d,ev=d.evid||[];
+  const f=[];
+  if(!ev.some(e=>e.fase==="antes")||!ev.some(e=>e.fase==="depois"))f.push("fotos antes e depois");
+  if(!d.ef.reaval)f.push("data da nova observação");
+  if(!d.ef.trabalhadores)f.push("confirmação dos trabalhadores");
+  if(!d.ef.residual)f.push("risco residual");
+  if(!d.ef.decisao)f.push("decisão");
+  if(f.length){aviso("Falta: "+f.join("; ")+".");return}
+  r.d=JSON.parse(JSON.stringify(d));
+  if(d.ef.decisao==="Encerrar como eficaz"){
+    if(d.ef.residual==="Crítico"&&!confirm("O risco residual está Crítico. Encerrar como eficaz mesmo assim?"))return;
+    r.d.status="eficaz";acaoLog(r,"Eficácia aprovada",d.ef.obs||d.ef.comparacao||"");
+  }else if(d.ef.decisao==="Reabrir a ação"){r.d.status="execucao";acaoLog(r,"Ineficaz: ação reaberta",d.ef.comparacao||"")}
+  else{r.d.status="eficaz";acaoLog(r,"Eficácia parcial: complementar com nova ação",d.ef.comparacao||"");}
+  G.ed.d=JSON.parse(JSON.stringify(r.d));regGravar(r);
+  if(d.ef.decisao==="Complementar com nova ação"){const n=novaAcao({demandaId:d.demandaId,postoId:d.postoId,atividadeId:d.atividadeId,origemId:r.id,problema:"Complemento da ação "+(d.numero||"")+": "+(d.problema||""),prioridade:d.prioridade});regGravar(n);G.ed=n;G.ed.novo=false;aviso("Criada nova ação para complementar.")}
+  renderAcoes();
+}
+function acoesDoItem(tipo,regId){
+  const r=regGet(regId);if(!r)return;
+  gravarEd();const d=r.d,c=aepClasse(d);
+  const itens=[];c.cats.forEach(cat=>cat.itens.forEach(i=>itens.push({cat:cat.nome,i})));
+  const existentes=regOf("acao").filter(a=>a.d.origemId===regId).map(a=>a.d.origemItem);
+  const novos=itens.filter(x=>!existentes.includes(x.i.k));
+  if(!novos.length){aviso(itens.length?"Já existem ações para todos os itens em Alto/Crítico.":"Nenhum item em Alto ou Crítico nesta AEP.");return}
+  if(!confirm("Criar "+novos.length+" ação(ões) a partir dos itens em Alto/Crítico? Você completa depois.")) return;
+  novos.forEach(x=>{const n=novaAcao({demandaId:d.demandaId,postoId:d.postoId,atividadeId:d.atividadeId,origemId:regId,origemItem:x.i.k,problema:x.cat+": "+x.i.t+" ("+NIV_F[x.i.n]+")",prioridade:String(x.i.n===3?3:2),prazo:somaDias(PRAZO_AC[x.i.n===3?3:2]),causa:""});delete n.novo;regGravar(n)});
+  aviso(novos.length+" ação(ões) criada(s) como proposta.");
+  irPara("acoes");
+}
+
+/* =====================================================================
+   ALERTAS
+   ===================================================================== */
+function calcAlertas(){
+  const A=[],hj=hojeISO(),push=(sev,tipo,txt,ac)=>A.push({sev,tipo,txt,ac});
+  const nomePosto=id=>id?caminho(id).split(" › ").slice(-1)[0]:"";
+  regOf("aep").forEach(r=>{
+    const d=r.d,c=aepClasse(d),n=d.numero||"AEP";
+    if(c.nivel===3&&d.status!=="rascunho")push(0,"Avaliação crítica",`${n}: exposição crítica em ${nomePosto(d.postoId)||"posto não vinculado"}. Avisar EHS e liderança imediatamente.`,["abrir-reg",r.id]);
+    else if(c.nivel===3)push(0,"Avaliação crítica",`${n} (rascunho): há itens críticos em ${nomePosto(d.postoId)||"posto não vinculado"}.`,["abrir-reg",r.id]);
+    if(c.nivel===3&&!(d.provisoria||"").trim()&&!regOf("acao").some(a=>a.d.origemId===r.id&&(a.d.provisoria||"").trim()&&a.d.status!=="cancelada"))push(0,"Exposição crítica sem medida provisória",`${n}: registre uma medida provisória.`,["abrir-reg",r.id]);
+    if(c.gat.length&&!regOf("aet").some(a=>a.d.demandaId&&a.d.demandaId===d.demandaId||a.d.aepId===r.id))push(1,"Necessidade de AET",`${n}: ${c.gat.length} gatilho(s) para AET e nenhuma AET aberta.`,["abrir-reg",r.id]);
+    if(d.crit&&d.crit.c4)push(1,"Queixa recorrente",`${n}: queixa recorrente registrada em ${nomePosto(d.postoId)||"posto"}.`,["abrir-reg",r.id]);
+    if(d.status==="aprovada"&&!(d.evid||[]).length)push(2,"Ausência de evidência",`${n} aprovada sem nenhuma evidência anexada.`,["abrir-reg",r.id]);
+  });
+  regOf("aet").forEach(r=>{if(r.d.status==="aprovada"&&!(r.d.evid||[]).length)push(2,"Ausência de evidência",`${r.d.numero||"AET"} aprovada sem evidência anexada.`,["abrir-reg",r.id])});
+  regOf("acao").forEach(r=>{
+    const d=r.d,n=d.numero||"Ação",at=diasAtraso(d);
+    if(at>0)push(at>15?0:1,"Ação vencida",`${n}: ${at} dia(s) de atraso. Escalonar para ${escalonar(at)}.`,["ac-abrir",r.id]);
+    else if(ABERTA_AC(d.status)&&d.prazo&&diasEntre(hj,d.prazo)<=7)push(2,"Ação vencendo",`${n}: prazo em ${diasEntre(hj,d.prazo)} dia(s) (${dataBR(d.prazo)}).`,["ac-abrir",r.id]);
+    if(d.status==="concluida"){const pv=d.ef&&d.ef.prevista;push(pv&&pv<hj?1:2,"Concluída, aguardando eficácia",`${n}: concluída e ainda sem verificação de eficácia${pv?" (prevista para "+dataBR(pv)+")":""}.`,["ac-abrir",r.id])}
+    if(d.status==="concluida"&&!(d.evid||[]).length)push(2,"Ausência de evidência",`${n} concluída sem evidência.`,["ac-abrir",r.id]);
+  });
+  regOf("dem").forEach(r=>{const d=r.d;if(FECHADA(d.status))return;
+    if(vencida(d))push(1,"Demanda vencida",`${d.numero||"Demanda"} (${d.origem}): prazo ${dataBR(d.prazo)} vencido.`,["abrir-dem",r.id]);
+    if(["Mudança de processo","Alteração de layout","Novo posto ou equipamento","Nova ferramenta"].includes(d.origem)&&!regOf("aep").some(a=>a.d.demandaId===r.id&&a.d.status==="aprovada"))push(1,"Mudança sem nova avaliação",`${d.numero||"Demanda"} (${d.origem}): ainda sem AEP aprovada.`,["abrir-dem",r.id])});
+  // posto sem reavaliação (mais de 12 meses ou nunca)
+  regOf("cad").filter(r=>r.d.tc==="posto").forEach(r=>{
+    const ult=regOf("aep").filter(a=>a.d.postoId===r.id&&a.d.status==="aprovada").map(a=>a.d.data||"").sort().pop(),ult2=lista.filter(a=>a.ctx&&a.ctx.postoId===r.id).map(a=>a.ctx.data||"").sort().pop();
+    const u=[ult,ult2].filter(Boolean).sort().pop();
+    if(u&&diasEntre(u,hj)>365)push(2,"Posto sem reavaliação",`${r.d.nome}: última avaliação em ${dataBR(u)} (mais de 12 meses).`,["hist-posto",r.id])});
+  // condição repetida em diferentes áreas
+  const rep={};
+  regOf("aep").forEach(r=>{const c=aepClasse(r.d),ar=r.d.postoId&&regGet(r.d.postoId)&&regGet(r.d.postoId).d.pai||"?";c.cats.forEach(cat=>cat.itens.filter(i=>i.n>=2).forEach(i=>{(rep[i.k]=rep[i.k]||{t:i.t,areas:new Set()}).areas.add(ar)}))});
+  Object.keys(rep).forEach(k=>{if(rep[k].areas.size>=2)push(2,"Condição repetida em várias áreas",`"${rep[k].t}" em Alto/Crítico em ${rep[k].areas.size} áreas diferentes.`,null)});
+  return A.sort((a,b)=>a.sev-b.sev);
+}
+function renderAlertas(){
+  const el=$("#v-alertas");if(!el)return;
+  const A=calcAlertas(),sev=["Crítico","Atenção","Acompanhar"],cls=["n3","n2","n1"];
+  el.innerHTML=`<div class="card"><h2>Alertas</h2><p class="mut">Calculados a partir dos seus registros, em tempo real. O aviso por e-mail ou Teams ao EHS e à liderança depende de integração (Power Automate), prevista para fase posterior.</p>
+  <div class="kpis">${[0,1,2].map(s=>`<div><b>${A.filter(a=>a.sev===s).length}</b><small>${sev[s].toLowerCase()}</small></div>`).join("")}</div></div>
+  ${[0,1,2].map(s=>{const L=A.filter(a=>a.sev===s);return L.length?`<div class="card"><h3><span class="bd ${cls[s]}">${sev[s]}</span></h3>${L.map(a=>`<div class="sug"><span><b>${esc(a.tipo)}</b><br><small>${esc(a.txt)}</small></span>${a.ac?`<button class="btn sec peq" data-g-acao="${a.ac[0]}" data-id="${a.ac[1]}">Abrir</button>`:""}</span></div>`).join("")}</div>`:""}).join("")||""}
+  ${A.length?"":`<div class="card"><p class="mut">Nenhum alerta no momento.</p></div>`}`;
+}
+function atualizarSinoAlertas(){
+  const b=$("#nav button[data-v=alertas]");if(!b)return;
+  const n=calcAlertas().filter(a=>a.sev<=1).length;
+  b.innerHTML="Alertas"+(n?` <span class="bd n3" style="padding:0 7px;font-size:.72rem">${n}</span>`:"");
+}
+
+/* ---------- ganchos nos módulos da fase 1 ---------- */
+const _irPara=irPara;
+irPara=function(v){_irPara(v);if(v==="acoes")renderAcoes();if(v==="alertas")renderAlertas();atualizarSinoAlertas()};
+const _reRender=reRender;
+reRender=function(){
+  const v=$(".view.on"),id=v?v.id:"";
+  if(id!=="v-acoes")return _reRender();
+  const y=window.scrollY,ab=[...document.querySelectorAll("#v-acoes details")].map(x=>x.open),foco=document.activeElement&&document.activeElement.dataset?document.activeElement.dataset.g:null;
+  renderAcoes();
+  document.querySelectorAll("#v-acoes details").forEach((x,i)=>{if(ab[i]!==undefined)x.open=ab[i]});
+  if(foco){const e=document.querySelector(`#v-acoes [data-g="${foco}"]`);if(e)e.focus({preventScroll:true})}
+  window.scrollTo(0,y);
+};
+// evidência com fase (antes/depois/conclusão) nas ações
+const _htmlEvid=htmlEvid;
+htmlEvid=function(b){
+  let h=_htmlEvid(b);
+  if(G.ed&&G.ed.tipo==="acao"){
+    const ev=G.ed.d.evid||[];
+    ev.forEach((e,i)=>{h=h.replace(`<input data-g="evid.${i}.legenda"`,`<select data-g="evid.${i}.fase" ${b?"disabled":""}><option value="">Fase…</option>${sel1([["antes","Antes"],["depois","Depois"],["conclusao","Conclusão"],["outra","Outra"]],e.fase||"")}</select><input data-g="evid.${i}.legenda"`)});
+  }
+  return h;
+};
+// painel: bloco do plano de ação
+const _renderPainel=renderPainel;
+renderPainel=function(){
+  _renderPainel();
+  const el=$("#v-painel");if(!el)return;
+  const ac=regOf("acao");if(!ac.length&&!regOf("dem").length)return;
+  const A=calcAlertas();
+  const por=(f)=>ac.filter(x=>f(x.d)).length;
+  el.insertAdjacentHTML("beforeend",`<div class="card"><h3>Gestão ergonômica</h3><div class="kpis">
+   <div><b>${regOf("dem").filter(r=>!FECHADA(r.d.status)).length}</b><small>demandas abertas</small></div>
+   <div><b>${regOf("aep").length}</b><small>AEPs</small></div><div><b>${regOf("aet").length}</b><small>AETs</small></div>
+   <div><b>${por(d=>ABERTA_AC(d.status))}</b><small>ações abertas</small></div>
+   <div><b style="color:#b71c1c">${por(d=>diasAtraso(d)>0)}</b><small>ações vencidas</small></div>
+   <div><b>${por(d=>d.status==="concluida")}</b><small>aguardando eficácia</small></div>
+   <div><b style="color:#1b7f3a">${por(d=>d.status==="eficaz")}</b><small>eficazes</small></div>
+   <div><b style="color:#b71c1c">${A.filter(a=>a.sev===0).length}</b><small>alertas críticos</small></div></div>
+   <p class="mut" style="font-size:.84rem">Percentual de ações eficazes entre as concluídas: <b>${(()=>{const t=por(d=>d.status==="concluida"||d.status==="eficaz");return t?Math.round(100*por(d=>d.status==="eficaz")/t)+"%":"—"})()}</b>. Os indicadores são por situação, processo, posto e área, nunca por trabalhador.</p></div>`);
+};
+// atalho para criar ações a partir da AEP e da demanda (botões são inseridos na renderização)
+const _htmlClasse=htmlClasse;
+htmlClasse=function(c,dis){
+  return _htmlClasse(c,dis)+`<div class="linha" style="margin-top:12px"><button type="button" class="btn sec" data-g-acao="ac-da-aep" data-id="${G.ed.id}">Criar ações a partir dos itens em Alto/Crítico</button>${regOf("acao").filter(a=>a.d.origemId===G.ed.id).length?`<button type="button" class="btn sec" data-g-acao="ac-lista">Ver ações desta AEP (${regOf("acao").filter(a=>a.d.origemId===G.ed.id).length})</button>`:""}</div>`;
+};
+const _htmlDemFluxo=htmlDemFluxo;
+htmlDemFluxo=function(id){
+  const h=_htmlDemFluxo(id),L=regOf("acao").filter(r=>r.d.demandaId===id);
+  const bloco=`<h4 style="margin-top:14px">Ações desta demanda</h4>${L.map(r=>`<div class="sug"><span><b>${esc(r.d.numero||"(pendente)")}</b> · ${esc((r.d.acao||r.d.problema||"").slice(0,70))}<br><small>${stAcao(r.d.status)}</small></span><button class="btn sec peq" data-g-acao="ac-abrir" data-id="${r.id}">Abrir</button></div>`).join("")||`<p class="mut">Nenhuma ação ainda.</p>`}<div class="linha" style="margin-top:8px"><button class="btn sec peq" data-g-acao="ac-nova-dem" data-id="${id}">+ Nova ação para esta demanda</button></div>`;
+  return h.replace(/<div class="linha" style="margin-top:12px"><button class="btn sec peq" data-g-acao="dem-del"/,bloco+'<div class="linha" style="margin-top:12px"><button class="btn sec peq" data-g-acao="dem-del"');
+};
+
+/* ---------- eventos ---------- */
+document.addEventListener("input",()=>{},true);
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset&&t.dataset.prazo2&&G.ed&&G.ed.tipo==="acao"){G.ed.d.prazo=somaDias(PRAZO_AC[Number(t.value)||0]);reRender()}
+},true);
+document.addEventListener("click",e=>{
+  const nb=e.target.closest("#nav button");
+  if(nb&&nb.dataset.v==="acoes"){if(G.ed&&G.ed.tipo==="acao")gravarEd();G.ed=null}
+  const b=e.target.closest("[data-g-acao]");if(!b)return;
+  const id=b.dataset.id;
+  switch(b.dataset.gAcao){
+    case "ac-filtro":G.acFiltro=b.dataset.f;renderAcoes();break;
+    case "ac-nova":G.ed=novaAcao();irPara("acoes");break;
+    case "ac-nova-dem":{const dm=regGet(id);const n=novaAcao({demandaId:id,postoId:dm?dm.d.postoId:"",atividadeId:dm?dm.d.atividadeId:"",problema:dm?dm.d.motivo:""});delete n.novo;regGravar(n);G.ed=n;irPara("acoes");break}
+    case "ac-abrir":{const r=regGet(id);if(r){G.ed={id,tipo:"acao",d:JSON.parse(JSON.stringify(r.d))};irPara("acoes")}break}
+    case "ac-passo":passoAcao(b.dataset.p);break;
+    case "ac-decidir":decidirEficacia();break;
+    case "ac-da-aep":acoesDoItem("aep",id);break;
+    case "ac-lista":G.acFiltro="todas";gravarEd();G.ed=null;irPara("acoes");break;
+    case "ed-voltar":if(G.ed&&G.ed.tipo==="acao"){gravarEd();G.ed=null;renderAcoes();window.scrollTo(0,0)}break;
+    case "hist-posto":if(($(".view.on")||{}).id!=="v-cadastros")irPara("cadastros");break;
+  }
+},true);
+// garante que "Plano de ação" (nova ação sem registro prévio) seja gravada ao editar
+const _gravarEd=gravarEd;
+gravarEd=function(){
+  if(G.ed&&G.ed.tipo==="acao"&&G.ed.novo){
+    if(!(G.ed.d.problema||G.ed.d.acao||"").trim())return;
+    const r={id:G.ed.id,tipo:"acao",d:JSON.parse(JSON.stringify(G.ed.d))};regGravar(r);G.ed.novo=false;return;
+  }
+  _gravarEd();
+};
+setTimeout(atualizarSinoAlertas,300);
 /* =====================================================================
    INÍCIO
    ===================================================================== */

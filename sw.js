@@ -1,5 +1,5 @@
 // Service worker do ErgoContexto: abre offline (rede primeiro, cache como reserva).
-const CACHE = "ergocontexto-v6";
+const CACHE = "ergocontexto-v7";
 const ARQUIVOS = ["./", "index.html", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png", "apple-touch-icon.png", "config.js"];
 
 self.addEventListener("install", (e) => {
