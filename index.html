@@ -4823,8 +4823,8 @@ function renderDocs(){
   const el=$("#v-docs");if(!el)return;
   if(G.dc){el.innerHTML=htmlDocEd();return}
   const L=regOf("doc").sort((a,b)=>(b.atualizadoEm||0)-(a.atualizadoEm||0));
-  el.innerHTML=`<div class="card"><h2>Documentos oficiais</h2><p class="mut">Laudos, pareceres, relatórios, atas e termos, com signatários, registro profissional e assinatura eletrônica. Ao emitir, o conteúdo é bloqueado e recebe um selo de integridade.</p>
-  <div class="linha"><select id="docNovoTipo">${Object.keys(TIPOS_DOC).map(k=>`<option value="${k}">${esc(TIPOS_DOC[k].rot)}</option>`).join("")}</select><button class="btn" data-dc="novo">+ Novo documento</button></div></div>
+  el.innerHTML=`<div class="card"><h2>Termos, atas e assinaturas</h2><p class="mut">Atas, termos e registros, com signatários, registro profissional e assinatura eletrônica. Ao emitir, o conteúdo é bloqueado e recebe um selo de integridade.</p>
+  <div class="linha"><select id="docNovoTipo">${Object.keys(TIPOS_DOC).filter(k=>!["aet","parecer","quant"].includes(k)).map(k=>`<option value="${k}">${esc(TIPOS_DOC[k].rot)}</option>`).join("")}</select><button class="btn" data-dc="novo">+ Novo documento</button></div></div>
   <div class="card">${L.map(r=>{const d=r.d;return `<div class="sug"><span><b>${esc(d.numero||"(número após sincronizar)")}</b> · ${esc(d.titulo||"")}<br><small>${esc((TIPOS_DOC[d.dtipo]||TIPOS_DOC.livre).rot)} · ${dataBR(d.data)} · ${STATUS_REG[d.status]||d.status}${(d.assin||[]).length?" · "+(d.assin||[]).filter(a=>a.sig).length+"/"+d.assin.length+" assinaturas":""}</small></span><span class="linha"><button class="btn sec peq" data-dc="abrir" data-id="${r.id}">Abrir</button>${d.status==="aprovada"?"":`<button class="btn sec peq" data-dc="excluir" data-id="${r.id}">Excluir</button>`}</span></div>`}).join("")||`<p class="mut">Nenhum documento ainda.</p>`}</div>`;
 }
 function htmlDocEd(){
@@ -6876,6 +6876,53 @@ htmlRelatorio=function(){
   return h+`<h3>Participação do trabalhador (${R.n} entrevistado${R.n>1?"s":""})</h3><table class="tab"><tr><th>Região</th><th>12 meses</th><th>7 dias</th><th>Limitou</th></tr>${R.reg.filter(x=>x.m12||x.d7||x.imp).map(x=>`<tr><td>${x.r}</td><td>${x.m12}/${R.n}</td><td>${x.d7}/${R.n}</td><td>${x.imp}/${R.n}</td></tr>`).join("")||`<tr><td colspan="4">Nenhum desconforto relatado.</td></tr>`}</table>`;
 };
 (function(){const s=document.createElement("style");s.textContent=`.ptmapa{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden}.ptl{display:grid;grid-template-columns:1fr 70px 70px 70px;gap:4px;align-items:center;padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:.88rem}.ptl:first-child{background:#f9fafb}.ptl input{justify-self:center;width:20px;height:20px}.ptl b{text-align:center}.ptl b:first-child{text-align:left}@media(max-width:480px){.ptl{grid-template-columns:1fr 52px 52px 52px;padding:6px}}`;document.head.appendChild(s)})();
+/* FASE 22: Início só com painéis grandes, sem menu superior, botão Início em todo módulo */
+const NOMES36={demandas:"Demandas",avaliar:"AEP",aet:"AET",acoes:"Ações",alertas:"Alertas",inventario:"Inventário",painel:"Painel",cadastros:"Cadastros",docs:"Termos, atas e assinaturas",sobre:"Sobre o método",conta:"Conta e privacidade",busca:"Busca"};
+TILES.forEach(t=>{if(t[0]==="docs"){t[1]="Termos e assinaturas";t[2]="Atas, termos e registros assinados"}});
+const _renderInicio36=renderInicio;
+renderInicio=function(){
+  try{_renderInicio36()}catch(e){}
+  const el=$("#v-inicio");if(!el)return;
+  const h=new Date().getHours(),sd=h<12?"Bom dia":h<18?"Boa tarde":"Boa noite",nome=((perfil&&perfil.nome)||"").split(" ")[0];
+  const tl=el.querySelector(".tiles");
+  el.innerHTML=`<div class="ini-sd"><h2>${sd}${nome?", "+esc(nome):""}</h2><p>O que você quer fazer agora?</p></div>`+(tl?tl.outerHTML:"");
+};
+// botão Início em todo módulo
+function barraInicio(){
+  let b=$("#barraIni");
+  if(!b){b=document.createElement("div");b.id="barraIni";b.className="no-print";b.innerHTML=`<button type="button" class="btn sec" data-tile="inicio">⌂ Início</button><span id="barraTit"></span>`;const v=$("#v-inicio");if(v&&v.parentNode)v.parentNode.insertBefore(b,v)}
+  return b;
+}
+const _irPara36=irPara;
+irPara=function(v){
+  _irPara36(v);
+  const b=barraInicio(),ini=$("#v-inicio")&&$("#v-inicio").classList.contains("on");
+  b.style.display=ini?"none":"flex";$("#barraTit").textContent=ini?"":(NOMES36[v]||"");
+};
+document.addEventListener("click",e=>{
+  const b=e.target.closest('[data-tile="inicio"]');if(!b)return;
+  if(G.ed&&G.ed.tipo!=="dem"){try{gravarEd()}catch(x){}}
+  G.triagemOn=false;irPara("inicio");
+},true);
+// a marca leva ao Início
+document.addEventListener("click",e=>{if(e.target.closest(".marca")){if(G.ed&&G.ed.tipo!=="dem"){try{gravarEd()}catch(x){}}G.triagemOn=false;irPara("inicio")}});
+(function(){const s=document.createElement("style");s.textContent=`
+#nav,#menuBtn{display:none!important}
+.marca{cursor:pointer}
+.topo-in{flex-direction:row!important;align-items:center;justify-content:space-between;flex-wrap:nowrap}
+.topo-dir{flex:1 1 auto!important;justify-content:flex-end;order:0!important}
+.gsw{flex:0 1 420px}
+@media(max-width:700px){.topo-in{flex-wrap:wrap}.topo-dir{flex:1 1 100%!important}.gsw{flex:1}}
+.ini-sd{padding:8px 4px 4px}.ini-sd h2{margin:0;color:#FF9900;font-size:1.8rem}.ini-sd p{margin:4px 0 0;color:#6B7280;font-size:1.05rem}
+.tiles{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))!important;gap:18px!important;margin:16px 0!important}
+.tile{padding:26px!important;min-height:132px!important;border-radius:20px!important;gap:20px!important}
+.tile-ic{width:64px!important;height:64px!important;border-radius:16px!important}.tile-ic svg{width:34px;height:34px}
+.tile-tx b{font-size:1.25rem!important}.tile-tx small{font-size:.92rem!important}
+.tile-tri{min-height:150px!important}.tile-tri .tile-tx b{font-size:1.5rem!important}
+.tile-n{top:14px!important;right:16px!important;min-width:28px!important;height:28px!important;font-size:.88rem!important}
+#barraIni{display:none;align-items:center;gap:12px;max-width:2200px;margin:8px auto 0;padding:0 16px}#barraIni .btn{padding:8px 16px}#barraTit{font-weight:700;color:#FF9900}
+@media(max-width:600px){.tiles{grid-template-columns:1fr 1fr!important;gap:12px!important}.tile{padding:16px!important;min-height:116px!important;flex-direction:column;align-items:flex-start;gap:10px!important}.tile-tri{grid-column:1/-1;flex-direction:row!important;align-items:center}.tile-ic{width:52px!important;height:52px!important}.tile-tx b{font-size:1.05rem!important}}`;document.head.appendChild(s)})();
+barraInicio();irPara("inicio");
 /* =====================================================================
    INÍCIO
    ===================================================================== */
