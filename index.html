@@ -2440,9 +2440,9 @@ const AET_SEC=[
 function novoReg(tipo,demId){
   const dem=demId&&regGet(demId),base={data:hojeISO(),demandaId:demId||"",postoId:dem?dem.d.postoId:"",atividadeId:dem?dem.d.atividadeId:"",status:"rascunho",versao:1,hist:[],evid:[],avaliadores:(perfil&&perfil.nome)||"",f:{},crit:{},gat:{},enc:{},prio:{},obs:{},part:{},etapas:[{n:"",dur:"",freq:""}],metodosAp:[],sec:{},resp:{}};
   if(tipo==="aet"){
-    const aep=regOf("aep").filter(r=>r.d.demandaId===demId&&demId).sort((a,b)=>b.atualizadoEm-a.atualizadoEm)[0];
-    if(aep){base.aepId=aep.id;const c=aepClasse(aep.d);
-      base.sec.demanda=(dem?dem.d.origem+": "+dem.d.motivo:"");
+    const aep=(G.aepFonte&&regGet(G.aepFonte))||regOf("aep").filter(r=>r.d.demandaId===demId&&demId).sort((a,b)=>b.atualizadoEm-a.atualizadoEm)[0];
+    if(aep){base.aepId=aep.id;const c=aepClasse(aep.d);base.postoId=base.postoId||aep.d.postoId||"";base.atividadeId=base.atividadeId||aep.d.atividadeId||"";
+      base.sec.demanda=(dem?dem.d.origem+": "+dem.d.motivo:"")+(c.gat.length?(dem?"\n":"")+"Gatilhos que levaram à AET: "+c.gat.map(g=>g.rot).join("; "):"");
       base.sec.prescrita=aep.d.obs.prescrita||"";base.sec.real=aep.d.obs.realizada||"";base.sec.estrategias=aep.d.obs.estrategias||"";
       base.sec.fisicas=c.cats[0].itens.map(i=>"• "+i.t+" ("+NIV_F[i.n]+")").join("\n");
       base.sec.organizacionais=c.cats[1].itens.map(i=>"• "+i.t+" ("+NIV_F[i.n]+")").join("\n");
@@ -2480,8 +2480,10 @@ function htmlGovernanca(dis){
     if(!(d.obs.prescrita||"").trim()||!(d.obs.realizada||"").trim())bloqueios.push("registre a atividade prescrita e a realizada");
     if(cl.totResp<cl.tot/2)bloqueios.push("avalie ao menos metade dos itens ("+cl.totResp+"/"+cl.tot+")");
     if(cl.nivel===3&&!(d.provisoria||"").trim())bloqueios.push("exposição crítica exige medida provisória");
+    aepAetPend(d,cl).forEach(x=>bloqueios.push(x));
   }else{
     if(!(d.sec.diagnostico||"").trim()||!(d.sec.recomendacoes||"").trim())bloqueios.push("preencha diagnóstico e recomendações");
+    aetFalta(d).forEach(x=>bloqueios.push(x));
     if(!(d.resp.nome||"").trim()||!(d.resp.qualificacao||"").trim())bloqueios.push("informe responsável técnico e qualificação");
   }
   const avisos=[];
@@ -2523,6 +2525,7 @@ function htmlRegEd(){
   }else{
     corpo+=AET_SEC.map(([tit,cs],gi)=>bloco(`${gi+2}. ${tit}`,cs.map(([k,r])=>T("sec."+k,r,dis,k==="conclusao"||k==="diagnostico"||k==="recomendacoes"?5:3)).join(""),gi<2)).join("");
     if(d.aepId&&regGet(d.aepId))corpo+=bloco("Origem",`<p class="mut">Pré-preenchida a partir da AEP ${esc(regGet(d.aepId).d.numero||"")}. Revise e complemente com estudo de campo, entrevistas e medições.</p>`,false);
+    corpo+=bloco("Entrevistas, recomendações e conteúdo mínimo",htmlAetEstudo(dis),true);
     corpo+=bloco("Evidências",htmlEvid(lock),false);
   }
   corpo+=bloco("Revisão e aprovação",htmlGovernanca(dis),true);
@@ -2565,8 +2568,10 @@ function aprovarReg(){
     if(!d.postoId&&!d.atividadeId)msgs.push("vincule um posto ou atividade");
     if(!(d.obs.prescrita||"").trim()||!(d.obs.realizada||"").trim())msgs.push("registre atividade prescrita e realizada");
     if(c.totResp<c.tot/2)msgs.push("avalie ao menos metade dos itens");
-    if(c.nivel===3&&!(d.provisoria||"").trim())msgs.push("informe a medida provisória");}
+    if(c.nivel===3&&!(d.provisoria||"").trim())msgs.push("informe a medida provisória");
+    aepAetPend(d,c).forEach(x=>msgs.push(x));}
   else{if(!(d.sec.diagnostico||"").trim()||!(d.sec.recomendacoes||"").trim())msgs.push("preencha diagnóstico e recomendações");
+    aetFalta(d).forEach(x=>msgs.push(x));
     if(!(d.resp.nome||"").trim()||!(d.resp.qualificacao||"").trim())msgs.push("informe responsável técnico e qualificação");}
   if(msgs.length){aviso("Antes de aprovar: "+msgs.join("; ")+".");return}
   const o=prompt("Observação da aprovação (opcional):","");if(o===null)return;
@@ -2600,7 +2605,7 @@ function htmlRelatorio(){
     ${(d.metodosAp||[]).filter(m=>m.m).length?`<h3>Métodos aplicados</h3><table class="tab"><tr><th>Método</th><th>Versão</th><th>Resultado</th><th>Parâmetros</th><th>Limitações</th></tr>${d.metodosAp.filter(m=>m.m).map(m=>`<tr><td>${esc(m.m)}</td><td>${esc(m.v||"")}</td><td>${esc(m.r||"")}</td><td>${esc(m.p||"")}</td><td>${esc(m.l||"")}</td></tr>`).join("")}</table>`:""}
     ${sec("Medida provisória",d.provisoria)}${sec("Conclusão",d.conclusao)}`;
   }else{
-    corpo=AET_SEC.map(([t,cs])=>`<h2 style="font-size:1.05rem">${t}</h2>`+cs.map(([k,r])=>sec(r,d.sec[k])).join("")).join("")+`<h3>Responsável técnico</h3><p>${esc(d.resp.nome||"")} · ${esc(d.resp.qualificacao||"")} · ${esc(d.resp.registro||"")}</p>`;
+    corpo=AET_SEC.map(([t,cs])=>`<h2 style="font-size:1.05rem">${t}</h2>`+cs.map(([k,r])=>sec(r,d.sec[k])).join("")).join("")+htmlAetRel(d)+`<h3>Responsável técnico</h3><p>${esc(d.resp.nome||"")} · ${esc(d.resp.qualificacao||"")} · ${esc(d.resp.registro||"")}</p>`;
   }
   const ev=(d.evid||[]).filter(e=>e.mini);
   return `<div class="card rel-reg"><div class="no-print linha" style="margin-bottom:12px"><button class="btn sec peq" data-g-acao="rel-voltar">← Voltar à edição</button><button class="btn" data-g-acao="rel-print">Imprimir / salvar PDF</button></div>
@@ -2802,6 +2807,7 @@ function htmlAcaoEd(){
   if(!d.ef.reaval)blEf.push("data da nova observação");
   if(!d.ef.trabalhadores)blEf.push("confirmação dos trabalhadores");
   if(!d.ef.residual)blEf.push("risco residual");
+  efExtra(d).forEach(x=>blEf.push(x));
   if(!d.ef.decisao)blEf.push("decisão");
   const s=d.status;
   corpo+=bloco("6. Situação e aprovação",
@@ -2848,9 +2854,10 @@ function decidirEficacia(){
   if(!d.ef.reaval)f.push("data da nova observação");
   if(!d.ef.trabalhadores)f.push("confirmação dos trabalhadores");
   if(!d.ef.residual)f.push("risco residual");
+  efExtra(d).forEach(x=>f.push(x));
   if(!d.ef.decisao)f.push("decisão");
   if(f.length){aviso("Falta: "+f.join("; ")+".");return}
-  r.d=JSON.parse(JSON.stringify(d));
+  r.d=JSON.parse(JSON.stringify(d));r.d.ef.aprovadoPor=(perfil&&perfil.nome)||"";r.d.ef.aprovadoEm=hojeISO();
   if(d.ef.decisao==="Encerrar como eficaz"){
     if(d.ef.residual==="Crítico"&&!confirm("O risco residual está Crítico. Encerrar como eficaz mesmo assim?"))return;
     r.d.status="eficaz";acaoLog(r,"Eficácia aprovada",d.ef.obs||d.ef.comparacao||"");
@@ -5754,6 +5761,129 @@ htmlClasse=function(c,dis){
   const sel=`<select class="btn sec peq" data-mt-mais="1" aria-label="Mais métodos"><option value="">Mais métodos…</option>${MD_NOMES.map(([k,n])=>`<option value="${k}">${n}</option>`).join("")}</select>`;
   return h.replace(/(<button[^>]*data-mt-abrir="tlx">[^<]*<\/button>)/,`$1${sel}`);
 };
+/* =====================================================================
+   FASE 16: gatilhos claros para AET na AEP, AET como estudo técnico e
+   exigências adicionais de eficácia.
+   ===================================================================== */
+// ---------- gatilhos automáticos que faltavam: g0, g5, g7 ----------
+const NIVAL=t=>/crític|alto|imediat|em breve|investigar e mudar|prioridade|ação necessária/i.test(t||"")?2:/baixo|aceit[aá]vel|adequad|satisfat/i.test(t||"")?0:1;
+const _aepClasse27=aepClasse;
+aepClasse=function(d){
+  const c=_aepClasse27(d);
+  const poe=(id,rot)=>{const i=c.gat.findIndex(g=>g.id===id);if(i>=0)c.gat.splice(i,1);c.gat.push({id,rot})};
+  const ap=(d.metodosAp||[]).filter(m=>m&&m.m&&m.r);
+  if(c.nivel>=2&&(d.enc&&(d.enc.metodo||d.enc.aepdet||d.enc.aet)||c.pontos>=7))poe("g0","Necessidade de avaliação aprofundada (classificação "+NIV_F[c.nivel]+(c.pontos>=7?", priorização alta":"")+")");
+  if(ap.length){
+    const altos=ap.filter(m=>NIVAL(m.r)===2),baixos=ap.filter(m=>NIVAL(m.r)===0);
+    if(c.nivel>=0&&c.nivel<=1&&altos.length)poe("g5","Divergência entre resultados: AEP "+NIV_F[c.nivel]+", mas "+altos[0].m+" indica risco elevado");
+    else if(c.nivel>=2&&baixos.length===ap.length)poe("g5","Divergência entre resultados: AEP "+NIV_F[c.nivel]+", mas os métodos aplicados indicam risco baixo");
+    else if(altos.length&&baixos.length)poe("g5","Divergência entre métodos aplicados: "+altos[0].m+" (elevado) e "+baixos[0].m+" (baixo)");
+  }
+  if(d.postoId){
+    const lim=new Date();lim.setFullYear(lim.getFullYear()-1);const li=lim.toISOString().slice(0,10);
+    const ms=regOf("cad").filter(r=>r.d.tc==="mudanca"&&mudPosto(r)===d.postoId&&(r.d.data||"")>=li&&["Processo","Posto ou layout","Equipamento ou ferramenta","Novo posto ou equipamento","Organização do trabalho"].includes(r.d.tipo));
+    if(ms.length)poe("g7","Mudança relevante de processo no posto: "+(ms[0].d.nome||ms[0].d.tipo)+" ("+dataBR(ms[0].d.data)+")");
+  }
+  return c;
+};
+function aepAetPend(d,c){
+  const m=[];if(!c||!c.gat.length)return m;
+  if(!d.aetDec)m.push("há gatilho para AET: registre a decisão (encaminhar, em andamento ou não necessária)");
+  else if(/^AET não/.test(d.aetDec)&&!(d.aetJust||"").trim())m.push("justifique por que a AET não é necessária apesar dos gatilhos");
+  else if(d.aetDec==="Encaminhar para AET"&&!regOf("aet").some(r=>r.d.aepId===G.ed.id||(r.d.aepId&&r.d.aepId===d.id)))m.push("a AET foi encaminhada, mas ainda não foi aberta (use o botão Abrir AET)");
+  return m;
+}
+const AET_DEC=["Encaminhar para AET","AET já em andamento","AET não necessária (justificar)"];
+const _htmlClasse27=htmlClasse;
+htmlClasse=function(c,dis){
+  const h=_htmlClasse27(c,dis),d=G.ed.d,ini='<h4>Gatilhos para aprofundamento (AET)</h4>',fim='<h4>Encaminhamentos</h4>';
+  const i=h.indexOf(ini),j=h.indexOf(fim);if(i<0||j<0)return h;
+  const aets=regOf("aet").filter(r=>r.d.aepId===G.ed.id);
+  const lin=GAT.map(([k,r])=>{const a=c.gat.find(g=>g.id===k),man=d.gat&&d.gat[k];
+    const st=a&&!man?`<span class="bd n3">Disparado</span>`:a&&man?`<span class="bd n3">Disparado e marcado</span>`:man?`<span class="bd n2">Marcado manualmente</span>`:`<span class="bd nd">Não disparado</span>`;
+    return `<tr><td><label class="chk" style="margin:0"><input type="checkbox" data-g="gat.${k}" data-re="1" ${man?"checked":""} ${dis}> ${esc(r)}</label>${a?`<br><small class="mut">${esc(a.rot.replace(/ \(manual\)$/,""))}</small>`:""}</td><td>${st}</td></tr>`}).join("");
+  const n=c.gat.length;
+  const painel=`<h4>Gatilhos para aprofundamento (AET)</h4>
+  <p class="mut" style="font-size:.84rem">Os gatilhos 1 a 8 são checados automaticamente a partir da classificação, das condições que se sobrepõem, dos métodos aplicados e do cadastro de mudanças. Marque à mão os que a observação em campo indicar.</p>
+  <table class="tab"><tr><th>Gatilho</th><th>Situação</th></tr>${lin}</table>
+  <div class="${n?"alerta":"sug"}" style="margin-top:8px"><b>${n?`${n} gatilho(s) ativo(s): a AET deve ser considerada.`:"Nenhum gatilho ativo."}</b></div>
+  ${n?`<label class="campo">Decisão sobre a AET<select data-g="aetDec" data-re="1" ${dis}><option value=""></option>${sel1(AET_DEC,d.aetDec||"")}</select></label>${/^AET não/.test(d.aetDec||"")?T("aetJust","Justificativa (obrigatória)",dis,2):""}`:""}
+  ${aets.map(r=>`<div class="sug"><span><b>AET</b> ${esc(r.d.numero||"(pendente)")}<br><small>v${r.d.versao||1} · ${esc(r.d.status)}</small></span><button type="button" class="btn sec peq" data-g-acao="abrir-reg" data-id="${r.id}">Abrir</button></div>`).join("")}
+  ${!dis&&n?`<button type="button" class="btn" data-aet="abrir">Abrir AET a partir desta AEP</button>`:""}
+  <h4>Marcação manual (compatibilidade)</h4><small class="mut">Use a tabela acima.</small>`;
+  const resto=h.slice(j);
+  return h.slice(0,i)+painel+resto;
+};
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-aet]");if(!b)return;const k=b.dataset.aet;
+  if(k==="abrir"){
+    if(!G.ed||G.ed.tipo!=="aep")return;gravarEd();const id=G.ed.id,r=regGet(id);if(!r)return;
+    const j=regOf("aet").find(x=>x.d.aepId===id);if(j){abrirReg(j.id);return}
+    if(!r.d.aetDec||r.d.aetDec!=="AET já em andamento"){r.d.aetDec="Encaminhar para AET";regGravar(r)}
+    G.aepFonte=id;try{criarReg("aet",r.d.demandaId||"")}finally{G.aepFonte=""}
+    aviso("AET aberta com os dados da AEP.");return;
+  }
+  if(!G.ed||G.ed.tipo!=="aet")return;const d=G.ed.d;
+  if(k==="ent-add"){(d.entrev=d.entrev||[]).push({f:"",dt:hojeISO(),s:""});reRender()}
+  else if(k==="ent-del"){d.entrev.splice(Number(b.dataset.i),1);reRender()}
+  else if(k==="rec-add"){(d.recs=d.recs||[]).push({t:"",hier:"",prio:"1",resp:"",prazo:"",crit:"",just:""});reRender()}
+  else if(k==="rec-del"){const x=d.recs[Number(b.dataset.i)];if(x&&x.acaoId){aviso("Esta recomendação já gerou uma ação.");return}d.recs.splice(Number(b.dataset.i),1);reRender()}
+  else if(k==="rec-gerar"){
+    gravarEd();const r=regGet(G.ed.id);if(!r)return;let n=0,pend=[];
+    (G.ed.d.recs||[]).forEach((x,i)=>{
+      if(!(x.t||"").trim()||x.acaoId)return;
+      if(x.hier===""){pend.push("recomendação "+(i+1)+": escolha o tipo na hierarquia");return}
+      if(Number(x.hier)===9&&!(x.just||"").trim()){pend.push("recomendação "+(i+1)+": justifique o uso de treinamento");return}
+      const a=novaAcao({demandaId:G.ed.d.demandaId,postoId:G.ed.d.postoId,atividadeId:G.ed.d.atividadeId,origemId:G.ed.id,origemItem:"rec"+i,problema:(G.ed.d.sec.diagnostico||"").slice(0,200),causa:(G.ed.d.sec.determinantes||"").slice(0,200),acao:x.t,hier:x.hier,justTreino:x.just||"",prioridade:x.prio||"1",responsavel:x.resp||((perfil&&perfil.nome)||""),prazo:x.prazo||somaDias(60)});
+      a.d.ef.prevista=a.d.ef.prevista||"";if(x.crit)a.d.ef.obs="Critério de eficácia definido na AET: "+x.crit;
+      delete a.novo;regGravar(a);x.acaoId=a.id;n++});
+    gravarEd();
+    if(pend.length){aviso("Pendências: "+pend.join("; ")+".");reRender();return}
+    reRender();aviso(n?n+" ação(ões) criada(s) como proposta, ligadas a esta AET.":"Nenhuma recomendação nova para gerar.");
+  }
+});
+// ---------- AET como estudo técnico ----------
+const AET_NUCLEO=[["demanda","demanda e motivo"],["processo","descrição do processo"],["organizacao","descrição da organização"],["prescrita","atividade prescrita"],["real","atividade real"],["campo","observação em campo"],["variabilidade","variabilidade"],["determinantes","determinantes da atividade"],["metodos","métodos empregados"],["resultados","resultados"],["diagnostico","diagnóstico ergonômico"],["eficacia","critérios de eficácia"],["responsaveis","responsáveis"],["acompanhamento","plano de acompanhamento"],["conclusao","conclusão"]];
+function aetFalta(d){
+  const m=[],sc=d.sec||{};
+  const f=AET_NUCLEO.filter(([k])=>!(sc[k]||"").toString().trim()).map(x=>x[1]);
+  if(f.length)m.push("conteúdo mínimo da AET incompleto ("+f.join(", ")+"). Se algo não se aplica, escreva \"não se aplica\" e o motivo");
+  if(!(d.entrev||[]).some(e=>(e.s||"").trim())&&!(sc.entrevistas||"").trim())m.push("registre as entrevistas");
+  if(!(d.recs||[]).some(x=>(x.t||"").trim())&&!(sc.recomendacoes||"").trim())m.push("registre as recomendações");
+  (d.recs||[]).forEach((x,i)=>{if((x.t||"").trim()&&x.hier==="")m.push("recomendação "+(i+1)+": escolha o tipo na hierarquia de soluções");if((x.t||"").trim()&&Number(x.hier)===9&&x.hier!==""&&!(x.just||"").trim())m.push("recomendação "+(i+1)+": treinamento isolado exige justificativa")});
+  return m;
+}
+function htmlAetEstudo(dis){
+  const d=G.ed.d,sc=d.sec||{};
+  const feitos=AET_NUCLEO.filter(([k])=>(sc[k]||"").toString().trim()).length;
+  const ent=(d.entrev||[]).map((e,i)=>`<div class="metodo"><div class="grid3"><input data-g="entrev.${i}.f" value="${esc(e.f||"")}" placeholder="Função ou GSTS (sem nome)" ${dis}><input type="date" data-g="entrev.${i}.dt" value="${esc(e.dt||"")}" ${dis}>${dis?"":`<button type="button" class="btn sec peq" data-aet="ent-del" data-i="${i}">Remover</button>`}</div><textarea data-g="entrev.${i}.s" rows="2" placeholder="Síntese do que foi dito sobre a atividade, as dificuldades e as estratégias" ${dis}>${esc(e.s||"")}</textarea></div>`).join("");
+  const rec=(d.recs||[]).map((x,i)=>{const tr=x.hier!==""&&Number(x.hier)===9;return `<div class="metodo"><textarea data-g="recs.${i}.t" rows="2" placeholder="Recomendação" ${dis||x.acaoId?"disabled":""}>${esc(x.t||"")}</textarea>
+   <div class="grid3"><select data-g="recs.${i}.hier" data-re="1" ${dis||x.acaoId?"disabled":""}><option value="">Tipo (hierarquia)…</option>${HIER.map((h,k)=>`<option value="${k}" ${String(x.hier)===String(k)&&x.hier!==""?"selected":""}>${k+1}. ${h}</option>`).join("")}</select>
+   <select data-g="recs.${i}.prio" ${dis||x.acaoId?"disabled":""}>${sel1(PRI_AC.map((p,k)=>[String(k),p]),x.prio||"1")}</select><input type="date" data-g="recs.${i}.prazo" value="${esc(x.prazo||"")}" title="Prazo" ${dis||x.acaoId?"disabled":""}></div>
+   <div class="grid2"><input data-g="recs.${i}.resp" value="${esc(x.resp||"")}" placeholder="Responsável" ${dis||x.acaoId?"disabled":""}><input data-g="recs.${i}.crit" value="${esc(x.crit||"")}" placeholder="Critério de eficácia" ${dis||x.acaoId?"disabled":""}></div>
+   ${tr?`<div class="alerta">Treinamento isolado não resolve problema de projeto, layout, peso, altura, alcance ou organização.</div><textarea data-g="recs.${i}.just" rows="2" placeholder="Justificativa (obrigatória)" ${dis||x.acaoId?"disabled":""}>${esc(x.just||"")}</textarea>`:""}
+   <div class="linha">${x.acaoId&&regGet(x.acaoId)?`<span class="bd n0">Ação ${esc(regGet(x.acaoId).d.numero||"criada")}</span> <button type="button" class="btn sec peq" data-g-acao="ac-abrir" data-id="${x.acaoId}">Abrir ação</button>`:`<span class="bd nd">Sem ação</span>`}${dis||x.acaoId?"":`<button type="button" class="btn sec peq" data-aet="rec-del" data-i="${i}">Remover</button>`}</div></div>`}).join("");
+  return `<p class="mut">A AET é um estudo técnico: confirme que cada parte do conteúdo mínimo está preenchida. Conteúdo mínimo preenchido: <b>${feitos}/${AET_NUCLEO.length}</b> (as demais seções são complementares).</p>
+  ${AET_NUCLEO.filter(([k])=>!(sc[k]||"").toString().trim()).length?`<small class="mut">Faltam: ${AET_NUCLEO.filter(([k])=>!(sc[k]||"").toString().trim()).map(x=>x[1]).join(", ")}.</small>`:`<small class="mut">Conteúdo mínimo completo.</small>`}
+  <h4>Entrevistas</h4><small class="mut">Registre por função ou GSTS, sem nome do trabalhador quando houver risco de exposição.</small>${ent}${dis?"":`<button type="button" class="btn sec peq" data-aet="ent-add">+ Entrevista</button>`}
+  <h4>Recomendações e plano de ação</h4><small class="mut">Cada recomendação vira uma ação rastreável, com tipo na hierarquia de soluções, prioridade, prazo, responsável e critério de eficácia.</small>${rec}${dis?"":`<div class="linha"><button type="button" class="btn sec peq" data-aet="rec-add">+ Recomendação</button><button type="button" class="btn" data-aet="rec-gerar">Gerar ações das recomendações</button></div>`}`;
+}
+function htmlAetRel(d){
+  const e=(d.entrev||[]).filter(x=>(x.s||"").trim()),r=(d.recs||[]).filter(x=>(x.t||"").trim());
+  return (e.length?`<h3>Entrevistas</h3><table class="tab"><tr><th>Função / GSTS</th><th>Data</th><th>Síntese</th></tr>${e.map(x=>`<tr><td>${esc(x.f||"")}</td><td>${esc(dataBR(x.dt)||"")}</td><td>${esc(x.s)}</td></tr>`).join("")}</table>`:"")+
+   (r.length?`<h3>Recomendações e plano de ação</h3><table class="tab"><tr><th>Recomendação</th><th>Tipo</th><th>Prioridade</th><th>Prazo</th><th>Responsável</th><th>Critério de eficácia</th><th>Ação</th></tr>${r.map(x=>`<tr><td>${esc(x.t)}</td><td>${x.hier===""?"":esc(HIER[Number(x.hier)]||"")}</td><td>${esc(PRI_AC[Number(x.prio)]||"")}</td><td>${esc(dataBR(x.prazo)||"")}</td><td>${esc(x.resp||"")}</td><td>${esc(x.crit||"")}</td><td>${x.acaoId&&regGet(x.acaoId)?esc(regGet(x.acaoId).d.numero||"criada"):"—"}</td></tr>`).join("")}</table>`:"");
+}
+// ---------- eficácia: exigências adicionais ----------
+function efExtra(d){
+  const f=[],ef=d.ef||{};
+  if(!ef.prevista)f.push("data definida para a verificação");
+  if(!(ef.avaliador||"").trim())f.push("avaliador da eficácia");
+  if(!(ef.metodo||"").trim())f.push("método repetido (ou \"não aplicável\")");
+  if(!(ef.comparacao||"").trim())f.push("comparação da exposição antes e depois");
+  if(!(ef.efeitos||"").trim())f.push("efeitos indesejados (escreva \"nenhum\" se não houve)");
+  if(ef.reaval&&d.dataReal&&ef.reaval<d.dataReal)f.push("a nova observação não pode ser anterior à data de conclusão");
+  return f;
+}
 /* =====================================================================
    INÍCIO
    ===================================================================== */
