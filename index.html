@@ -2061,7 +2061,7 @@ function renderConta(){
   const eq=equipeInfo&&perfil&&perfil.equipe_id
     ?`<p><b>${esc(equipeInfo.nome)}</b> · você é <b>${admin?"administrador":"avaliador"}</b></p>
       <p>Código para convidar colegas: <span class="codigo">${esc(equipeInfo.codigo)}</span></p>
-      <h4 style="margin-top:14px">Membros (${membros.length})</h4>${membros.map(m=>`<div class="sug"><span>${esc(m.nome||"")}<br><small>${esc(m.email||"")}</small></span>${admin&&m.id!==sessao.user.id?`<select class="sel-papel" data-papel-membro="${esc(m.id)}" aria-label="Papel de ${esc(m.nome||"")}">${Object.keys(PAPEIS).map(k=>`<option value="${k}" ${m.papel===k?"selected":""}>${PAPEIS[k]}</option>`).join("")}</select>`:`<span class="bd ${m.papel==="admin"?"n2":"nd"}">${PAPEIS[m.papel]||m.papel}</span>`}</div>`).join("")}
+      <h4 style="margin-top:14px">Membros (${membros.length})</h4>${membros.map(m=>`<div class="sug"><span>${esc(m.nome||"")}<br><small>${esc(m.email||"")}</small></span>${admin&&m.id!==sessao.user.id?`<select class="sel-papel" data-papel-membro="${esc(m.id)}" aria-label="Papel de ${esc(m.nome||"")}">${Object.keys(PAPEIS).filter(k=>PAPEIS_NOVOS.includes(k)||k===m.papel).map(k=>`<option value="${k}" ${m.papel===k?"selected":""}>${PAPEIS[k]}</option>`).join("")}</select>`:`<span class="bd ${m.papel==="admin"?"n2":"nd"}">${PAPEIS[m.papel]||m.papel}</span>`}</div>`).join("")}
       <details style="margin-top:8px"><summary>O que cada papel pode fazer</summary><p class="mut" style="font-size:.84rem"><b>Administrador:</b> tudo, inclusive reabrir registros aprovados e definir papéis. <b>Aprovador:</b> aprova e bloqueia registros. <b>Revisor:</b> avalia e registra a revisão técnica. <b>Avaliador:</b> cria e edita as próprias avaliações. <b>Leitor:</b> somente consulta. Para aprovar, é preciso uma revisão feita por outra pessoa da equipe.</p></details>
       <p class="mut" style="font-size:.84rem">Todos da equipe veem as avaliações uns dos outros. Só o autor (ou um administrador) edita cada avaliação.</p>
       <button class="btn sec peq" data-acao="equipe-sair">Sair da equipe</button>`
@@ -2139,11 +2139,17 @@ function regGravar(r,agora){
   if(typeof agendarSync==="function")agendarSync();
 }
 function regExcluir(id){const r=REG.find(x=>x.id===id);if(!r)return;r.excluido=true;regGravar(r)}
-const quemEdita=()=>perfil&&perfil.papel==="admin";
-const PAPEIS={admin:"Administrador",aprovador:"Aprovador",revisor:"Revisor",avaliador:"Avaliador",leitor:"Leitor"};
-const quemAprova=()=>perfil&&(perfil.papel==="admin"||perfil.papel==="aprovador");
-const quemRevisa=()=>perfil&&["admin","aprovador","revisor"].includes(perfil.papel);
-const soLeitura=()=>!!(perfil&&perfil.papel==="leitor");
+const PAPEIS={admin:"Administrador",ehs:"EHS/Ergonomia",saude:"Saúde Ocupacional",avaliador:"Avaliador",gestor:"Gestor da área",respacao:"Responsável por ação",consulta:"Consulta/Auditoria",aprovador:"Aprovador (perfil antigo)",revisor:"Revisor (perfil antigo)",leitor:"Leitor (perfil antigo)"};
+const PAPEIS_NOVOS=["admin","ehs","saude","avaliador","gestor","respacao","consulta"];
+const PERM_ACOES=[["ver","Visualizar"],["criar","Criar"],["editar","Editar"],["revisar","Revisar"],["aprovar","Aprovar"],["reabrir","Reabrir registro aprovado"],["arquivar","Arquivar"],["excluir","Excluir"],["exportar","Exportar"],["restrito","Acessar informações restritas (saúde)"]];
+const _P=(...k)=>Object.fromEntries(k.map(x=>[x,1]));
+const PERM={admin:_P("ver","criar","editar","revisar","aprovar","reabrir","arquivar","excluir","exportar","restrito"),ehs:_P("ver","criar","editar","revisar","aprovar","reabrir","arquivar","exportar"),saude:_P("ver","criar","exportar","restrito"),avaliador:_P("ver","criar","editar","arquivar"),gestor:_P("ver","criar"),respacao:_P("ver"),consulta:_P("ver","exportar"),aprovador:_P("ver","criar","editar","revisar","aprovar","arquivar","exportar","restrito"),revisor:_P("ver","criar","editar","revisar","restrito"),leitor:_P("ver")};
+const pode=a=>perfil?!!(PERM[perfil.papel]||{})[a]:!["aprovar","reabrir"].includes(a);
+const quemEdita=()=>perfil&&["admin","ehs"].includes(perfil.papel);
+const quemAprova=()=>perfil&&!!(PERM[perfil.papel]||{}).aprovar;
+const quemRevisa=()=>perfil&&!!(PERM[perfil.papel]||{}).revisar;
+const soLeitura=()=>!!(perfil&&!(PERM[perfil.papel]||{}).editar);
+const podeEditarAcao=d=>{if(!perfil)return true;const p=perfil.papel;if(["admin","ehs","avaliador","revisor","aprovador","gestor"].includes(p))return true;if(p==="respacao"){const n=String(perfil.nome||"").toLowerCase().trim();return !!n&&String(d.responsavel||"").toLowerCase().includes(n)}return false};
 const travado=d=>d&&(d.status==="aprovada"||soLeitura());
 // SHA-256 síncrono (FIPS 180-4) para a assinatura de integridade
 const sha256=(()=>{const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
@@ -2159,7 +2165,7 @@ const sha256=(()=>{const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c2
     return H.map(v=>(v>>>0).toString(16).padStart(8,"0")).join("")}})();
 const canon=o=>o===null||typeof o!=="object"?JSON.stringify(o):Array.isArray(o)?"["+o.map(canon).join(",")+"]":"{"+Object.keys(o).sort().map(k=>JSON.stringify(k)+":"+canon(o[k])).join(",")+"}";
 // o hash cobre o conteúdo técnico do registro (não cobre status, histórico, assinatura nem os bytes dos anexos)
-const hashDoc=d=>{const {aprov,hist,status,versao,evid,revisao,_autor,_criadoEm,...c}=d;return sha256(canon(c))};
+const hashDoc=d=>{const {aprov,hist,status,versao,evid,revisao,_autor,_criadoEm,versoes,arquivada,encerrada,aetId,...c}=d;return sha256(canon(c))};
 const autorReg=()=>{const r=G.ed&&regGet(G.ed.id);return r&&r.autor?r.autor.id:null};
 const faltaRevisao=d=>{if(!perfil||(typeof membros!=="undefined"&&membros.length<2))return false;const a=autorReg();return !(d.revisao&&d.revisao.porId&&d.revisao.porId!==a)};
 
@@ -2724,10 +2730,11 @@ document.addEventListener("click",e=>{
    com evidência (foto antes/depois), nova observação e aprovação técnica.
    ===================================================================== */
 const HIER=["Eliminação da exigência","Modificação do processo","Solução de engenharia","Mecanização ou automação","Redução de peso, força, alcance ou repetição","Adequação do layout","Ferramenta apropriada","Organização e alternância do trabalho","Pausas","Treinamento e orientação"];
-const ST_ACAO=[["proposta","Proposta"],["planejada","Aprovada / planejada"],["execucao","Em execução"],["concluida","Concluída (aguarda eficácia)"],["eficaz","Eficaz"],["cancelada","Cancelada"]];
+const ST_ACAO=[["proposta","Não iniciada (aguardando aprovação)"],["planejada","Não iniciada (aprovada)"],["execucao","Em andamento"],["concluida","Concluída"],["verificacao","Aguardando verificação de eficácia"],["eficaz","Eficaz"],["parcial","Parcialmente eficaz"],["naoeficaz","Não eficaz"],["cancelada","Cancelada"]];
 const stAcao=s=>(ST_ACAO.find(x=>x[0]===s)||[0,s])[1];
 const PRI_AC=["P4 · Monitorar","P3 · Planejar","P2 · Priorizar","P1 · Imediata"],PRAZO_AC=[90,60,30,7];
 const ABERTA_AC=s=>s==="proposta"||s==="planejada"||s==="execucao";
+const AGUARDA=s=>s==="concluida"||s==="verificacao";
 const diasEntre=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5);
 const diasAtraso=d=>d.prazo&&ABERTA_AC(d.status)?Math.max(0,diasEntre(d.prazo,hojeISO())):0;
 function escalonar(n){return n<=0?"":n<=7?"Responsável direto":n<=15?"Liderança da área":n<=30?"Gerência e EHS":"Diretoria"}
@@ -2743,9 +2750,9 @@ function renderAcoes(){
   const el=$("#v-acoes");if(!el)return;
   if(G.ed&&G.ed.tipo==="acao"){el.innerHTML=htmlAcaoEd();return}
   const f=G.acFiltro,todas=regOf("acao"),hj=hojeISO();
-  const filtros={abertas:d=>ABERTA_AC(d.status),vencidas:d=>diasAtraso(d)>0,aguarda:d=>d.status==="concluida",eficazes:d=>d.status==="eficaz",todas:()=>true};
+  const filtros={abertas:d=>ABERTA_AC(d.status),vencidas:d=>diasAtraso(d)>0,aguarda:d=>AGUARDA(d.status),eficazes:d=>d.status==="eficaz",ineficaz:d=>d.status==="parcial"||d.status==="naoeficaz",todas:()=>true};
   const L=todas.filter(r=>filtros[f](r.d)).sort((a,b)=>(a.d.prazo||"9").localeCompare(b.d.prazo||"9"));
-  const chips=[["abertas","Abertas"],["vencidas","Vencidas"],["aguarda","Aguardando eficácia"],["eficazes","Eficazes"],["todas","Todas"]].map(([k,r])=>`<button type="button" class="${f===k?"on":""}" data-g-acao="ac-filtro" data-f="${k}">${r} <small>${todas.filter(x=>filtros[k](x.d)).length}</small></button>`).join("");
+  const chips=[["abertas","Abertas"],["vencidas","Vencidas"],["aguarda","Aguardando eficácia"],["eficazes","Eficazes"],["ineficaz","Parcial ou não eficaz"],["todas","Todas"]].map(([k,r])=>`<button type="button" class="${f===k?"on":""}" data-g-acao="ac-filtro" data-f="${k}">${r} <small>${todas.filter(x=>filtros[k](x.d)).length}</small></button>`).join("");
   const n=(s)=>todas.filter(x=>x.d.status===s).length;
   const cards=L.map(r=>{const d=r.d,at=diasAtraso(d);
     return `<div class="sug"><span><b>${esc(d.numero||"(número após sincronizar)")}</b> · ${esc((d.acao||d.problema||"").slice(0,90))}<br><small>${esc(d.postoId?caminho(d.postoId):"")}${d.responsavel?" · resp.: "+esc(d.responsavel):""}${d.hier!==""?" · "+esc(HIER[Number(d.hier)]):""}</small></span><span class="linha" style="flex-direction:column;align-items:flex-end;gap:4px"><span class="bd ${["n0","n1","n2","n3"][Number(d.prioridade)||0]}">${PRI_AC[Number(d.prioridade)||0].split(" ")[0]}</span><span class="bd ${d.status==="eficaz"?"n0":d.status==="concluida"?"n1":"nd"}">${stAcao(d.status)}</span>${at?`<span class="bd n3">${at} d de atraso</span><small>${escalonar(at)}</small>`:d.prazo&&ABERTA_AC(d.status)?`<small>prazo ${dataBR(d.prazo)}</small>`:""}<button class="btn sec peq" data-g-acao="ac-abrir" data-id="${r.id}">Abrir</button></span></div>`}).join("")||`<p class="mut">Nenhuma ação neste filtro.</p>`;
@@ -2757,7 +2764,7 @@ function renderAcoes(){
 
 /* ---------- editor ---------- */
 function htmlAcaoEd(){
-  const {d,id}=G.ed,novo=G.ed.novo,lock=d.status==="eficaz"||d.status==="cancelada",dis=lock?"disabled":"";
+  const {d,id}=G.ed,novo=G.ed.novo,lock=["eficaz","parcial","naoeficaz","cancelada"].includes(d.status)||!podeEditarAcao(d),dis=lock?"disabled":"";
   const at=diasAtraso(d),adm=quemEdita();
   const origem=d.origemId&&regGet(d.origemId);
   const treino=Number(d.hier)===9&&d.hier!=="";
@@ -2772,7 +2779,7 @@ function htmlAcaoEd(){
     ${T("ef.efeitos","Efeitos indesejados observados",dis,2)}
     <h4>Ganhos observados (opcional, para os indicadores de resultado)</h4>
     <div class="grid2"><label class="campo">Tempo economizado (min por dia)<input inputmode="decimal" data-g="ef.tempoMin" value="${esc(d.ef.tempoMin||"")}" ${dis}></label><label class="campo">Redução de retrabalho (%)<input inputmode="decimal" data-g="ef.retrabalho" value="${esc(d.ef.retrabalho||"")}" ${dis}></label><label class="campo">Ganho de produtividade (%)<input inputmode="decimal" data-g="ef.produtividade" value="${esc(d.ef.produtividade||"")}" ${dis}></label><label class="campo">Redução de esforço percebido (%)<input inputmode="decimal" data-g="ef.esforco" value="${esc(d.ef.esforco||"")}" ${dis}></label><label class="campo">Custo realizado (R$)<input inputmode="decimal" data-g="ef.custoReal" value="${esc(d.ef.custoReal||"")}" ${dis}></label><label class="campo">Ganho estimado (R$ por ano)<input inputmode="decimal" data-g="ef.ganhoAno" value="${esc(d.ef.ganhoAno||"")}" ${dis}></label></div>
-    <label class="campo">Decisão<select data-g="ef.decisao" ${dis}><option value=""></option>${sel1(["Encerrar como eficaz","Reabrir a ação","Complementar com nova ação"],d.ef.decisao)}</select></label>
+    <label class="campo">Decisão<select data-g="ef.decisao" ${dis}><option value=""></option>${sel1(["Encerrar como eficaz","Parcialmente eficaz (complementar com nova ação)","Não eficaz (abrir nova ação)","Reabrir a ação"],d.ef.decisao)}</select></label>
     <p class="mut">Evidências: ${tem("antes")?"✔":"✘"} antes · ${tem("depois")?"✔":"✘"} depois · ${tem("conclusao")?"✔":"✘"} conclusão. Marque a fase de cada foto em <b>Evidências</b>.</p>`;
   };
   const dem=d.demandaId&&regGet(d.demandaId);
@@ -2794,10 +2801,11 @@ function htmlAcaoEd(){
     ${at?`<div class="alerta">Atrasada ${at} dia(s). Escalonamento: <b>${escalonar(at)}</b>.</div>`:""}
     ${T("atraso","Justificativa de atraso",dis,2)}${I("escal","Escalonamento realizado (quem foi acionado)",dis)}`,true);
   corpo+=bloco("4. Evidências (conclusão, antes e depois)",htmlEvid(lock),false);
-  corpo+=bloco("5. Verificação de eficácia",efHtml(),d.status==="concluida");
+  corpo+=bloco("5. Verificação de eficácia",efHtml(),AGUARDA(d.status));
   const bl=[];
   if(!(d.acao||"").trim())bl.push("descreva a ação");
-  if(!(d.responsavel||"").trim())bl.push("informe o responsável");
+  if(!(d.responsavel||"").trim())bl.push("Ação sem responsável");
+  if(!d.prazo)bl.push("Ação sem prazo");
   if(treino&&!(d.justTreino||"").trim())bl.push("justifique o treinamento");
   const blConc=[];
   if(!d.dataReal)blConc.push("informe a data realizada");
@@ -2814,16 +2822,16 @@ function htmlAcaoEd(){
     `<div class="grid2"><label class="campo">Status<input value="${stAcao(s)}" disabled></label><label class="campo">Número<input value="${esc(d.numero||"(após sincronizar)")}" disabled></label></div>
     ${s==="proposta"&&bl.length?`<div class="alerta">Para planejar: ${bl.join("; ")}.</div>`:""}
     ${s==="execucao"&&blConc.length?`<div class="alerta">Para concluir: ${blConc.join("; ")}.</div>`:""}
-    ${s==="concluida"&&blEf.length?`<div class="alerta">Para decidir a eficácia: ${blEf.join("; ")}.</div>`:""}
+    ${AGUARDA(s)&&blEf.length?`<div class="alerta">Para decidir a eficácia: ${blEf.join("; ")}.</div>`:""}
     <div class="linha" style="margin-top:8px">
      ${s==="proposta"?`<button class="btn verde" data-g-acao="ac-passo" data-p="planejada">Aprovar e planejar</button>`:""}
      ${s==="planejada"?`<button class="btn verde" data-g-acao="ac-passo" data-p="execucao">Iniciar execução</button>`:""}
      ${s==="execucao"?`<button class="btn verde" data-g-acao="ac-passo" data-p="concluida">Marcar como concluída</button>`:""}
-     ${s==="concluida"?`<button class="btn verde" data-g-acao="ac-decidir" ${adm?"":"disabled"}>Registrar decisão de eficácia</button>`:""}
+     ${s==="concluida"?`<button class="btn verde" data-g-acao="ac-passo" data-p="verificacao">Enviar para verificação de eficácia</button>`:""}${AGUARDA(s)?`<button class="btn verde" data-g-acao="ac-decidir" ${adm?"":"disabled"}>Registrar decisão de eficácia</button>`:""}
      ${!lock&&s!=="proposta"?`<button class="btn sec" data-g-acao="ac-passo" data-p="voltar">Voltar etapa</button>`:""}
      ${!lock?`<button class="btn sec" data-g-acao="ac-passo" data-p="cancelada">Cancelar ação</button>`:""}
-     ${s==="eficaz"&&adm?`<button class="btn sec" data-g-acao="ac-passo" data-p="reabrir">Reabrir (administrador)</button>`:""}
-    </div>${s==="concluida"&&!adm?`<small class="mut">Só o administrador aprova o encerramento técnico.</small>`:""}
+     ${["eficaz","parcial","naoeficaz"].includes(s)&&adm?`<button class="btn sec" data-g-acao="ac-passo" data-p="reabrir">Reabrir (administrador)</button>`:""}
+    </div>${AGUARDA(s)&&!adm?`<small class="mut">Só o administrador aprova o encerramento técnico.</small>`:""}
     ${(d.hist||[]).length?`<details style="margin-top:10px"><summary>Histórico (${d.hist.length})</summary>${d.hist.map(h=>`<div class="sug"><span>${dataBR(h.em)} · <b>${esc(h.acao)}</b> · ${esc(h.por)}${h.motivo?"<br><small>"+esc(h.motivo)+"</small>":""}</span></div>`).join("")}</details>`:""}`,true);
   return `<div class="card no-print"><button class="btn sec peq" data-g-acao="ed-voltar">← Plano de ação</button><h2 style="margin-top:12px">Ação ${esc(d.numero||"(número após sincronizar)")}${dem?` <small class="mut">· demanda ${esc(dem.d.numero||"")}</small>`:""}</h2>${lock?`<div class="alerta">Ação ${stAcao(d.status).toLowerCase()}: bloqueada para edição.</div>`:`<small class="mut">Salvamento automático neste aparelho.</small>`}</div>${corpo}`;
 }
@@ -2841,8 +2849,9 @@ function passoAcao(p){
   if(p==="concluida"){
     if(!d.dataReal){aviso("Informe a data realizada.");return}
     if(!(d.evid||[]).some(e=>e.fase==="conclusao"||e.fase==="depois")){aviso("Anexe uma evidência de conclusão (fase Conclusão ou Depois).");return}
-    r.d=JSON.parse(JSON.stringify(d));r.d.status="concluida";if(!r.d.ef.prevista)r.d.ef.prevista=somaDias(30);acaoLog(r,"Concluída (aguarda verificação de eficácia)");sair();return}
-  if(p==="voltar"){const ant={planejada:"proposta",execucao:"planejada",concluida:"execucao"}[s];if(!ant)return;r.d=JSON.parse(JSON.stringify(d));r.d.status=ant;acaoLog(r,"Voltou para "+stAcao(ant));sair();return}
+    r.d=JSON.parse(JSON.stringify(d));r.d.status="concluida";if(!r.d.ef.prevista)r.d.ef.prevista=somaDias(30);acaoLog(r,"Concluída (execução terminada; a eficácia ainda não foi verificada)");sair();return}
+  if(p==="verificacao"){r.d=JSON.parse(JSON.stringify(d));r.d.status="verificacao";if(!r.d.ef.prevista)r.d.ef.prevista=somaDias(30);acaoLog(r,"Enviada para verificação de eficácia");sair();return}
+  if(p==="voltar"){const ant={planejada:"proposta",execucao:"planejada",concluida:"execucao",verificacao:"concluida"}[s];if(!ant)return;r.d=JSON.parse(JSON.stringify(d));r.d.status=ant;acaoLog(r,"Voltou para "+stAcao(ant));sair();return}
   if(p==="cancelada"){const m=prompt("Motivo do cancelamento:","");if(!m||!m.trim())return;r.d=JSON.parse(JSON.stringify(d));r.d.status="cancelada";acaoLog(r,"Cancelada",m);sair();return}
   if(p==="reabrir"){if(!quemEdita())return;const m=prompt("Motivo da reabertura:","");if(!m||!m.trim())return;r.d=JSON.parse(JSON.stringify(d));r.d.status="execucao";acaoLog(r,"Reaberta",m);sair()}
 }
@@ -2862,9 +2871,10 @@ function decidirEficacia(){
     if(d.ef.residual==="Crítico"&&!confirm("O risco residual está Crítico. Encerrar como eficaz mesmo assim?"))return;
     r.d.status="eficaz";acaoLog(r,"Eficácia aprovada",d.ef.obs||d.ef.comparacao||"");
   }else if(d.ef.decisao==="Reabrir a ação"){r.d.status="execucao";acaoLog(r,"Ineficaz: ação reaberta",d.ef.comparacao||"")}
-  else{r.d.status="eficaz";acaoLog(r,"Eficácia parcial: complementar com nova ação",d.ef.comparacao||"");}
+  else if(/^Não eficaz/.test(d.ef.decisao)){r.d.status="naoeficaz";acaoLog(r,"Registrada como não eficaz",d.ef.comparacao||"")}
+  else{r.d.status="parcial";acaoLog(r,"Parcialmente eficaz: complementar com nova ação",d.ef.comparacao||"");}
   G.ed.d=JSON.parse(JSON.stringify(r.d));regGravar(r);
-  if(d.ef.decisao==="Complementar com nova ação"){const n=novaAcao({demandaId:d.demandaId,postoId:d.postoId,atividadeId:d.atividadeId,origemId:r.id,problema:"Complemento da ação "+(d.numero||"")+": "+(d.problema||""),prioridade:d.prioridade});regGravar(n);G.ed=n;G.ed.novo=false;aviso("Criada nova ação para complementar.")}
+  if(/^(Parcialmente eficaz|Complementar|Não eficaz)/.test(d.ef.decisao)){const n=novaAcao({demandaId:d.demandaId,postoId:d.postoId,atividadeId:d.atividadeId,origemId:r.id,problema:(/^Não/.test(d.ef.decisao)?"Ação sem eficácia ":"Complemento da ação ")+(d.numero||"")+": "+(d.problema||""),prioridade:d.prioridade});regGravar(n);G.ed=n;G.ed.novo=false;aviso("Criada nova ação para complementar.")}
   renderAcoes();
 }
 function acoesDoItem(tipo,regId){
@@ -2900,7 +2910,7 @@ function calcAlertas(){
     const d=r.d,n=d.numero||"Ação",at=diasAtraso(d);
     if(at>0)push(at>15?0:1,"Ação vencida",`${n}: ${at} dia(s) de atraso. Escalonar para ${escalonar(at)}.`,["ac-abrir",r.id]);
     else if(ABERTA_AC(d.status)&&d.prazo&&diasEntre(hj,d.prazo)<=7)push(2,"Ação vencendo",`${n}: prazo em ${diasEntre(hj,d.prazo)} dia(s) (${dataBR(d.prazo)}).`,["ac-abrir",r.id]);
-    if(d.status==="concluida"){const pv=d.ef&&d.ef.prevista;push(pv&&pv<hj?1:2,"Concluída, aguardando eficácia",`${n}: concluída e ainda sem verificação de eficácia${pv?" (prevista para "+dataBR(pv)+")":""}.`,["ac-abrir",r.id])}
+    if(AGUARDA(d.status)){const pv=d.ef&&d.ef.prevista;push(pv&&pv<hj?1:2,"Concluída, aguardando eficácia",`${n}: concluída e ainda sem verificação de eficácia${pv?" (prevista para "+dataBR(pv)+")":""}.`,["ac-abrir",r.id])}
     if(d.status==="concluida"&&!(d.evid||[]).length)push(2,"Ausência de evidência",`${n} concluída sem evidência.`,["ac-abrir",r.id]);
   });
   regOf("dem").forEach(r=>{const d=r.d;if(FECHADA(d.status))return;
@@ -2950,7 +2960,7 @@ htmlEvid=function(b){
   let h=_htmlEvid(b);
   if(G.ed&&G.ed.tipo==="acao"){
     const ev=G.ed.d.evid||[];
-    ev.forEach((e,i)=>{h=h.replace(`<input data-g="evid.${i}.legenda"`,`<select data-g="evid.${i}.fase" ${b?"disabled":""}><option value="">Fase…</option>${sel1([["antes","Antes"],["depois","Depois"],["conclusao","Conclusão"],["outra","Outra"]],e.fase||"")}</select><input data-g="evid.${i}.legenda"`)});
+    ev.forEach((e,i)=>{h=h.replace(`<input data-g="evid.${i}.legenda"`,`<select data-g="evid.${i}.fase" ${b?"disabled":""}><option value="">Fase…</option>${sel1([["antes","Antes"],["depois","Depois"],["conclusao","Conclusão"],["provisoria","Medida provisória"],["outra","Outra"]],e.fase||"")}</select><input data-g="evid.${i}.legenda"`)});
   }
   return h;
 };
@@ -2967,10 +2977,10 @@ renderPainel=function(){
    <div><b>${regOf("aep").length}</b><small>AEPs</small></div><div><b>${regOf("aet").length}</b><small>AETs</small></div>
    <div><b>${por(d=>ABERTA_AC(d.status))}</b><small>ações abertas</small></div>
    <div><b style="color:#FF3300">${por(d=>diasAtraso(d)>0)}</b><small>ações vencidas</small></div>
-   <div><b>${por(d=>d.status==="concluida")}</b><small>aguardando eficácia</small></div>
+   <div><b>${por(d=>AGUARDA(d.status))}</b><small>aguardando eficácia</small></div>
    <div><b style="color:#01688A">${por(d=>d.status==="eficaz")}</b><small>eficazes</small></div>
    <div><b style="color:#FF3300">${A.filter(a=>a.sev===0).length}</b><small>alertas críticos</small></div></div>
-   <p class="mut" style="font-size:.84rem">Percentual de ações eficazes entre as concluídas: <b>${(()=>{const t=por(d=>d.status==="concluida"||d.status==="eficaz");return t?Math.round(100*por(d=>d.status==="eficaz")/t)+"%":"—"})()}</b>. Os indicadores são por situação, processo, posto e área, nunca por trabalhador.</p></div>`);
+   <p class="mut" style="font-size:.84rem">Percentual de ações eficazes entre as concluídas: <b>${(()=>{const t=por(d=>AGUARDA(d.status)||d.status==="eficaz");return t?Math.round(100*por(d=>d.status==="eficaz")/t)+"%":"—"})()}</b>. Os indicadores são por situação, processo, posto e área, nunca por trabalhador.</p></div>`);
 };
 // atalho para criar ações a partir da AEP e da demanda (botões são inseridos na renderização)
 const _htmlClasse=htmlClasse;
@@ -4011,7 +4021,7 @@ function linhaMensal(aeps,acoes,nm){
   const meses=[];const d=new Date();d.setDate(1);for(let i=nm-1;i>=0;i--){const x=new Date(d.getFullYear(),d.getMonth()-i,1);meses.push(x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0"))}
   const a={},c={};meses.forEach(m=>{a[m]=0;c[m]=0});
   aeps.forEach(r=>{const m=ISO_MES(r.criadoEm||r.atualizadoEm);if(m in a)a[m]++});
-  acoes.forEach(r=>{if(r.d.status==="concluida"||r.d.status==="eficaz"){const t=r.d.dataReal?new Date(r.d.dataReal+"T12:00:00").getTime():r.atualizadoEm,m=ISO_MES(t);if(m in c)c[m]++}});
+  acoes.forEach(r=>{if(["concluida","verificacao","eficaz","parcial","naoeficaz"].includes(r.d.status)){const t=r.d.dataReal?new Date(r.d.dataReal+"T12:00:00").getTime():r.atualizadoEm,m=ISO_MES(t);if(m in c)c[m]++}});
   const W=640,H=200,pl=30,pb=26,pt=12,max=Math.max(3,...meses.map(m=>Math.max(a[m],c[m])));
   const X=i=>pl+(W-pl-10)*(meses.length===1?.5:i/(meses.length-1)),Y=v=>pt+(H-pt-pb)*(1-v/max);
   const path=o=>meses.map((m,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(o[m]).toFixed(1)).join("");
@@ -4030,7 +4040,7 @@ function renderDash(){
   const aprov=D.aeps.filter(r=>r.d.status==="aprovada").length;
   const ac=k=>D.acoes.filter(r=>r.d.status===k).length;
   const abertas=D.acoes.filter(r=>ABERTA_AC(r.d.status)),atr=abertas.filter(r=>diasAtraso(r.d)>0);
-  const conc=ac("concluida")+ac("eficaz"),efic=conc?Math.round(100*ac("eficaz")/conc):null;
+  const conc=ac("concluida")+ac("verificacao")+ac("eficaz")+ac("parcial")+ac("naoeficaz"),efic=conc?Math.round(100*ac("eficaz")/conc):null;
   const demAb=D.dems.filter(r=>!["encerrada","cancelada","aep","aet"].includes(r.d.status)).length;
   let cob=null;if(D.linhas.length){const c=D.linhas.filter(l=>invStatus(l).s!=="sem").length;cob=Math.round(100*c/D.linhas.length)}
   const esc4=[["Até 7 dias",1,7],["8 a 15 dias",8,15],["16 a 30 dias",16,30],["Mais de 30 dias",31,1e9]].map(([rot,a,b])=>({rot,v:atr.filter(r=>{const n=diasAtraso(r.d);return n>=a&&n<=b}).length,cor:"var(--n2)"}));
@@ -4160,7 +4170,7 @@ renderDash=function(){
   const reinc=Object.keys(rein).filter(k=>rein[k]>=2).length;
   const rk={};aeps.forEach(r=>aepClasse(r.d).cats.forEach(c=>c.itens.forEach(i=>{rk[i.t]=(rk[i.t]||0)+1})));
   const top=Object.keys(rk).map(k=>({rot:k,v:rk[k],tip:k+": "+rk[k]+" avaliação(ões) em Alto/Crítico"})).sort((a,b)=>b.v-a.v).slice(0,8);
-  const efetiv=acoes.filter(a=>a.d.status==="concluida"||a.d.status==="eficaz"||(a.d.ef&&a.d.ef.decisao)).length;
+  const efetiv=acoes.filter(a=>["concluida","verificacao","eficaz","parcial","naoeficaz"].includes(a.d.status)||(a.d.ef&&a.d.ef.decisao)).length;
   const eficazes=acoes.filter(a=>a.d.ef&&a.d.ef.decisao==="Encerrar como eficaz").length;
   const kp=(n,r)=>`<div class="kpi"><b>${n}</b><small>${r}</small></div>`;
   const div=document.createElement("div");div.className="card";
@@ -4931,7 +4941,7 @@ CAD.saude={rot:"Saúde ocupacional (consolidado)",um:"indicador de saúde",pai:[
  ["pcmso","Indicação técnica do PCMSO",{op:["Sim","Não"]}],["tend","Tendência",{op:["Melhora","Estável","Agravamento"]}],
  ["aprof","Precisa de aprofundamento",{op:["Sim","Não"]}],["obs","Observação (somente dados do grupo, sem nome, diagnóstico ou medicamento)"]]};
 if(!CAD_ORD.includes("saude"))CAD_ORD.push("saude");
-const podeSaude=()=>!!(perfil&&["admin","aprovador","revisor"].includes(perfil.papel))||!perfil;
+const podeSaude=()=>!perfil||pode("restrito");
 const RX_CLINICO=/\b[A-TV-Z]\d{2}(\.\d{1,2})?\b|\bCID\b|diagn[oó]stic|medicament|rem[eé]dio|atestado|laudo m[eé]dico|prontu[aá]rio|\bCPF\b|\bmatr[ií]cula\b/;
 const _regGravar21=regGravar;
 regGravar=function(r,agora){
@@ -4992,9 +5002,9 @@ regExcluir=function(id){
 };
 // ---------- matriz de responsabilidades ----------
 function relMatriz(){
-  const P=["admin","aprovador","revisor","avaliador","leitor"],S="Sim",N="—";
-  const M=[["Criar e editar registros em rascunho",S,S,S,S,N],["Registrar revisão (segunda pessoa)",S,S,S,N,N],["Aprovar, emitir e assinar integridade",S,S,N,N,N],["Reabrir registro aprovado",S,N,N,N,N],["Alterar o papel de colegas",S,N,N,N,N],["Ver e lançar saúde ocupacional consolidada",S,S,S,N,N],["Ver a trilha de acesso do servidor",S,N,N,N,N],["Excluir registro em rascunho",S,S,S,S,N],["Excluir registro aprovado (bloqueado por retenção)",N,N,N,N,N]];
-  return relCab("Matriz de responsabilidades","Quem pode fazer o quê, conforme os perfis do sistema")+relTab(["Ação",...P.map(p=>PAPEIS[p])],M)+`<p class="mut" style="font-size:.84rem">Com mais de uma pessoa na equipe, a aprovação exige revisão feita por pessoa diferente do autor (regra dos quatro olhos). Retenção documental: ${RETENCAO_ANOS} anos.</p>`;
+  const P=PAPEIS_NOVOS,M=PERM_ACOES.map(([k,t])=>[t,...P.map(p=>(PERM[p]||{})[k]?"Sim":"—")]);
+  M.push(["Alterar o papel de colegas",...P.map(p=>p==="admin"?"Sim":"—")]);
+  return relCab("Matriz de responsabilidades","Quem pode fazer o quê, conforme os perfis do sistema")+relTab(["Ação",...P.map(p=>PAPEIS[p])],M)+`<p class="mut" style="font-size:.84rem">Com mais de uma pessoa na equipe, a aprovação exige revisão feita por pessoa diferente do autor (regra dos quatro olhos). O responsável por ação edita apenas as ações em que consta como responsável. Informações clínicas e dados individuais de saúde só aparecem para quem tem acesso restrito. Perfis antigos (aprovador, revisor e leitor) continuam valendo para quem já os tem.</p>`;
 }
 // ---------- casos semelhantes e lições aprendidas ----------
 const STOP=new Set("de da do das dos a o e em para com por um uma que na no nas nos ao as os se ou mais menos muito sem sobre entre ser foi".split(" "));
@@ -6006,7 +6016,7 @@ function renderInicio(){
   const h=new Date().getHours(),sd=h<12?"Bom dia":h<18?"Boa tarde":"Boa noite";
   const nome=((perfil&&perfil.nome)||"").split(" ")[0];
   const dems=regOf("dem"),aeps=aepsVivas(),aets=aetsVivas(),acs=regOf("acao"),hj=hojeISO();
-  const k={tri:dems.filter(r=>r.d.status==="aberta").length,aep:aeps.filter(r=>r.d.status!=="aprovada").length,gat:aeps.filter(gatSemDecisao).length,aet:aets.filter(r=>r.d.status!=="aprovada").length,venc:acs.filter(r=>diasAtraso(r.d)>0).length,efic:acs.filter(r=>r.d.status==="concluida").length};
+  const k={tri:dems.filter(r=>r.d.status==="aberta").length,aep:aeps.filter(r=>r.d.status!=="aprovada").length,gat:aeps.filter(gatSemDecisao).length,aet:aets.filter(r=>r.d.status!=="aprovada").length,venc:acs.filter(r=>diasAtraso(r.d)>0).length,efic:acs.filter(r=>AGUARDA(r.d.status)).length};
   const card=(id,n,t,al)=>`<button type="button" class="${al&&n?"al":""}" data-ini="${id}"><b>${n}</b><small>${t}</small></button>`;
   // continuar
   const rasc=aeps.concat(aets).filter(r=>r.d.status==="rascunho").sort((a,b)=>b.atualizadoEm-a.atualizadoEm)[0];
@@ -6018,7 +6028,7 @@ function renderInicio(){
   aeps.forEach(r=>{const c=aepClasse(r.d);if(c.nivel===3)P.push({rk:1,t:"AEP",r,chip:[["Crítico","r"]],mot:"Condição crítica"+((r.d.provisoria||"").trim()?"":" sem controle provisório"),prazo:"",resp:r.d.avaliadores,ac:["abrir-reg",r.id]});else if(c.nivel===2)P.push({rk:1.5,t:"AEP",r,chip:[["Alto","o"]],mot:"Condição alta",prazo:"",resp:r.d.avaliadores,ac:["abrir-reg",r.id]})});
   acs.filter(r=>diasAtraso(r.d)>0).forEach(r=>P.push({rk:2,t:"Ação",r,chip:[["Vencido","r"]],mot:"Vencida há "+diasAtraso(r.d)+" dia(s)",prazo:r.d.prazo,resp:r.d.responsavel,ac:["ac-abrir",r.id]}));
   aeps.filter(gatSemDecisao).forEach(r=>P.push({rk:3,t:"AEP",r,chip:[["Gatilho AET","o"]],mot:"Gatilho para AET sem decisão",prazo:"",resp:r.d.avaliadores,ac:["abrir-reg",r.id]}));
-  acs.filter(r=>r.d.status==="concluida").forEach(r=>P.push({rk:4,t:"Ação",r,chip:[["Aguardando eficácia","b"]],mot:"Concluída, falta verificar a eficácia",prazo:r.d.ef&&r.d.ef.prevista,resp:r.d.responsavel,ac:["ac-abrir",r.id]}));
+  acs.filter(r=>AGUARDA(r.d.status)).forEach(r=>P.push({rk:4,t:"Ação",r,chip:[["Aguardando eficácia","b"]],mot:"Concluída, falta verificar a eficácia",prazo:r.d.ef&&r.d.ef.prevista,resp:r.d.responsavel,ac:["ac-abrir",r.id]}));
   dems.filter(r=>r.d.status==="aberta").forEach(r=>P.push({rk:5,t:"Demanda",r,chip:[["Sem triagem","b"]],mot:"Demanda aguardando triagem",prazo:r.d.prazo,resp:r.d.solicitante,ac:["abrir-dem",r.id]}));
   aeps.concat(aets).filter(r=>r.d.status!=="aprovada").sort((a,b)=>a.atualizadoEm-b.atualizadoEm).slice(0,3).forEach(r=>P.push({rk:6,t:r.tipo.toUpperCase(),r,chip:[["Sem atualização","b"]],mot:"Parada desde "+quando(r.atualizadoEm),prazo:"",resp:r.d.avaliadores||(r.d.resp||{}).nome,ac:["abrir-reg",r.id]}));
   P.forEach(p=>{if(!(p.resp||"").toString().trim())p.chip.push(["Sem responsável","b"])});
@@ -6226,7 +6236,7 @@ document.addEventListener("click",e=>{
   const r=e.target.closest("[data-pnl-rel]");if(r){G.pnlRel=r.dataset.pnlRel;renderPnl()}
 });
 const cartao=(n,t,cor)=>`<div><b ${cor?`style="color:${cor}"`:""}>${n}</b><small>${t}</small></div>`;
-const barrasSimples=(it)=>typeof barras==="function"?barras(it):"";
+const barrasSimples=(it)=>typeof gBarras==="function"?gBarras(it):(typeof barras==="function"?barras(it):"");
 function pnlHtml(tab){
   const dems=regOf("dem"),aeps=aepsVivas(),aets=aetsVivas(),acs=regOf("acao");
   if(tab==="dem"){
@@ -6234,14 +6244,17 @@ function pnlHtml(tab){
     const org={};dems.forEach(r=>{const k=r.d.origem||"Sem origem";org[k]=(org[k]||0)+1});
     const sts=ST_DEM.map(([k,t])=>({rot:t,v:dems.filter(r=>r.d.status===k).length}));
     return `<div class="card"><h3 style="margin-top:0">Demandas</h3><div class="kpis">${cartao(dems.length,"demandas")}${cartao(dems.filter(r=>r.d.status==="aberta").length,"aguardando triagem")}${cartao(dems.filter(r=>vencida(r.d)).length,"vencidas","#FF3300")}${cartao(dems.filter(r=>FECHADA(r.d.status)).length,"encerradas")}</div></div>
-    <div class="grid2"><div class="card"><h3>Por situação</h3>${barrasSimples(sts)}</div><div class="card"><h3>Por origem</h3>${dems.length?barrasSimples(por(org)):`<p class="mut">Sem demandas.</p>`}</div></div>`;
+    <div class="grid2"><div class="card"><h3>Por situação</h3>${barrasSimples(sts)}</div><div class="card"><h3>Por origem</h3>${dems.length?barrasSimples(por(org)):`<p class="mut">Sem demandas.</p>`}</div></div>
+    <div class="card"><h3>Demandas abertas nos últimos 6 meses</h3>${(()=>{const m=serieMes(dems,r=>r.criadoEm?new Date(r.criadoEm).toISOString():"");return gColunas(m.cats,m.v,"Demandas")})()}</div>`;
   }
   if(tab==="aep"){
     const cls=[0,0,0,0,0];aeps.forEach(r=>{const c=aepClasse(r.d);cls[c.nivel<0?4:c.nivel]++});
     const st=Object.keys(STATUS_REG).map(k=>({rot:STATUS_REG[k],v:aeps.filter(r=>r.d.status===k).length}));
     const area={};aeps.forEach(r=>{const a=areaTxt(r.d)||"Sem área";area[a]=(area[a]||0)+1});
     return `<div class="card"><h3 style="margin-top:0">AEP</h3><div class="kpis">${cartao(aeps.length,"AEP")}${cartao(cls[3],"críticas","#FF3300")}${cartao(cls[2],"altas")}${cartao(aeps.filter(gatSemDecisao).length,"gatilho AET sem decisão","#FF3300")}${cartao(Math.round(aeps.reduce((s,r)=>s+progAep(r.d),0)/(aeps.length||1))+"%","preenchimento médio")}</div></div>
-    <div class="grid2"><div class="card"><h3>Por classificação</h3>${barrasSimples([["Adequado",0],["Atenção",1],["Alto",2],["Crítico",3],["Sem dados",4]].map(([t,i])=>({rot:t,v:cls[i]})))}</div><div class="card"><h3>Por situação</h3>${barrasSimples(st)}</div></div>
+    <div class="grid2"><div class="card"><h3>Por classificação</h3>${gRosca([["Adequado",0],["Atenção",1],["Alto",2],["Crítico",3],["Sem dados",4]].map(([t,i])=>({rot:t,v:cls[i]})))}</div><div class="card"><h3>Por situação</h3>${gRosca(st,["#FFD699","#FF9900","#B45309"])}</div></div>
+    <div class="card"><h3>Classificação por área</h3>${gEmpilhado(Object.keys(area).slice(0,8),[0,1,2,3].map(i=>({rot:NIV_F[i],cor:COR_NIV[i],v:Object.keys(area).slice(0,8).map(a=>aeps.filter(r=>(areaTxt(r.d)||"Sem área")===a&&aepClasse(r.d).nivel===i).length)})),"Classificação por área")}</div>
+    <div class="card"><h3>AEP criadas nos últimos 6 meses</h3>${(()=>{const m=serieMes(aeps,r=>r.criadoEm?new Date(r.criadoEm).toISOString():"");return gColunas(m.cats,m.v,"AEP criadas")})()}</div>
     <div class="card"><h3>Por área</h3>${aeps.length?barrasSimples(Object.entries(area).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([rot,v])=>({rot,v}))):`<p class="mut">Sem AEP.</p>`}</div>`;
   }
   if(tab==="aet"){
@@ -6266,7 +6279,7 @@ function pnlHtml(tab){
     <div class="card"><h3>Abertas por responsável</h3>${ab.length?barrasSimples(Object.entries(resp).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([rot,v])=>({rot,v}))):`<p class="mut">Nenhuma ação aberta.</p>`}</div>`;
   }
   if(tab==="eficacia"){
-    const conc=acs.filter(r=>["concluida","eficaz"].includes(r.d.status)),ef=acs.filter(r=>r.d.status==="eficaz"),ag=acs.filter(r=>r.d.status==="concluida");
+    const conc=acs.filter(r=>["concluida","verificacao","eficaz","parcial","naoeficaz"].includes(r.d.status)),ef=acs.filter(r=>r.d.status==="eficaz"),ag=acs.filter(r=>AGUARDA(r.d.status));
     const res={};ef.concat(ag).forEach(r=>{const k=(r.d.ef&&r.d.ef.residual)||"Não verificado";res[k]=(res[k]||0)+1});
     const atras=ag.filter(r=>r.d.ef&&r.d.ef.prevista&&r.d.ef.prevista<hojeISO());
     return `<div class="card"><h3 style="margin-top:0">Eficácia</h3><p class="mut">Ação concluída não é ação eficaz: só conta como eficaz com evidência e aprovação técnica.</p><div class="kpis">${cartao(conc.length,"concluídas")}${cartao(ef.length,"eficazes")}${cartao(ag.length,"aguardando verificação")}${cartao(atras.length,"verificação atrasada","#FF3300")}${cartao(conc.length?Math.round(100*ef.length/conc.length)+"%":"—","taxa de eficácia")}</div></div>
@@ -6309,7 +6322,7 @@ document.addEventListener("click",e=>{
   else if(k==="aep"){h=relCab("Relatório de AEP",sub)+relTab(["Número","Data","Atividade","Posto","Área","Avaliador","Classificação","Prioridade","Gatilho AET","Status","Versão"],sel("aep").map(r=>{const c=aepClasse(r.d);return [r.d.numero||"",dataBR(r.d.data),ativTxt(r.d),r.d.postoId?caminho(r.d.postoId):"",areaTxt(r.d),r.d.avaliadores||"",c.nivel<0?"Sem dados":NIV_F[c.nivel],prioTxt(r),c.gat.length?"Sim":"Não",statTxt(r),"v"+(r.d.versao||1)]}))}
   else if(k==="aet"){h=relCab("Relatório de AET",sub)+relTab(["Número","Abertura","Origem","Atividade","Área","Responsável técnico","Conteúdo mínimo","Status","Versão"],sel("aet").map(r=>[r.d.numero||"",dataBR(r.d.data),r.d.origemTipo==="direta"?"Direta":r.d.aepId&&regGet(r.d.aepId)?"AEP "+(regGet(r.d.aepId).d.numero||""):"Demanda",ativTxt(r.d),areaTxt(r.d),(r.d.resp||{}).nome||"",progAet(r.d)+"%",statTxt(r),"v"+(r.d.versao||1)]))}
   else if(k==="plano"){h=relCab("Plano de ação",sub)+relTab(["Número","Ação","Tipo (hierarquia)","Responsável","Área","Prazo","Custo estimado","Status"],sel("acao").map(r=>[r.d.numero||"",r.d.acao||r.d.problema||"",r.d.hier!==""&&HIER[Number(r.d.hier)]||"",r.d.responsavel||"",r.d.area||"",dataBR(r.d.prazo),r.d.custo||"",statTxt(r)]))}
-  else if(k==="efic"){h=relCab("Verificação de eficácia",sub)+relTab(["Número","Ação","Conclusão","Verificação prevista","Avaliador","Método repetido","Risco residual","Decisão","Status"],sel("acao").filter(r=>["concluida","eficaz"].includes(r.d.status)).map(r=>{const e=r.d.ef||{};return [r.d.numero||"",r.d.acao||"",dataBR(r.d.dataReal),dataBR(e.prevista),e.avaliador||"",e.metodo||"",e.residual||"",e.decisao||"",statTxt(r)]}))}
+  else if(k==="efic"){h=relCab("Verificação de eficácia",sub)+relTab(["Número","Ação","Conclusão","Verificação prevista","Avaliador","Método repetido","Risco residual","Decisão","Status"],sel("acao").filter(r=>["concluida","verificacao","eficaz","parcial","naoeficaz"].includes(r.d.status)).map(r=>{const e=r.d.ef||{};return [r.d.numero||"",r.d.acao||"",dataBR(r.d.dataReal),dataBR(e.prevista),e.avaliador||"",e.metodo||"",e.residual||"",e.decisao||"",statTxt(r)]}))}
   else if(k==="area"||k==="ativ"){const g={},key=r=>(k==="area"?areaTxt(r.d):ativTxt(r.d))||"Não informado";
     ["dem","aep","aet","acao"].forEach(t=>sel(t).forEach(r=>{const x=g[key(r)]=g[key(r)]||{dem:0,aep:0,aet:0,ab:0,venc:0,crit:0};if(t==="acao"){if(ABERTA_AC(r.d.status))x.ab++;if(diasAtraso(r.d)>0)x.venc++}else x[t]++;if(t==="aep"&&aepClasse(r.d).nivel===3)x.crit++}));
     h=relCab(k==="area"?"Relatório por área":"Relatório por atividade",sub)+relTab([k==="area"?"Área":"Atividade","Demandas","AEP","AET","Ações abertas","Ações vencidas","AEP críticas"],Object.entries(g).sort((a,b)=>b[1].crit-a[1].crit||b[1].venc-a[1].venc).map(([n,x])=>[n,x.dem,x.aep,x.aet,x.ab,x.venc,x.crit]))}
@@ -6320,6 +6333,342 @@ document.addEventListener("click",e=>{
   else if(k==="exec"){h=relExecutivo()}
   mostrarRel(h);
 });
+/* =====================================================================
+   FASE 18: gatilhos ampliados, controle provisório, versionamento com
+   revisão, alertas, qualidade dos dados e permissões por perfil.
+   ===================================================================== */
+// ---------- 12 gatilhos do documento (mantém os 8 anteriores) ----------
+[["g8","Condição alta ou crítica sem compreensão suficiente"],["g9","Resultado inconclusivo"],["g10","Acidente relacionado"],["g11","Divergência relevante entre trabalho prescrito e real"],["g12","Combinação de fatores físicos, cognitivos e organizacionais"],["g13","Necessidade de estudar a organização do trabalho"],["g14","AEP insuficiente para definição das medidas"]].forEach(g=>{if(!GAT.some(x=>x[0]===g[0]))GAT.push(g)});
+const _aepClasse30=aepClasse;
+aepClasse=function(d){
+  const c=_aepClasse30(d);
+  const poe=(id,rot)=>{const i=c.gat.findIndex(g=>g.id===id);if(i>=0)c.gat.splice(i,1);c.gat.push({id,rot})};
+  if(c.nivel>=2&&(c.totResp<c.tot*0.7||((d.metodosAp||[]).length===0&&!(d.medIds||[]).length)))poe("g8","Condição "+NIV_F[c.nivel]+" sem compreensão suficiente (poucos fatores avaliados, sem método ou medição)");
+  if(c.nivel<0&&c.totResp>0)poe("g9","Resultado inconclusivo: dados insuficientes para classificar");
+  const dem=d.demandaId&&regGet(d.demandaId);
+  if(dem&&/acidente/i.test(dem.d.origem||""))poe("g10","Demanda de origem: "+dem.d.origem);
+  if(c.cats[0]&&c.cats[1]&&c.cats[2]&&c.cats[0].pior>=2&&c.cats[1].pior>=2&&c.cats[2].pior>=2)poe("g12","Fatores físicos, organizacionais e cognitivos em Alto ou Crítico ao mesmo tempo");
+  if(c.cats[1]&&c.cats[1].pior>=2)poe("g13","Organização do trabalho em Alto ou Crítico: estudar a organização");
+  return c;
+};
+// ---------- decisão sobre AET e controle provisório ----------
+function aepAetPend(d,c){
+  const m=[];
+  if(c&&c.gat.length){
+    if(!d.aetDec)m.push("há gatilho para AET: registre a decisão (encaminhar, em andamento ou não necessária)");
+    else if(/^AET não/.test(d.aetDec)&&!(d.aetJust||"").trim())m.push("justifique por que a AET não é necessária apesar dos gatilhos");
+    else if(d.aetDec==="Encaminhar para AET"&&!regOf("aet").some(r=>r.d.aepId===(G.ed&&G.ed.id)))m.push("a AET foi encaminhada, mas ainda não foi aberta (use o botão Abrir AET)");
+  }
+  if(c&&c.nivel===3){
+    if(!(d.provResp||"").trim())m.push("controle provisório sem responsável");
+    if(!d.provValidade)m.push("controle provisório sem validade");
+    if(!(d.evid||[]).some(e=>e.fase==="provisoria"))m.push("controle provisório sem evidência (anexe e marque a fase Medida provisória)");
+    if(!d.provAcao||!regGet(d.provAcao))m.push("vincule a ação definitiva ao controle provisório");
+  }
+  return m;
+}
+const _htmlClasse30=htmlClasse;
+htmlClasse=function(c,dis){
+  let h=_htmlClasse30(c,dis);const d=G.ed.d;
+  if(c.gat.length)h=h.replace(/(<label class="campo">Decisão sobre a AET)/,T("gatJust","Justificativa técnica e motivos dos gatilhos",dis,2)+"$1");
+  const prox=`<div class="grid2">${I("proxReav","Próxima reavaliação",dis,"date")}</div>`;
+  let ext=prox;
+  if(c.nivel===3){
+    const acs=regOf("acao").filter(a=>a.d.origemId===G.ed.id||(d.postoId&&a.d.postoId===d.postoId)).map(a=>[a.id,(a.d.numero||"(pendente)")+" · "+(a.d.acao||a.d.problema||"").slice(0,60)]);
+    ext+=`<h4>Controle provisório (condição crítica)</h4><div class="grid2">${I("provResp","Responsável pelo controle provisório",dis)}${I("provValidade","Validade do controle provisório",dis,"date")}</div>
+    <label class="campo">Ação definitiva vinculada<select data-g="provAcao" ${dis}><option value="">Selecione…</option>${sel1(acs,d.provAcao||"")}</select></label>
+    <small class="mut">A evidência do controle provisório é um anexo marcado com a fase "Medida provisória", em Evidências. ${(d.evid||[]).some(e=>e.fase==="provisoria")?"✔ há evidência.":"✘ ainda não há."} Crie a ação definitiva em Ações, ligada a esta AEP, antes de aprovar.</small>`;
+  }
+  return h.replace(/(<label class="campo">Conclusão e encaminhamento)/,ext+"$1");
+};
+// ---------- qualidade dos dados ----------
+function qualidade(tipo,d,id){
+  const m=[],bloqueia=[];
+  const add=(t,b)=>{m.push(t);if(b)bloqueia.push(t)};
+  if(tipo==="aep"||tipo==="aet"){
+    if(!ativTxt(d)||!d.atividadeId)add("Atividade não informada",1);
+    if(!d.postoId)add("Posto não vinculado",1);
+    if(!areaTxt(d))add("Área não informada",!d.postoId);
+    if(!(d.avaliadores||"").trim()&&!((d.resp||{}).nome||"").trim())add("Responsável não definido",1);
+    if(tipo==="aep"){const c=aepClasse(d);if(!c.totResp)add("Nenhum fator avaliado",1);if(c.nivel>=2&&!(d.evid||[]).length)add("Evidência insuficiente: condição "+NIV_F[c.nivel]+" sem nenhuma evidência anexada",0)}
+    else{if(!String((d.sec||{}).diagnostico||"").trim())add("AET sem diagnóstico",1);if(!((d.resp||{}).nome||"").trim()||!((d.resp||{}).qualificacao||"").trim())add("AET sem responsável técnico e qualificação",1);if(!(d.evid||[]).length)add("Evidência insuficiente: AET sem anexos",0);if(!(d.participantes||"").trim())add("AET sem participantes registrados",1);if(!(d.revisor||"").trim())add("AET sem revisor designado",1);if(!d.data)add("AET sem data",1)}
+  }
+  return {m,bloqueia};
+}
+const _htmlGov30=htmlGovernanca;
+htmlGovernanca=function(dis){
+  let h=_htmlGov30(dis);const {d,tipo}=G.ed;
+  if(tipo!=="aep"&&tipo!=="aet")return h;
+  const q=qualidade(tipo,d,G.ed.id);
+  const painel=`${q.m.length?`<div class="alerta"><b>Qualidade dos dados</b><br>${q.m.map(x=>"• "+esc(x)).join("<br>")}<br><small>O rascunho pode ser salvo incompleto. Itens sem evidência de rascunho impedem a revisão e a aprovação; os demais são avisos.</small></div>`:`<div class="sug"><span>Qualidade dos dados: nenhuma pendência.</span></div>`}`;
+  const ver=(d.versoes||[]).length?`<details style="margin-top:10px"><summary>Versões anteriores (${d.versoes.length})</summary>${d.versoes.slice().reverse().map((x,k)=>{const i=d.versoes.length-1-k;return `<div class="sug"><span><b>v${x.v}</b> · ${esc(x.status||"")} · preservada em ${esc((x.hora||"").slice(0,16).replace("T"," "))} por ${esc(x.por||"")}${x.motivo?"<br><small>Motivo da revisão: "+esc(x.motivo)+"</small>":""}${x.aprov?`<br><small>Aprovada por ${esc(x.aprov.por||"")} em ${dataBR(x.aprov.em)}</small>`:""}</span><button type="button" class="btn sec peq" data-ver="ver" data-i="${i}">Consultar</button></div>`}).join("")}</details>`:"";
+  const hs=h.replace('<div class="linha" style="margin-top:10px">',painel+'<div class="linha" style="margin-top:10px">');
+  return hs+ver;
+};
+document.addEventListener("click",e=>{
+  const b=e.target.closest('[data-g-acao="reg-revisao"],[data-g-acao="reg-aprovar"]');if(!b||!G.ed||(G.ed.tipo!=="aep"&&G.ed.tipo!=="aet"))return;
+  gravarEd();const q=qualidade(G.ed.tipo,G.ed.d,G.ed.id);
+  if(q.bloqueia.length){e.stopImmediatePropagation();e.preventDefault();aviso("Antes de seguir: "+q.bloqueia.join("; ")+".")}
+},true);
+// ---------- versionamento com revisão ----------
+const ROTC={demandaId:"Demanda vinculada",postoId:"Posto",atividadeId:"Atividade",data:"Data",avaliadores:"Avaliadores",nExpostos:"Nº de expostos",turno:"Turno",funcoes:"Funções",provisoria:"Medida provisória",conclusao:"Conclusão",etapas:"Etapas",metodosAp:"Métodos aplicados",entrev:"Entrevistas",recs:"Recomendações",aetDec:"Decisão sobre AET",aetJust:"Justificativa da AET",provResp:"Responsável pelo controle provisório",provValidade:"Validade do controle provisório",provAcao:"Ação definitiva vinculada",proxReav:"Próxima reavaliação"};
+const GRP={f:"Fator",obs:"Observação",part:"Participação",sec:"Seção da AET",crit:"Condição de prevalência",gat:"Gatilho",enc:"Encaminhamento",prio:"Priorização",resp:"Responsável técnico",aet:"AET"};
+function rotChave(g,k){
+  if(g==="f"){let t=null;CATS.forEach(c=>c.itens.forEach(i=>{if(i.k===k)t=i.t}));return "Fator: "+(t||k)}
+  if(g==="sec"){let t=null;AET_SEC.forEach(([,cs])=>cs.forEach(([kk,r])=>{if(kk===k)t=r}));return "Seção: "+(t||k)}
+  if(g==="gat"){const x=GAT.find(y=>y[0]===k);return "Gatilho: "+(x?x[1]:k)}
+  return (GRP[g]||g)+": "+k;
+}
+function difCampos(a,b){
+  const o=[];
+  Object.keys(ROTC).forEach(k=>{if(canon(a[k]===undefined?null:a[k])!==canon(b[k]===undefined?null:b[k]))o.push(ROTC[k])});
+  Object.keys(GRP).forEach(g=>{const x=a[g]||{},y=b[g]||{};new Set([...Object.keys(x),...Object.keys(y)]).forEach(k=>{if(canon(x[k]===undefined?null:x[k])!==canon(y[k]===undefined?null:y[k]))o.push(rotChave(g,k))})});
+  return o.slice(0,40);
+}
+function copiaVersao(d){
+  const c=JSON.parse(JSON.stringify(d));delete c.versoes;
+  (c.evid||[]).forEach(e=>{Object.keys(e).forEach(k=>{if(typeof e[k]==="string"&&e[k].length>2000)e[k]="(conteúdo do anexo omitido na cópia da versão)"})});
+  return c;
+}
+const _mudarStatus30=mudarStatus;
+mudarStatus=function(acao,novo,motivo){
+  const d=G.ed.d,ant=d.status,ts=new Date().toISOString(),tipo=G.ed.tipo;
+  const comVersao=tipo==="aep"||tipo==="aet";
+  let campos=[];
+  if(comVersao&&acao==="Reaberta"){
+    (d.versoes=d.versoes||[]).push({v:d.versao||1,status:ant,hora:ts,por:(autorAtual()||{}).nome||"",motivo:motivo||"",aprov:d.aprov?{por:d.aprov.por,em:d.aprov.em,hash:d.aprov.hash}:null,snap:copiaVersao(d)});
+  }
+  if(comVersao&&novo==="aprovada"){const u=(d.versoes||[]).slice(-1)[0];if(u)campos=difCampos(d,u.snap)}
+  _mudarStatus30(acao,novo,motivo);
+  const D=G.ed.d,h=(D.hist||[]).slice(-1)[0];
+  if(h){h.hora=ts;h.de=ant;h.para=novo;h.versao=D.versao||1;if(campos.length)h.campos=campos}
+  if(novo==="aprovada"&&D.aprov&&campos.length)D.aprov.alterados=campos;
+  const r=regGet(G.ed.id);if(r){r.d=JSON.parse(JSON.stringify(D));regGravar(r)}
+};
+const _gravarEd30=gravarEd;
+gravarEd=function(){if(G.ed&&G.ed.ver)return;_gravarEd30()};
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-ver]");if(!b||!G.ed)return;
+  const x=(G.ed.d.versoes||[])[Number(b.dataset.i)];if(!x)return;
+  gravarEd();G.edBack={ed:G.ed,rel:G.rel};
+  G.ed={id:G.ed.id,tipo:G.ed.tipo,d:JSON.parse(JSON.stringify(x.snap)),ver:true,verRot:"v"+x.v,verInfo:x};G.rel=true;
+  G.ed.d.versoes=G.edBack.ed.d.versoes;reRender();window.scrollTo(0,0);
+});
+document.addEventListener("click",e=>{
+  const b=e.target.closest('[data-g-acao="rel-voltar"]');if(!b||!G.ed||!G.ed.ver||!G.edBack)return;
+  e.stopImmediatePropagation();G.ed=G.edBack.ed;G.rel=G.edBack.rel;G.edBack=null;reRender();
+},true);
+const _htmlRel30=htmlRelatorio;
+htmlRelatorio=function(){
+  const h=_htmlRel30();
+  if(!(G.ed&&G.ed.ver))return h;const x=G.ed.verInfo;
+  return `<div class="alerta"><b>Você está consultando a versão ${esc(G.ed.verRot)}</b> (somente leitura). Preservada em ${esc((x.hora||"").slice(0,16).replace("T"," "))} por ${esc(x.por||"")}.${x.motivo?" Motivo da revisão: "+esc(x.motivo)+".":""} A versão atual é outra.</div>`+h;
+};
+// ---------- alertas ----------
+const _calcAlertas30=calcAlertas;
+calcAlertas=function(){
+  let A=_calcAlertas30().filter(a=>a.tipo!=="Necessidade de AET");
+  const hj=hojeISO(),push=(sev,tipo,txt,ac)=>A.push({sev,tipo,txt,ac});
+  const dias=t=>Math.floor((Date.now()-(t||Date.now()))/864e5);
+  regOf("dem").forEach(r=>{const d=r.d;if(d.status==="aberta"&&dias(r.criadoEm)>=3)push(2,"Demanda sem triagem",`${d.numero||"Demanda"} (${d.origem||"sem origem"}): aberta há ${dias(r.criadoEm)} dia(s) sem triagem.`,["abrir-dem",r.id]);if(d.status==="triagem")push(2,"Triagem aguardando decisão",`${d.numero||"Demanda"}: triagem feita, falta decidir o encaminhamento.`,["abrir-dem",r.id])});
+  aepsVivas().forEach(r=>{
+    const d=r.d,n=d.numero||"AEP",c=aepClasse(d);
+    if(d.status!=="aprovada"&&dias(r.atualizadoEm)>=30)push(2,"AEP sem atualização",`${n}: sem alterações há ${dias(r.atualizadoEm)} dia(s).`,["abrir-reg",r.id]);
+    if(d.status==="revisao")push(2,"AEP aguardando revisão",`${n}: enviada para revisão.`,["abrir-reg",r.id]);
+    if(gatSemDecisao(r))push(1,"Gatilho para AET sem decisão",`${n}: ${c.gat.length} gatilho(s) e nenhuma decisão registrada sobre a AET.`,["abrir-reg",r.id]);
+    const pr=d.proxReav||(d.aprov&&d.aprov.em?new Date(new Date(d.aprov.em+"T12:00:00").setFullYear(new Date(d.aprov.em+"T12:00:00").getFullYear()+1)).toISOString().slice(0,10):"");
+    if(pr&&d.status==="aprovada"){const k=diasEntre(hj,pr);if(k<0)push(1,"Reavaliação vencida",`${n}: reavaliação prevista para ${dataBR(pr)}.`,["abrir-reg",r.id]);else if(k<=30)push(2,"Reavaliação próxima",`${n}: reavaliação em ${k} dia(s) (${dataBR(pr)}).`,["abrir-reg",r.id])}
+  });
+  aetsVivas().forEach(r=>{const d=r.d,n=d.numero||"AET";
+    if(!((d.resp||{}).nome||"").trim())push(1,"AET sem responsável técnico",`${n}: informe o responsável técnico e a qualificação.`,["abrir-reg",r.id]);
+    if(d.status==="revisao")push(2,"AET aguardando aprovação",`${n}: em revisão, aguardando aprovação.`,["abrir-reg",r.id]);
+  });
+  const vistos=new Set();A=A.filter(a=>{const k=a.tipo+"|"+(a.ac&&a.ac[1]||"")+"|"+a.txt;if(vistos.has(k))return false;vistos.add(k);return true});
+  return A.sort((a,b)=>a.sev-b.sev);
+};
+// ---------- permissões por perfil ----------
+document.addEventListener("click",e=>{
+  const r=e.target.closest("[data-reg]");
+  if(r){const k=r.dataset.reg,m={dup:"criar",arq:"arquivar",del:"excluir",enc:"arquivar"}[k];if(m&&!pode(m)){e.stopImmediatePropagation();e.preventDefault();aviso("Seu perfil ("+(PAPEIS[perfil.papel]||perfil.papel)+") não permite esta ação.")}}
+  const x=e.target.closest("[data-rel]");
+  if(x&&["pgr","backup","saude"].includes(x.dataset.rel)&&!pode("exportar")){e.stopImmediatePropagation();e.preventDefault();aviso("Seu perfil não permite exportar.")}
+  if(x&&x.dataset.rel==="saude"&&!pode("restrito")){e.stopImmediatePropagation();e.preventDefault();aviso("Informação restrita: seu perfil não tem acesso.")}
+},true);
+/* FASE 18b: AET em 25 etapas, com progresso e salvamento automático */
+const AET25=[
+ ["Identificação e vínculo","ident"],["Demanda e motivo",["sec.demanda"]],["Contexto",["sec.contexto"]],["População abrangida",["sec.populacao"]],
+ ["Descrição do processo",["sec.processo"]],["Organização do trabalho",["sec.organizacao"]],["Atividade prescrita",["sec.prescrita"]],["Atividade real",["sec.real"]],
+ ["Observação em campo",["sec.campo"]],["Entrevistas","entrev"],["Variabilidade e estratégias operatórias",["sec.variabilidade","sec.estrategias"]],["Determinantes da atividade",["sec.determinantes"]],
+ ["Exigências físicas",["sec.fisicas"]],["Exigências cognitivas",["sec.cognitivas"]],["Exigências organizacionais",["sec.organizacionais"]],["Condições ambientais",["sec.ambientais"]],
+ ["Dados de saúde coletivos",["sec.saude"]],["Métodos empregados","metodos"],["Resultados",["sec.resultados"]],["Diagnóstico ergonômico",["sec.diagnostico"]],
+ ["Recomendações","recs"],["Prioridades e cronograma",["sec.prioridades","sec.cronograma"]],["Critérios de eficácia e responsáveis",["sec.eficacia","sec.responsaveis"]],["Acompanhamento e conclusão",["sec.acompanhamento","sec.conclusao"]],
+ ["Evidências, revisão e aprovação","final"]
+];
+function aetPassoOk(d,i){
+  const [,c]=AET25[i];
+  if(Array.isArray(c))return c.every(p=>String(gget(d,p)||"").trim());
+  if(c==="ident")return !!(d.postoId&&d.atividadeId&&d.data&&((d.resp||{}).nome||"").trim());
+  if(c==="entrev")return (d.entrev||[]).some(e=>(e.s||"").trim())||!!String((d.sec||{}).entrevistas||"").trim();
+  if(c==="metodos")return !!String((d.sec||{}).metodos||"").trim()||(d.metodosAp||[]).length>0;
+  if(c==="recs")return (d.recs||[]).some(r=>(r.t||"").trim())&&!!String((d.sec||{}).recomendacoes||"").trim();
+  if(c==="final")return (d.evid||[]).length>0&&!!(d.participantes||"").trim()&&!!(d.revisor||"").trim()&&!!((d.resp||{}).qualificacao||"").trim();
+  return false;
+}
+function aetProgresso(d){let n=0;for(let i=0;i<25;i++)if(aetPassoOk(d,i))n++;return n}
+G.aetPasso=G.aetPasso||{};
+const _htmlRegEd31=htmlRegEd;
+htmlRegEd=function(){
+  const h=_htmlRegEd31();
+  if(!G.ed||G.ed.tipo!=="aet")return h;
+  const d=G.ed.d,lock=travado(d),dis=lock?"disabled":"";
+  const a=h.indexOf('<details class="bloco"'),z=h.lastIndexOf("</details>")+10;
+  if(a<0||z<10)return h;
+  const head=h.slice(0,a),tail=h.slice(z),m=h.slice(a,z);
+  const mi=m.indexOf('<div class="bloco-c">')+21,identHtml=m.slice(mi,m.indexOf("</div></details>",mi));
+  let n=G.aetPasso[G.ed.id];if(typeof n!=="number"||n<0||n>24)n=0;
+  const [tit,c]=AET25[n];let corpo="";
+  if(Array.isArray(c))corpo=c.map(p=>{const k=p.split(".")[1],r=(AET_SEC.flatMap(g=>g[1]).find(x=>x[0]===k)||[k,k])[1];return T(p,r,dis,k==="conclusao"||k==="diagnostico"||k==="recomendacoes"?6:4)}).join("");
+  else if(c==="ident")corpo=identHtml;
+  else if(c==="entrev"){const e=htmlAetEstudo(dis),i=e.indexOf("<h4>Recomendações");corpo=T("sec.entrevistas","Síntese das entrevistas",dis,4)+e.slice(e.indexOf("<h4>Entrevistas"),i<0?e.length:i)}
+  else if(c==="metodos"){corpo=T("sec.metodos","Métodos empregados",dis,4)+`<h4>Métodos aplicados (registro)</h4>`+(d.metodosAp||[]).map((x,i)=>`<div class="metodo"><div class="grid3"><input data-g="metodosAp.${i}.m" value="${esc(x.m||"")}" placeholder="Método" ${dis}><input data-g="metodosAp.${i}.v" value="${esc(x.v||"")}" placeholder="Versão" ${dis}><input data-g="metodosAp.${i}.r" value="${esc(x.r||"")}" placeholder="Resultado" ${dis}></div></div>`).join("")+(dis?"":`<button type="button" class="btn sec peq" data-g-acao="metodo-add">+ Método aplicado</button>`)+(typeof htmlMedBloco==="function"?htmlMedBloco(d,dis):"")}
+  else if(c==="recs"){const e=htmlAetEstudo(dis),i=e.indexOf("<h4>Recomendações");corpo=T("sec.recomendacoes","Recomendações (texto)",dis,4)+(i<0?"":e.slice(i))}
+  else if(c==="final"){
+    const q=qualidade("aet",d,G.ed.id);
+    corpo=`<div class="grid2">${I("resp.nome","Responsável técnico",dis)}${I("resp.qualificacao","Qualificação",dis)}</div>${I("resp.registro","Registro profissional",dis)}${I("participantes","Participantes do estudo (funções/GSTS e equipe)",dis)}<div class="grid2">${I("revisor","Revisor designado",dis)}<label class="campo">Versão<input value="v${d.versao||1}" disabled></label></div>
+    <div class="${q.bloqueia.length?"alerta":"sug"}"><span><b>Antes de aprovar:</b> ${q.bloqueia.length?q.bloqueia.map(esc).join("; ")+".":"todos os requisitos obrigatórios cumpridos."} O aprovador e a data da aprovação são gravados no momento da aprovação.</span></div>${htmlEvid(lock)}${htmlGovernanca(dis)}`;
+  }
+  const ok=aetProgresso(d),pct=Math.round(ok/25*100);
+  const chips=AET25.map((x,i)=>`<button type="button" class="st-chip ${i===n?"on":""} ${aetPassoOk(d,i)?"ok":""}" data-st="${i}" title="${esc(x[0])}">${i+1}</button>`).join("");
+  const nav=`<div class="st-nav"><button type="button" class="btn sec" data-st="${n-1}" ${n===0?"disabled":""}>← Anterior</button><span class="mut" id="aetSalvo">Salvamento automático ativo</span><button type="button" class="btn" data-st="${n+1}" ${n===24?"disabled":""}>Próxima →</button></div>`;
+  const step=`<div class="card st-wrap"><div class="st-top"><b>Etapa ${n+1} de 25 · ${esc(tit)}</b><span class="bd ${ok===25?"n0":"nd"}">${ok}/25 concluídas</span></div><div class="st-bar"><i style="width:${pct}%"></i></div><div class="st-chips">${chips}</div>${aetPassoOk(d,n)?"":`<small class="mut">Esta etapa ainda tem campos vazios. Você pode avançar e voltar: o rascunho salva incompleto, mas a revisão e a aprovação exigem os itens obrigatórios.</small>`}<div class="st-corpo">${corpo}</div>${nav}</div>`;
+  return head+step+tail;
+};
+if(!document.getElementById("css31")){const s=document.createElement("style");s.id="css31";s.textContent=`.st-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}.st-top b{color:#FF9900}.st-bar{height:8px;background:#e5e7eb;border-radius:4px;margin:10px 0;overflow:hidden}.st-bar i{display:block;height:100%;background:#FF9900}.st-chips{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}.st-chip{min-width:34px;min-height:34px;border:1px solid #d1d5db;background:#fff;border-radius:6px;font-size:.8rem;cursor:pointer}.st-chip.ok{background:#f3f4f6;border-color:#9ca3af;font-weight:700}.st-chip.on{border-color:#FF9900;box-shadow:0 0 0 2px #FF9900}.st-nav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap}.st-corpo{margin-top:8px}`;document.head.appendChild(s)}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-st]");if(!b||!G.ed||G.ed.tipo!=="aet"||b.disabled)return;
+  gravarEd();G.aetPasso[G.ed.id]=Math.max(0,Math.min(24,Number(b.dataset.st)));reRender();window.scrollTo(0,0);
+});
+let _t31;
+["input","change"].forEach(ev=>document.addEventListener(ev,e=>{
+  const t=e.target;if(!G.ed||G.ed.tipo!=="aet"||G.ed.ver||!(t.dataset&&t.dataset.g))return;
+  clearTimeout(_t31);_t31=setTimeout(()=>{try{gravarEd();const s=document.getElementById("aetSalvo");if(s)s.textContent="Salvo automaticamente às "+new Date().toTimeString().slice(0,5)}catch(x){}},700);
+}));
+/* FASE 18c: situação de trabalho (visão consolidada e aviso de duplicidade) e desfechos de demanda/triagem */
+function sitRegs(postoId,atId,exceto){
+  const mesmo=d=>d.postoId&&d.postoId===postoId&&(!atId||!d.atividadeId||d.atividadeId===atId);
+  const v=t=>regOf(t).filter(r=>!r.excluido&&r.id!==exceto&&mesmo(r.d));
+  return {dem:v("dem"),aep:v("aep"),aet:v("aet"),acao:v("acao"),med:(typeof regOf==="function"?regOf("med"):[]).filter(r=>!r.excluido&&mesmo(r.d)),tri:(typeof lista!=="undefined"?lista:[]).filter(a=>a.ctx&&a.ctx.postoId===postoId)};
+}
+function sitHtml(d,exceto){
+  if(!d.postoId)return `<p class="mut">Vincule um posto para ver a situação de trabalho.</p>`;
+  const s=sitRegs(d.postoId,d.atividadeId,exceto);
+  const lin=(t,rs,f)=>rs.length?`<h4>${t} (${rs.length})</h4>`+rs.map(f).join(""):"";
+  const it=(n,sub,id,acao)=>`<div class="sug"><span><b>${esc(n)}</b><br><small>${esc(sub)}</small></span>${id?`<button type="button" class="btn sec peq" data-sit-ir="${acao}" data-id="${id}">Abrir</button>`:""}</div>`;
+  const tot=s.dem.length+s.aep.length+s.aet.length+s.acao.length+s.med.length+s.tri.length;
+  return `<p class="mut"><b>${esc(caminho(d.postoId))}</b>${ativTxt(d)?" · "+esc(ativTxt(d)):""}</p>`+(tot?"":`<p class="mut">Nenhum outro registro nesta situação de trabalho.</p>`)+
+   lin("Demandas",s.dem,r=>it(r.d.numero||"Demanda",(r.d.origem||"")+" · "+((ST_DEM.find(x=>x[0]===r.d.status)||[0,r.d.status])[1]),r.id,"dem"))+
+   lin("Triagens rápidas",s.tri,a=>it("Triagem "+a.id,dataBR(a.ctx.data)||"",null))+
+   lin("AEP",s.aep,r=>{const c=aepClasse(r.d);return it(r.d.numero||"AEP",(STATUS_REG[r.d.status]||r.d.status)+" · "+(c.nivel<0?"sem classificação":NIV_F[c.nivel]),r.id,"reg")})+
+   lin("AET",s.aet,r=>it(r.d.numero||"AET",(STATUS_REG[r.d.status]||r.d.status)+" · v"+(r.d.versao||1),r.id,"reg"))+
+   lin("Ações",s.acao,r=>it(r.d.numero||"Ação",stAcao(r.d.status)+" · "+(r.d.acao||r.d.problema||"").slice(0,70),r.id,"acao"))+
+   lin("Medições",s.med,r=>it(r.d.numero||r.d.tipo||"Medição",dataBR(r.d.data)||"",null));
+}
+function sitDup(tipo,d,id){
+  if(!d.postoId)return "";
+  const s=sitRegs(d.postoId,d.atividadeId,id),abertos=r=>!["aprovada","arquivada"].includes(r.d.status)&&!r.d.arquivada;
+  const L=(tipo==="aep"?s.aep:tipo==="aet"?s.aet:s.dem).filter(r=>tipo==="dem"?!FECHADA(r.d.status):abertos(r));
+  if(!L.length)return "";
+  return `<div class="alerta"><b>Possível duplicidade:</b> já existe ${L.length>1?L.length+" registros":"um registro"} do mesmo tipo em andamento para esta situação de trabalho (${L.map(r=>esc(r.d.numero||"sem número")).join(", ")}). Prefira revisar ou vincular o existente em vez de criar outro.</div>`;
+}
+const _htmlRegEd32=htmlRegEd;
+htmlRegEd=function(){
+  const h=_htmlRegEd32();if(!G.ed||G.ed.ver)return h;
+  const add=`${sitDup(G.ed.tipo,G.ed.d,G.ed.id)}<div class="linha no-print" style="margin:0 0 10px"><button type="button" class="btn sec peq" data-sit="abrir">Situação de trabalho (visão consolidada)</button></div>`;
+  const k=[h.indexOf('<div class="card st-wrap"'),h.indexOf('<details class="bloco"')].filter(i=>i>=0).sort((a,b)=>a-b)[0];
+  return k===undefined?h:h.slice(0,k)+add+h.slice(k);
+};
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-sit]");
+  if(b&&G.ed){
+    let m=$("#modalSit");if(m)m.remove();m=document.createElement("div");m.id="modalSit";
+    m.innerHTML=`<div class="modal-fundo" data-sit="x"></div><div class="modal-caixa" role="dialog" aria-modal="true"><button type="button" class="modal-x" data-sit="x" aria-label="Fechar">×</button><h2>Situação de trabalho</h2>${sitHtml(G.ed.d,G.ed.id)}</div>`;
+    document.body.appendChild(m);if(b.dataset.sit==="x")m.remove();return;
+  }
+  const x=e.target.closest("[data-sit]");if(x&&x.dataset.sit==="x"){const m=$("#modalSit");if(m)m.remove()}
+  const o=e.target.closest("[data-sit-ir]");
+  if(o){const m=$("#modalSit");if(m)m.remove();if(G.ed&&G.ed.tipo!=="dem")gravarEd();const r=regGet(o.dataset.id);if(!r)return;
+    if(o.dataset.sitIr==="acao"){G.ed=null;irPara("acoes")}else{G.ed={id:r.id,tipo:r.tipo,d:JSON.parse(JSON.stringify(r.d))};G.rel=false;if(r.tipo==="dem")irPara("demandas");else irEd?irEd():irPara(r.tipo==="aet"?"aet":"avaliar")}}
+});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-sit=abrir]");if(!b){const f=e.target.closest('[data-sit="x"]');if(f){const m=$("#modalSit");if(m)m.remove()}}},true);
+// ---------- desfechos da demanda e da triagem ----------
+const DESF_DEM=[["aep","Vincular a uma AEP existente"],["esp","Encaminhar para avaliação especializada"],["enc","Encerrar com justificativa"]];
+const DESF_TRI=[["semaep","Encerrar sem AEP (com justificativa)"],["imediata","Ação imediata (registrar em Ações)"],["depois","Vincular a uma AEP depois"]];
+const _htmlDemFluxo32=htmlDemFluxo;
+htmlDemFluxo=function(id){
+  const h=_htmlDemFluxo32(id),r=regGet(id);if(!r)return h;const d=r.d,dd=d.desfecho;
+  const aeps=regOf("aep").filter(a=>!a.excluido&&(!d.postoId||a.d.postoId===d.postoId)).map(a=>[a.id,(a.d.numero||"(pendente)")+" · "+(ativTxt(a.d)||"sem atividade")]);
+  const box=`<div class="card no-print"><h3>Desfecho da demanda</h3>${dd?`<div class="sug"><span><b>${esc((DESF_DEM.concat(DESF_TRI).find(x=>x[0]===dd.tipo)||[0,dd.tipo])[1])}</b><br><small>${esc(dd.just||"")} · ${esc(dd.por||"")} · ${dataBR(dd.em)}</small></span></div>`:""}
+  <label class="campo">Desfecho<select id="dfT"><option value="">Escolha…</option>${sel1(DESF_DEM,"")}</select></label>
+  <label class="campo">Vincular à AEP<select id="dfAep"><option value="">Escolha…</option>${sel1(aeps,"")}</select></label>
+  <label class="campo">Justificativa (obrigatória para encaminhar ou encerrar)<textarea id="dfJ" rows="2"></textarea></label>
+  <hr><h4>Resultado da triagem rápida</h4><label class="campo">Desfecho da triagem<select id="dfTri"><option value="">Escolha…</option>${sel1(DESF_TRI,"")}</select></label>
+  <div class="linha"><button type="button" class="btn" data-df="dem" data-id="${id}">Registrar desfecho da demanda</button><button type="button" class="btn sec" data-df="tri" data-id="${id}">Registrar resultado da triagem</button></div></div>`;
+  return h.replace(/<div class="card no-print"><h3>Fluxo da demanda<\/h3>/,box+'<div class="card no-print"><h3>Fluxo da demanda</h3>');
+};
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-df]");if(!b)return;
+  const r=regGet(b.dataset.id);if(!r)return;const d=r.d,just=($("#dfJ")||{}).value||"";
+  const reg=(tipo,st)=>{d.desfecho={tipo,just:just.trim(),por:(perfil&&perfil.nome)||"",em:hojeISO()};if(st)d.status=st;(d.hist=d.hist||[]).push({acao:"Desfecho: "+tipo,por:(perfil&&perfil.nome)||"",em:hojeISO(),hora:new Date().toISOString(),obs:just.trim()});regGravar(r);if(G.ed&&G.ed.id===r.id)G.ed.d=JSON.parse(JSON.stringify(r.d));renderDemandas();aviso("Desfecho registrado.")};
+  if(b.dataset.df==="dem"){
+    const t=$("#dfT").value;if(!t)return aviso("Escolha o desfecho da demanda.");
+    if(t==="aep"){const a=$("#dfAep").value;if(!a)return aviso("Escolha a AEP.");const ae=regGet(a);ae.d.demandaId=r.id;regGravar(ae);reg("aep","aep")}
+    else{if(!just.trim())return aviso("Informe a justificativa.");reg(t,t==="enc"?"concluida":"triagem")}
+  }else{
+    const t=$("#dfTri").value;if(!t)return aviso("Escolha o desfecho da triagem.");
+    if(t==="semaep"){if(!just.trim())return aviso("Informe a justificativa para encerrar sem AEP.");reg("semaep","concluida")}
+    else if(t==="imediata"){reg("imediata","acao");G.ed=null;irPara("acoes")}
+    else reg("depois","triagem");
+  }
+});
+/* FASE 18d: gráficos reais (SVG) no Painel: barras, rosca, colunas empilhadas e colunas no tempo.
+   Dados ordinais usam rampa de uma cor (laranja) e vermelho só para crítico; legenda e tabela sempre presentes. */
+const COR_NIV=["#D1D5DB","#FFD699","#FF9900","#FF3300","#9CA3AF"];
+const SVGNS_=(w,h,corpo,rot)=>`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(rot)}" style="width:100%;height:auto;max-width:${w}px;display:block">${corpo}</svg>`;
+function gTabela(it,tit){return it.length?`<details class="gtab"><summary>Ver como tabela</summary><table class="tab"><tr><th>${esc(tit||"Item")}</th><th>Valor</th></tr>${it.map(x=>`<tr><td>${esc(x.rot)}</td><td>${x.v}</td></tr>`).join("")}</table></details>`:""}
+function gBarras(it){
+  it=it.filter(x=>x&&x.rot!==undefined);if(!it.length||it.every(x=>!x.v))return `<p class="mut">Sem dados para o gráfico.</p>`;
+  const W=560,lh=30,L=170,R=44,H=it.length*lh+8,max=Math.max(...it.map(x=>x.v),1);
+  const corpo=it.map((x,i)=>{const y=i*lh+4,w=Math.max(x.v?3:0,(W-L-R)*x.v/max),rot=String(x.rot).length>26?String(x.rot).slice(0,25)+"…":String(x.rot);
+    return `<g class="gm" data-tip="${esc(x.rot)}: ${x.v}"><text x="${L-8}" y="${y+14}" text-anchor="end" font-size="12" fill="#374151">${esc(rot)}</text><rect x="${L}" y="${y+3}" width="${w}" height="16" rx="3" fill="${x.cor||"#FF9900"}"/><text x="${L+w+6}" y="${y+15}" font-size="12" fill="#111827">${x.v}</text></g>`}).join("");
+  return SVGNS_(W,H,`<line x1="${L}" y1="0" x2="${L}" y2="${H}" stroke="#D1D5DB"/>`+corpo,"Gráfico de barras")+gTabela(it);
+}
+function gRosca(it,cores){
+  const tot=it.reduce((s,x)=>s+x.v,0);if(!tot)return `<p class="mut">Sem dados para o gráfico.</p>`;
+  const cx=90,cy=90,r=70,ri=44;let a0=-Math.PI/2;
+  const arco=(a,b)=>{const p=(rr,t)=>[cx+rr*Math.cos(t),cy+rr*Math.sin(t)],g=b-a>Math.PI?1:0,[x1,y1]=p(r,a),[x2,y2]=p(r,b),[x3,y3]=p(ri,b),[x4,y4]=p(ri,a);return `M${x1} ${y1}A${r} ${r} 0 ${g} 1 ${x2} ${y2}L${x3} ${y3}A${ri} ${ri} 0 ${g} 0 ${x4} ${y4}Z`};
+  const ps=it.map((x,i)=>{if(!x.v)return "";const a1=a0+2*Math.PI*x.v/tot-(it.filter(y=>y.v).length>1?0:0.0001);const cor=(cores||COR_NIV)[i]||"#9CA3AF";const d=x.v===tot?`M${cx} ${cy-r}A${r} ${r} 0 1 1 ${cx-.01} ${cy-r}L${cx-.01} ${cy-ri}A${ri} ${ri} 0 1 0 ${cx} ${cy-ri}Z`:arco(a0,a1);a0=a1;return `<path class="gm" data-tip="${esc(x.rot)}: ${x.v} (${Math.round(x.v/tot*100)}%)" d="${d}" fill="${cor}" stroke="#fff" stroke-width="2"/>`}).join("");
+  const leg=it.map((x,i)=>`<div class="gleg"><i style="background:${(cores||COR_NIV)[i]||"#9CA3AF"}"></i><span>${esc(x.rot)}</span><b>${x.v}</b></div>`).join("");
+  return `<div class="grosca">${SVGNS_(180,180,ps+`<text x="${cx}" y="${cy+2}" text-anchor="middle" font-size="26" font-weight="700" fill="#111827">${tot}</text><text x="${cx}" y="${cy+20}" text-anchor="middle" font-size="11" fill="#6B7280">total</text>`,"Gráfico de rosca")}<div class="gleg-c">${leg}</div></div>`+gTabela(it);
+}
+// colunas empilhadas: cats=[rótulo], series=[{rot,cor,v:[...]}]
+function gEmpilhado(cats,series,tit){
+  const tot=cats.map((_,i)=>series.reduce((s,x)=>s+(x.v[i]||0),0)),max=Math.max(...tot,1);
+  if(!cats.length||!tot.some(Boolean))return `<p class="mut">Sem dados para o gráfico.</p>`;
+  const W=Math.max(320,Math.min(640,cats.length*64+50)),H=220,L=30,B=44,T=10,bw=Math.min(36,(W-L)/cats.length-14);
+  let corpo=[0,.5,1].map(f=>{const y=T+(H-B-T)*(1-f);return `<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="#E5E7EB"/><text x="${L-4}" y="${y+4}" text-anchor="end" font-size="10" fill="#6B7280">${Math.round(max*f)}</text>`}).join("");
+  cats.forEach((c,i)=>{const x=L+(W-L)/cats.length*i+((W-L)/cats.length-bw)/2;let y=H-B;
+    series.forEach(s=>{const v=s.v[i]||0;if(!v)return;const h=(H-B-T)*v/max;y-=h;corpo+=`<rect class="gm" data-tip="${esc(c)} · ${esc(s.rot)}: ${v}" x="${x}" y="${y}" width="${bw}" height="${Math.max(h-2,1)}" rx="2" fill="${s.cor}"/>`});
+    corpo+=`<text x="${x+bw/2}" y="${H-B+14}" text-anchor="middle" font-size="10" fill="#374151">${esc(String(c).length>9?String(c).slice(0,8)+"…":c)}</text>`});
+  const leg=series.map(s=>`<div class="gleg"><i style="background:${s.cor}"></i><span>${esc(s.rot)}</span></div>`).join("");
+  const tb=cats.map((c,i)=>({rot:c,v:tot[i]}));
+  return SVGNS_(W,H,corpo,tit||"Colunas empilhadas")+`<div class="gleg-l">${leg}</div>`+gTabela(tb,tit||"Categoria");
+}
+function gColunas(cats,vals,rot){return gEmpilhado(cats,[{rot:rot||"Quantidade",cor:"#FF9900",v:vals}],rot)}
+function ultMeses(n){const o=[],h=new Date();for(let i=n-1;i>=0;i--){const d=new Date(h.getFullYear(),h.getMonth()-i,1);o.push({k:d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"),rot:d.toLocaleDateString("pt-BR",{month:"short"}).replace(".","")+"/"+String(d.getFullYear()).slice(2)})}return o}
+function serieMes(rs,campo){const M=ultMeses(6);return {cats:M.map(m=>m.rot),v:M.map(m=>rs.filter(r=>String(campo(r)||"").slice(0,7)===m.k).length)}}
+(function(){if(document.getElementById("css33"))return;const s=document.createElement("style");s.id="css33";s.textContent=`.grosca{display:flex;gap:16px;align-items:center;flex-wrap:wrap}.grosca svg{width:180px;flex:0 0 180px}.gleg-c{flex:1;min-width:150px}.gleg{display:flex;align-items:center;gap:8px;font-size:.86rem;padding:2px 0}.gleg i{width:12px;height:12px;border-radius:3px;flex:0 0 12px}.gleg b{margin-left:auto}.gleg-l{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px}.gtab{margin-top:6px;font-size:.84rem}.gm{cursor:default}.gm:hover rect,.gm:hover{opacity:.85}#gtip{position:fixed;z-index:9999;background:#111827;color:#fff;font-size:.8rem;padding:5px 9px;border-radius:6px;pointer-events:none;display:none;max-width:260px}`;document.head.appendChild(s);const t=document.createElement("div");t.id="gtip";document.body.appendChild(t)})();
+document.addEventListener("mousemove",e=>{const g=e.target.closest&&e.target.closest("[data-tip]"),t=document.getElementById("gtip");if(!t)return;if(g){t.textContent=g.dataset.tip;t.style.display="block";t.style.left=Math.min(e.clientX+12,innerWidth-270)+"px";t.style.top=(e.clientY+14)+"px"}else t.style.display="none"});
+document.addEventListener("click",e=>{const g=e.target.closest&&e.target.closest("[data-tip]"),t=document.getElementById("gtip");if(g&&t&&matchMedia("(hover:none)").matches){t.textContent=g.dataset.tip;t.style.display="block";t.style.left="12px";t.style.top=(e.clientY+14)+"px";setTimeout(()=>t.style.display="none",2500)}});
 /* =====================================================================
    INÍCIO
    ===================================================================== */
