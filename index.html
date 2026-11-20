@@ -1479,7 +1479,7 @@ function payloadIA(av){
 async function chamarIA(rota,corpo){
   const h={"Content-Type":"application/json"};
   if(SB_ON){const t=await tokenValido();if(!t)throw new Error("Entre na sua conta para usar a IA.");h.Authorization="Bearer "+t}
-  const r=await fetch(URL_BASE+rota,{method:"POST",headers:h,body:JSON.stringify(corpo)});
+  let r;try{r=await fetch(URL_BASE+rota,{method:"POST",headers:h,body:JSON.stringify(corpo)})}catch(e){throw new Error(navigator.onLine===false?"Sem internet no momento.":"Não consegui falar com o servidor de IA. Confirme que o Worker foi publicado com a versão mais recente e tente de novo.")}
   const j=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(j.erro||"falha");
   return j;
@@ -9167,81 +9167,6 @@ renderInicio=function(){
 .kb-d{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #eef0f2}.kb-n{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.86rem}.kb-d small{color:#6B7280;white-space:nowrap}
 @media(max-width:820px){.as-grid{grid-template-columns:1fr}.as-log{max-height:300px}}
 `;document.head.appendChild(s)})();
-/* FASE 27: avisos de tarefas vencendo por e-mail (configuração em Conta). O envio diário é feito pelo Worker (cron) a partir dos registros sincronizados no Supabase */
-const AV={cfg:null,carregado:false,erro:"",uid:""};
-const avTok=v=>String(v||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().split(/[^a-z0-9]+/).filter(t=>t.length>1);
-function avCasa(resp,nome){const a=avTok(nome);if(!a.length)return false;const s=new Set(avTok(resp));return a.every(t=>s.has(t))}
-function avPrevia(nome,ant){
-  const hj=hojeISO(),lim=somaDias(ant);let v=0,p=0,e=0;
-  regOf("acao").filter(r=>!r.excluido).forEach(r=>{
-    const d=r.d;
-    if(ABERTA_AC(d.status)&&d.prazo&&avCasa(d.responsavel,nome)){if(d.prazo<hj)v++;else if(d.prazo<=lim)p++}
-    const pv=d.ef&&d.ef.prevista;
-    if(AGUARDA(d.status)&&pv&&pv<=lim&&(avCasa(d.ef.avaliador,nome)||avCasa(d.responsavel,nome)))e++;
-  });
-  return {v,p,e};
-}
-function avHtml(){
-  const c=AV.cfg||{},email=c.email!==undefined?c.email:(sessao&&sessao.user&&sessao.user.email)||"",nome=c.nome_resp!==undefined?c.nome_resp:(perfil&&perfil.nome)||"",ant=c.antecedencia!==undefined?c.antecedencia:3,ativo=c.ativo!==undefined?c.ativo:true;
-  const pv=avPrevia(nome,ant);
-  const opt=[[0,"Só atrasadas e do dia"],[1,"1 dia antes"],[3,"3 dias antes"],[7,"7 dias antes"],[14,"14 dias antes"]].map(([k,t])=>`<option value="${k}" ${Number(ant)===k?"selected":""}>${t}</option>`).join("");
-  return `<h2 style="margin-top:0">Avisos de tarefas por e-mail</h2>
-  <p class="mut" style="margin-top:0">Receba um e-mail por dia, de manhã, quando houver ações no seu nome vencendo, atrasadas ou com verificação de eficácia a fazer. Sem tarefas, não envia nada.</p>
-  ${AV.erro?`<div class="alerta">${esc(AV.erro)}</div>`:""}
-  <form id="avForm" autocomplete="off">
-   <label class="linha" style="gap:8px;margin-bottom:8px"><input type="checkbox" name="ativo" ${ativo?"checked":""}> <b>Receber avisos por e-mail</b></label>
-   <div class="grid2">
-    <label class="campo">E-mail para receber<input type="email" name="email" value="${esc(email)}" placeholder="voce@empresa.com" required></label>
-    <label class="campo">Avisar com antecedência<select name="antecedencia">${opt}</select></label>
-   </div>
-   <label class="campo">Seu nome como aparece em “Responsável” nas ações<input name="nome_resp" value="${esc(nome)}" placeholder="Ex.: Raul Silva" required></label>
-   <p class="mut" style="font-size:.84rem;margin:2px 0 10px">Comparamos as palavras do seu nome com o campo Responsável, sem diferenciar acento ou maiúscula. “Raul Silva” encontra “Raul Oliveira Silva”. Um nome só (“Raul”) pode pegar tarefas de outro Raul.</p>
-   <div class="kb-prog" style="display:block;margin-bottom:10px" id="avPrevia">Hoje, com este nome: <b>${pv.v}</b> atrasada(s), <b>${pv.p}</b> vencendo em até ${ant} dia(s), <b>${pv.e}</b> verificação(ões) de eficácia a fazer.</div>
-   <div class="linha" style="flex-wrap:wrap;gap:8px"><button class="btn" type="submit" id="avSalvar">Salvar</button><button class="btn sec" type="button" data-av="teste">Salvar e enviar e-mail de teste</button></div>
-   <p id="avMsg" class="mut" style="font-size:.84rem;margin:8px 0 0" role="status">${c.ultimo_envio?"Último aviso enviado em "+esc(dataBR(c.ultimo_envio))+".":""}</p>
-  </form>
-  <p class="mut" style="font-size:.8rem;margin-bottom:0">O aviso usa as ações já sincronizadas na sua equipe. Todo e-mail tem um link para parar de receber.</p>`;
-}
-async function avCarregar(){
-  try{const r=await sbA("/rest/v1/avisos_email?select=*");AV.cfg=(r&&r[0])||null;AV.erro=""}
-  catch(e){AV.erro=/relation|does not exist|avisos_email|404/i.test(e.message||"")?"A tabela dos avisos ainda não existe no Supabase. Rode o arquivo supabase_fase16.sql no SQL Editor.":(e.message||"Não consegui carregar suas configurações.")}
-  AV.carregado=true;
-  const el=document.getElementById("avCard");if(el)el.innerHTML=avHtml();
-}
-function avLer(){
-  const f=document.getElementById("avForm");if(!f)return null;
-  const g=n=>f.elements[n];
-  const email=String(g("email").value||"").trim(),nome=String(g("nome_resp").value||"").trim();
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){aviso("Confira o e-mail.");return null}
-  if(avTok(nome).length===0){aviso("Informe seu nome como aparece em Responsável.");return null}
-  return {user_id:sessao.user.id,email,ativo:g("ativo").checked,antecedencia:Number(g("antecedencia").value)||0,nome_resp:nome.slice(0,120),atualizado_em:new Date().toISOString()};
-}
-async function avSalvar(){
-  const c=avLer();if(!c)return false;
-  try{
-    const r=await sbA("/rest/v1/avisos_email?on_conflict=user_id",{method:"POST",body:c,headers:{Prefer:"resolution=merge-duplicates,return=representation"}});
-    AV.cfg=(r&&r[0])||c;AV.erro="";
-    const m=document.getElementById("avMsg");if(m)m.textContent=c.ativo?"Salvo. Os avisos estão ligados.":"Salvo. Os avisos estão desligados.";
-    const pv=document.getElementById("avPrevia");if(pv){const x=avPrevia(c.nome_resp,c.antecedencia);pv.innerHTML=`Hoje, com este nome: <b>${x.v}</b> atrasada(s), <b>${x.p}</b> vencendo em até ${c.antecedencia} dia(s), <b>${x.e}</b> verificação(ões) de eficácia a fazer.`}
-    return true;
-  }catch(e){aviso(/avisos_email/i.test(e.message||"")?"Rode o supabase_fase16.sql no Supabase primeiro.":(e.message||"Não consegui salvar."));return false}
-}
-document.addEventListener("submit",e=>{if(e.target.id!=="avForm")return;e.preventDefault();avSalvar()});
-document.addEventListener("click",async e=>{
-  const b=e.target.closest('[data-av="teste"]');if(!b)return;
-  if(!(await avSalvar()))return;
-  const m=document.getElementById("avMsg");b.disabled=true;if(m)m.textContent="Enviando e-mail de teste…";
-  try{const j=await chamarIA("/api/ergo/avisos/teste",{});if(m)m.textContent=`Teste enviado para ${j.para}. Confira também a caixa de spam.`}
-  catch(er){if(m)m.textContent=er.message&&er.message!=="falha"?er.message:"Não consegui enviar o teste agora."}
-  finally{b.disabled=false}
-});
-const _renderConta52=renderConta;
-renderConta=function(){
-  _renderConta52();
-  const v=$("#v-conta");if(!v||!SB_ON||!sessao)return;
-  if(!v.querySelector("#avCard")){const c=document.createElement("div");c.className="card";c.id="avCard";c.innerHTML=avHtml();const ref=v.querySelector("[data-lgpd=exportar]");const cd=ref&&ref.closest(".card");if(cd)v.insertBefore(c,cd);else v.appendChild(c)}
-  if(!AV.carregado)avCarregar();
-};
 /* =====================================================================
    INÍCIO
    ===================================================================== */
