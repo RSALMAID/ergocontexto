@@ -386,6 +386,8 @@ h4{color:var(--verde)}
       <button data-v="historico">Histórico</button>
       <button data-v="dash">Dashboard</button>
       <button data-v="relat">Relatórios</button>
+      <button data-v="medicoes">Medições</button>
+      <button data-v="docs">Documentos</button>
       <button data-v="busca">Buscar</button>
       <button data-v="painel">Painel</button>
       <button data-v="sobre">Sobre o método</button>
@@ -407,6 +409,8 @@ h4{color:var(--verde)}
   <section id="v-cadastros" class="view"></section>
   <section id="v-dash" class="view"></section>
   <section id="v-relat" class="view"></section>
+  <section id="v-medicoes" class="view"></section>
+  <section id="v-docs" class="view"></section>
   <section id="v-busca" class="view"></section>
   <section id="v-historico" class="view"></section>
   <section id="v-painel" class="view"></section>
@@ -4526,6 +4530,379 @@ irPara=function(v){_irPara18(v);if(v==="busca")renderBusca()};
     try{rec.start();ativo=true;btn.style.background="#FF3300";btn.style.borderColor="#FF3300"}catch(e){aviso("Não foi possível iniciar o ditado.")}
   });
 })();
+/* =====================================================================
+   FASE 12A: MEDIÇÕES QUANTITATIVAS
+   Registro de avaliações quantitativas (ruído, iluminância, calor, conforto
+   térmico e outros agentes), com instrumento e calibração, pontos de medição,
+   cálculo e comparação com o critério informado e sua fonte.
+   Valores embutidos e conferidos nas fontes oficiais:
+   - NR-15 Anexo 1 (ruído contínuo ou intermitente): quadro de 85 a 115 dB(A) e dose
+   - NR-15 Anexo 2 (ruído de impacto): 130 dB (linear) ou 120 dB(C); risco grave e iminente
+     acima de 140 dB (linear) ou 130 dB(C)
+   - NHO 01 da Fundacentro: critério 85 dB(A), q = 3, limiar de integração 80 dB(A), NEN
+   - NR-15 Anexo 3 (calor, redação da Portaria SEPRT 1.359/2019): IBUTG máximo por taxa
+     metabólica (Quadro 1) e ponderação do IBUTG e da taxa metabólica pelo tempo
+   - NR-17 (redação 2021/2022), itens 17.8.3 e 17.8.4: iluminamento pela NHO 11,
+     ruído de fundo até 65 dB(A) e temperatura do ar de 18 a 25 °C em ambientes climatizados
+   Os demais critérios são informados pelo avaliador, sempre com a fonte.
+   ===================================================================== */
+const NR15_RUIDO=[[85,480],[86,420],[87,360],[88,300],[89,270],[90,240],[91,210],[92,180],[93,160],[94,135],[95,120],[96,105],[98,75],[100,60],[102,45],[104,35],[105,30],[106,25],[108,20],[110,15],[112,10],[114,8],[115,7]];
+// nível intermediário: vale a máxima exposição do nível imediatamente mais elevado
+const nr15T=L=>{if(L<85)return Infinity;if(L>115)return 0;const e=NR15_RUIDO.find(x=>x[0]>=L);return e[1]};
+const minTxt=m=>{const h=Math.floor(m/60),mm=Math.round(m%60);return (h?h+" h ":"")+(mm||!h?mm+" min":"")};
+const ibutgMax=M=>56.7-11.5*Math.log10(M); // reproduz o Quadro 1 do Anexo 3 da NR-15 (conferido em linhas do quadro)
+const AG={
+ ruido_cont:{rot:"Ruído contínuo ou intermitente",un:"dB(A)",calc:"ruido",ref:"NR-15 Anexo 1; NHO 01 (Fundacentro); ISO 9612. Medição em dB(A), circuito de resposta lenta (slow), com leituras próximas ao ouvido do trabalhador. Informe cada nível medido e o tempo de exposição a ele."},
+ ruido_imp:{rot:"Ruído de impacto",un:"dB",calc:"impacto",ref:"NR-15 Anexo 2; NHO 01. Picos de energia acústica com menos de 1 segundo, em intervalos maiores que 1 segundo."},
+ ruido_conf:{rot:"Ruído de fundo (conforto acústico)",un:"dB(A)",stat:"max",lim:{dir:"max",valor:"65",un:"dB(A)",fonte:"NR-17 item 17.8.4.1.2: ruído de fundo de até 65 dB(A), nível contínuo equivalente (LAeq) com resposta Slow, nos casos sem valor de referência em norma técnica oficial (17.8.4.1.1)."},ref:"NR-17 itens 17.8.4 a 17.8.4.1.2. Se houver valor de referência em norma técnica oficial para o tipo de ambiente (17.8.4.1.1), use-o e informe a fonte."},
+ ilum:{rot:"Iluminância (iluminamento)",un:"lux",stat:"media",lim:{dir:"min",valor:"",un:"lux",fonte:"NHO 11 da Fundacentro (2018), conforme NR-17 item 17.8.3. Informe o valor mínimo exigido para a tarefa."},calc:"ilum",ref:"NR-17 item 17.8.3 (níveis mínimos pela NHO 11); ABNT NBR ISO/CIE 8995-1. Informe o iluminamento mínimo exigido para a tarefa e a fonte do valor."},
+ calor:{rot:"Calor (IBUTG)",un:"°C",calc:"calor",ref:"NR-15 Anexo 3 (Portaria SEPRT 1.359/2019); NHO 06 (Fundacentro); ISO 7243. IBUTG = 0,7·Tbn + 0,3·Tg (interno ou externo sem carga solar) ou 0,7·Tbn + 0,2·Tg + 0,1·Tbs (externo com carga solar)."},
+ temp_ar:{rot:"Temperatura do ar (ambientes climatizados)",un:"°C",stat:"faixa",lim:{dir:"faixa",valor:"18",valor2:"25",un:"°C",fonte:"NR-17 item 17.8.4.2: faixa de temperatura do ar entre 18 e 25 °C em ambientes climatizados."},ref:"NR-17 item 17.8.4.2. Os itens 17.8.3 e 17.8.4.2 podem ser afastados com normativa específica e justificativa técnica (17.8.5)."},
+ umid:{rot:"Umidade relativa do ar",un:"%",stat:"media",lim:{dir:"min",valor:"",un:"%",fonte:""},ref:"NR-17 item 17.8.4.2 exige controle, sem valor numérico. Informe o critério adotado e a fonte."},
+ vel_ar:{rot:"Velocidade do ar",un:"m/s",stat:"max",lim:{dir:"max",valor:"",un:"m/s",fonte:""},ref:"NR-17 item 17.8.4.2.1 trata das correntes de ar sobre os trabalhadores, sem valor numérico. Informe o critério adotado e a fonte."},
+ vib_mao:{rot:"Vibração em mãos e braços",un:"m/s²",stat:"max",lim:{dir:"max",valor:"",un:"m/s²",fonte:""},ref:"NHO 10 (Fundacentro); ISO 5349-1 e -2; NR-9 (anexo de vibração). Informe o critério (por exemplo, A(8) ou VDV) e a fonte."},
+ vib_corpo:{rot:"Vibração de corpo inteiro",un:"m/s²",stat:"max",lim:{dir:"max",valor:"",un:"m/s²",fonte:""},ref:"NHO 09 (Fundacentro); ISO 2631-1. Informe o critério (por exemplo, aren ou VDV) e a fonte."},
+ forca:{rot:"Força de empurrar ou puxar",un:"N",stat:"max",lim:{dir:"max",valor:"",un:"N",fonte:""},ref:"ISO 11228-2; tabelas de Snook e Ciriello (1991). Informe o limite adotado e a fonte."},
+ carga:{rot:"Massa de carga manuseada",un:"kg",stat:"max",lim:{dir:"max",valor:"",un:"kg",fonte:""},ref:"ISO 11228-1; equação NIOSH (use a calculadora na AEP). Informe o limite adotado e a fonte."},
+ dim:{rot:"Dimensão do posto (altura, alcance, espaço)",un:"cm",stat:"media",lim:{dir:"faixa",valor:"",valor2:"",un:"cm",fonte:""},ref:"ABNT NBR ISO 9241-5; ISO 14738; ABNT NBR 13962 (mobiliário). Informe a faixa exigida e a fonte."},
+ outro:{rot:"Outro agente quantitativo",un:"",stat:"max",lim:{dir:"max",valor:"",un:"",fonte:""},ref:"Informe o agente, a unidade, o critério e a fonte."}
+};
+const STAT_ROT={media:"média dos pontos",max:"maior valor",min:"menor valor",faixa:"todos os pontos dentro da faixa"};
+const PT_VAZIO=a=>a==="calor"?{desc:"",tbn:"",tg:"",tbs:"",min:"",M:""}:a==="ruido_cont"?{desc:"",valor:"",min:""}:{desc:"",valor:""};
+function novaMed(){
+  const a="ruido_cont";
+  return {id:rid(),tipo:"med",d:{agente:a,status:"rascunho",versao:1,hist:[],data:hojeISO(),postoId:"",atividadeId:"",avaliador:(autorAtual()||{}).nome||"",registro:"",
+    equip:{modelo:"",serie:"",calibNum:"",calibVal:"",classe:""},sol:"interno",circuito:"linear",jornadaMin:"480",cond:"",conclusao:"",
+    lim:JSON.parse(JSON.stringify(AG[a].lim||{})),stat:AG[a].stat||"max",pontos:[PT_VAZIO(a)]}};
+}
+const nv=x=>{const v=NG(x);return isFinite(v)?v:NaN};
+function medCalc(d){
+  const A=AG[d.agente]||AG.outro,L=[],av=[];let ver={txt:"Sem critério informado",cls:"nd"};
+  const P=(d.pontos||[]);
+  const pv=P.map(p=>nv(p.valor)).filter(x=>!isNaN(x));
+  const f=(x,n=1)=>nf(x,n);
+  if(A.calc==="ruido"){
+    const R=P.map(p=>({L:nv(p.valor),t:nv(p.min)})).filter(x=>!isNaN(x.L)&&!isNaN(x.t)&&x.t>0);
+    if(!R.length)return {linhas:[],ver,av:["Informe ao menos um nível medido com o tempo de exposição."]};
+    let D15=0,sem=false,acima115=false;R.forEach(x=>{const T=nr15T(x.L);if(x.L>115)acima115=true;if(T===0)sem=true;else if(isFinite(T))D15+=x.t/T});
+    const soma=R.filter(x=>x.L>=80).reduce((s,x)=>s+x.t*Math.pow(10,x.L/10),0),NEN=soma>0?10*Math.log10(soma/480):null,Dn=soma>0?Math.pow(10,(NEN-85)/10):0;
+    const tot=R.reduce((s,x)=>s+x.t,0);
+    L.push(["Tempo total informado",minTxt(tot)]);
+    L.push(["NR-15 Anexo 1: dose Σ(Cn/Tn)",sem?"acima de 115 dB(A)":f(D15,2)+" ("+f(D15*100,0)+"%)"]);
+    L.push(["NHO 01: nível de exposição normalizado (NEN)",NEN==null?"abaixo do limiar de integração (80 dB(A))":f(NEN,1)+" dB(A)"]);
+    L.push(["NHO 01: dose diária",f(Dn*100,0)+"%"]);
+    const jm=nv(d.jornadaMin);if(!isNaN(jm)&&Math.abs(tot-jm)>jm*0.05)av.push("O tempo total informado ("+minTxt(tot)+") difere da jornada declarada ("+minTxt(jm)+"). Os períodos abaixo de 80 dB(A) podem ser omitidos, mas confira se todos os períodos ruidosos estão listados.");
+    const fora15=sem||D15>1,fora01=(NEN!=null&&NEN>85)||acima115;
+    const acao=D15>=0.5||Dn>=0.5;
+    ver=fora15||fora01?{txt:"Acima do limite: "+[fora15?"NR-15 (dose > 1)":"",fora01?"NHO 01 (NEN > 85 dB(A))":""].filter(Boolean).join(" e "),cls:"n3"}:acao?{txt:"Dentro do limite, mas no nível de ação (dose ≥ 50%)",cls:"n2"}:{txt:"Dentro dos limites (NR-15 e NHO 01)",cls:"n0"};
+    if(acima115)av.push("Há nível acima de 115 dB(A): exposição sem proteção adequada é risco grave e iminente (NR-15 Anexo 1, item 7).");
+  }else if(A.calc==="impacto"){
+    if(!pv.length)return {linhas:[],ver,av:["Informe ao menos um pico medido."]};
+    const lim=d.circuito==="C"?120:130,grave=d.circuito==="C"?130:140,mx=Math.max(...pv);
+    L.push(["Circuito de medição",d.circuito==="C"?"dB(C), resposta rápida (FAST)":"dB linear, resposta para impacto"]);
+    L.push(["Maior pico",f(mx,1)+" dB"]);L.push(["Limite de tolerância (NR-15 Anexo 2)",lim+(d.circuito==="C"?" dB(C)":" dB (linear)")]);
+    ver=mx>grave?{txt:"Acima de "+grave+" dB: risco grave e iminente sem proteção adequada",cls:"n3"}:mx>lim?{txt:"Acima do limite de tolerância",cls:"n3"}:{txt:"Dentro do limite de tolerância",cls:"n0"};
+    av.push("O Anexo 2 não fixa número máximo de impactos. Entre os picos, avalie o ruído como contínuo.");
+  }else if(A.calc==="calor"){
+    const R=P.map(p=>{const tbn=nv(p.tbn),tg=nv(p.tg),tbs=nv(p.tbs),M=nv(p.M),t=nv(p.min);
+      const ib=d.sol==="ext_com"?0.7*tbn+0.2*tg+0.1*tbs:0.7*tbn+0.3*tg;return {ib,M,t:isNaN(t)||t<=0?1:t}}).filter(x=>!isNaN(x.ib)&&!isNaN(x.M));
+    if(!R.length)return {linhas:[],ver,av:["Informe Tbn, Tg (e Tbs se houver carga solar) e a taxa metabólica de ao menos um ponto."]};
+    const T=R.reduce((s,x)=>s+x.t,0),ib=R.reduce((s,x)=>s+x.ib*x.t,0)/T,M=R.reduce((s,x)=>s+x.M*x.t,0)/T;
+    L.push(["Ambiente",{interno:"interno ou externo sem carga solar",ext_sem:"externo sem carga solar",ext_com:"externo com carga solar"}[d.sol]||""]);
+    L.push(["IBUTG médio (ponderado pelo tempo)",f(ib,1)+" °C"]);L.push(["Taxa metabólica média",f(M,0)+" W"]);
+    if(M<115||M>606){av.push("A taxa metabólica média ("+f(M,0)+" W) está fora do intervalo de 115 a 606 W conferido no Quadro 1. Consulte o texto do Anexo 3.");ver={txt:"Limite não calculado",cls:"nd"}}
+    else{const lim=ibutgMax(M);L.push(["IBUTG máximo (Quadro 1, Anexo 3)",f(lim,1)+" °C"]);ver=ib>lim+1e-9?{txt:"IBUTG acima do limite de exposição",cls:"n3"}:{txt:"IBUTG dentro do limite de exposição",cls:"n0"}}
+    av.push("Valores do Quadro 1 e demais condições (aclimatização, regime de descanso, medidas preventivas) conforme o Anexo 3 da NR-15.");
+  }else{
+    if(!pv.length)return {linhas:[],ver,av:["Informe ao menos um valor medido."]};
+    const n=pv.length,med=pv.reduce((a,b)=>a+b,0)/n,mn=Math.min(...pv),mx=Math.max(...pv),un=(d.lim&&d.lim.un)||A.un||"";
+    L.push(["Pontos",String(n)]);L.push(["Média",f(med,2)+" "+un]);L.push(["Mínimo",f(mn,2)+" "+un]);L.push(["Máximo",f(mx,2)+" "+un]);
+    if(A.calc==="ilum"&&med>0)L.push(["Uniformidade (mínimo ÷ média)",f(mn/med,2)]);
+    const lim=d.lim||{},v1=nv(lim.valor),v2=nv(lim.valor2),dir=lim.dir||"max",st=d.stat||A.stat||"max";
+    if(dir==="faixa"){
+      if(isNaN(v1)||isNaN(v2))av.push("Informe a faixa (mínimo e máximo) do critério.");
+      else{L.push(["Critério",f(v1,1)+" a "+f(v2,1)+" "+un]);ver=mn>=v1&&mx<=v2?{txt:"Todos os pontos dentro da faixa",cls:"n0"}:{txt:"Há pontos fora da faixa",cls:"n3"}}
+    }else if(isNaN(v1))av.push("Informe o valor do critério e a fonte para comparar.");
+    else{
+      const x=st==="media"?med:st==="min"?mn:mx;
+      L.push(["Critério ("+(dir==="max"?"não exceder":"mínimo")+")",f(v1,2)+" "+un]);L.push(["Valor comparado ("+STAT_ROT[st==="faixa"?"max":st]+")",f(x,2)+" "+un]);
+      const ok=dir==="max"?x<=v1:x>=v1;ver=ok?{txt:"Atende ao critério informado",cls:"n0"}:{txt:"Não atende ao critério informado",cls:"n3"};
+    }
+    if(dir!=="faixa"&&!(d.lim&&(d.lim.fonte||"").trim()))av.push("Informe a fonte do critério (norma, item e edição).");
+  }
+  // instrumento e calibração
+  const e=d.equip||{};
+  if(e.calibVal&&d.data&&e.calibVal<d.data)av.unshift("Calibração do instrumento vencida na data da medição ("+dataBR(e.calibVal)+"). O resultado não deve ser usado como prova.");
+  return {linhas:L,ver,av};
+}
+function medBloqueios(d){
+  const b=[],e=d.equip||{};
+  if(!d.postoId&&!d.atividadeId)b.push("vincule um posto ou atividade");
+  if(!(d.avaliador||"").trim())b.push("informe o avaliador");
+  if(!e.modelo||!e.calibNum||!e.calibVal)b.push("informe instrumento, certificado e validade da calibração");
+  else if(e.calibVal<d.data)b.push("calibração vencida na data da medição");
+  const c=medCalc(d);if(!c.linhas.length)b.push("preencha os pontos de medição");
+  const A=AG[d.agente]||AG.outro;if(!A.calc&&!((d.lim||{}).fonte||"").trim())b.push("informe a fonte do critério");
+  return b;
+}
+function medResumoHTML(d){
+  const A=AG[d.agente]||AG.outro,c=medCalc(d),e=d.equip||{};
+  const pts=(d.pontos||[]).filter(p=>Object.values(p).some(Boolean));
+  const campos=d.agente==="calor"?[["desc","Ponto"],["tbn","Tbn (°C)"],["tg","Tg (°C)"],["tbs","Tbs (°C)"],["min","Tempo (min)"],["M","Taxa metabólica (W)"]]:d.agente==="ruido_cont"?[["desc","Ponto"],["valor","Nível dB(A)"],["min","Tempo (min)"]]:[["desc","Ponto"],["valor","Valor ("+(A.un||(d.lim||{}).un||"")+")"]];
+  return `<p><b>${esc(A.rot)}</b>${d.numero?" · "+esc(d.numero):""} · ${dataBR(d.data)}${d.postoId?" · "+esc(caminho(d.postoId)):""}</p>
+  <p class="mut" style="font-size:.86rem">Avaliador: ${esc(d.avaliador||"—")}${d.registro?" ("+esc(d.registro)+")":""} · Instrumento: ${esc(e.modelo||"—")}${e.serie?" nº "+esc(e.serie):""}, certificado ${esc(e.calibNum||"—")}, validade ${dataBR(e.calibVal)||"—"}${e.classe?", "+esc(e.classe):""}</p>
+  <table class="tab"><tr>${campos.map(c=>`<th>${esc(c[1])}</th>`).join("")}</tr>${pts.map(p=>`<tr>${campos.map(c=>`<td>${esc(p[c[0]]||"")}</td>`).join("")}</tr>`).join("")}</table>
+  <table class="tab" style="margin-top:8px">${c.linhas.map(l=>`<tr><th style="text-align:left">${esc(l[0])}</th><td>${esc(l[1])}</td></tr>`).join("")}</table>
+  <p><span class="bd ${c.ver.cls}">${esc(c.ver.txt)}</span></p>${c.av.map(a=>`<p style="font-size:.84rem;${/vencida/.test(a)?"color:#FF3300;font-weight:700":""}">⚠ ${esc(a)}</p>`).join("")}
+  ${(d.lim&&d.lim.fonte)?`<p class="mut" style="font-size:.82rem">Critério e fonte: ${esc(d.lim.fonte)}</p>`:""}
+  ${d.cond?`<p style="font-size:.86rem"><b>Condições da medição:</b> ${esc(d.cond)}</p>`:""}${d.conclusao?`<p style="font-size:.86rem"><b>Conclusão:</b> ${esc(d.conclusao)}</p>`:""}`;
+}
+// ---------- tela ----------
+G.me=null;G.meFiltro="";
+const medLock=d=>d&&(d.status==="aprovada"||soLeitura());
+function renderMedicoes(){
+  const el=$("#v-medicoes");if(!el)return;
+  if(G.me){el.innerHTML=htmlMedEd();atualizarMedRes();return}
+  const L=regOf("med").filter(r=>!G.meFiltro||r.d.agente===G.meFiltro).sort((a,b)=>(b.atualizadoEm||0)-(a.atualizadoEm||0));
+  el.innerHTML=`<div class="card"><div class="linha" style="justify-content:space-between"><h2 style="margin:0">Medições quantitativas</h2><button class="btn peq" data-med="nova">+ Nova medição</button></div>
+  <p class="mut">Registro de avaliações quantitativas com instrumento, calibração, pontos de medição, cálculo e comparação com o critério e a fonte. Ruído, calor e os critérios da NR-17 já trazem os valores conferidos nas normas; para os demais agentes, você informa o critério e a fonte.</p>
+  <label class="campo">Filtrar por agente<select id="medFiltro"><option value="">Todos</option>${Object.keys(AG).map(k=>`<option value="${k}" ${G.meFiltro===k?"selected":""}>${esc(AG[k].rot)}</option>`).join("")}</select></label></div>
+  <div class="card">${L.map(r=>{const d=r.d,c=medCalc(d);return `<div class="sug"><span><b>${esc(d.numero||"(número após sincronizar)")}</b> · ${esc((AG[d.agente]||AG.outro).rot)}<br><small>${esc(d.postoId?caminho(d.postoId):"")} · ${dataBR(d.data)} · ${STATUS_REG[d.status]||d.status}</small><br><span class="bd ${c.ver.cls}">${esc(c.ver.txt)}</span></span><span class="linha"><button class="btn sec peq" data-med="abrir" data-id="${r.id}">Abrir</button>${d.status==="aprovada"?"":`<button class="btn sec peq" data-med="excluir" data-id="${r.id}">Excluir</button>`}</span></div>`}).join("")||`<p class="mut">Nenhuma medição registrada.</p>`}</div>`;
+}
+function htmlMedEd(){
+  const {d}=G.me,lock=medLock(d),dis=lock?"disabled":"",A=AG[d.agente]||AG.outro;
+  const postos=cads("posto").map(r=>[r.id,caminho(r.id)]),ativs=cads("atividade").map(r=>[r.id,caminho(r.id)]);
+  const I=(p,rot,tp)=>`<label class="campo">${rot}<input data-md="${p}" ${tp?`type="${tp}"`:""} value="${esc(gget(d,p)||"")}" ${dis}></label>`;
+  const ptc=d.agente==="calor"?[["desc","Ponto / posição"],["tbn","Tbn (°C)"],["tg","Tg (°C)"],...(d.sol==="ext_com"?[["tbs","Tbs (°C)"]]:[]),["min","Tempo (min)"],["M","Taxa metabólica (W)"]]:d.agente==="ruido_cont"?[["desc","Ponto / posição"],["valor","Nível dB(A)"],["min","Tempo de exposição (min)"]]:[["desc","Ponto / posição"],["valor","Valor"+((A.un||(d.lim||{}).un)?" ("+(A.un||d.lim.un)+")":"")]];
+  const lim=d.lim||{};
+  const bl=medBloqueios(d),apv=quemAprova();
+  return `<div class="card"><div class="linha" style="justify-content:space-between"><h2 style="margin:0">${d.numero?esc(d.numero)+" · ":""}Medição quantitativa</h2><button class="btn sec peq" data-med="voltar">← Lista</button></div>
+  <p class="mut">Status: <b>${STATUS_REG[d.status]||d.status}</b> · v${d.versao||1}</p>
+  <div class="grid2"><label class="campo">Agente<select data-md="agente" ${dis}>${Object.keys(AG).map(k=>`<option value="${k}" ${d.agente===k?"selected":""}>${esc(AG[k].rot)}</option>`).join("")}</select></label>${I("data","Data da medição","date")}
+  <label class="campo">Posto<select data-md="postoId" ${dis}><option value=""></option>${sel1(postos,d.postoId||"")}</select></label>
+  <label class="campo">Atividade<select data-md="atividadeId" ${dis}><option value=""></option>${sel1(ativs,d.atividadeId||"")}</select></label>
+  ${I("avaliador","Avaliador")}${I("registro","Registro profissional (ex.: CREA, CRM, MTE)")}</div>
+  <p class="mut" style="font-size:.84rem">Referência: ${esc(A.ref)}</p>
+  <h3>Instrumento e calibração</h3><div class="grid2">${I("equip.modelo","Instrumento (marca e modelo) *")}${I("equip.serie","Nº de série")}${I("equip.calibNum","Certificado de calibração nº *")}${I("equip.calibVal","Validade da calibração *","date")}${I("equip.classe","Classe / tipo (ex.: tipo 2, classe 1)")}${d.agente==="ruido_cont"?I("jornadaMin","Jornada diária (min)"):""}</div>
+  ${d.agente==="calor"?`<label class="campo">Ambiente<select data-md="sol" ${dis}>${sel1([["interno","Interno ou externo sem carga solar"],["ext_com","Externo com carga solar"]],d.sol)}</select></label>`:""}
+  ${d.agente==="ruido_imp"?`<label class="campo">Circuito de medição<select data-md="circuito" ${dis}>${sel1([["linear","dB linear, resposta para impacto (limite 130 dB)"],["C","dB(C), resposta rápida FAST (limite 120 dB(C))"]],d.circuito)}</select></label>`:""}
+  <h3>Pontos de medição</h3>${(d.pontos||[]).map((p,i)=>`<div class="metodo"><div class="grid3">${ptc.map(([k,r])=>`<label class="campo">${r}<input data-md="pontos.${i}.${k}" value="${esc(p[k]||"")}" ${k==="desc"?"":'inputmode="decimal"'} ${dis}></label>`).join("")}</div>${lock||d.pontos.length<2?"":`<button type="button" class="btn sec peq" data-med="pt-" data-i="${i}">Remover ponto</button>`}</div>`).join("")}
+  ${lock?"":`<button type="button" class="btn sec peq" data-med="pt+">+ Adicionar ponto</button>`}
+  ${A.calc==="ruido"||A.calc==="impacto"||A.calc==="calor"?"":`<h3>Critério de comparação</h3><div class="grid3"><label class="campo">Tipo<select data-md="lim.dir" ${dis}>${sel1([["max","Não pode exceder"],["min","Não pode ficar abaixo"],["faixa","Faixa (mínimo e máximo)"]],lim.dir||"max")}</select></label>${I("lim.valor",lim.dir==="faixa"?"Mínimo":"Valor")}${lim.dir==="faixa"?I("lim.valor2","Máximo"):""}${I("lim.un","Unidade")}</div>
+  ${lim.dir!=="faixa"?`<label class="campo">Valor comparado<select data-md="stat" ${dis}>${sel1([["media","Média dos pontos"],["max","Maior valor"],["min","Menor valor"]],d.stat||"max")}</select></label>`:""}
+  <label class="campo">Fonte do critério (norma, item e edição) *<textarea data-md="lim.fonte" rows="2" ${dis}>${esc(lim.fonte||"")}</textarea></label>`}
+  <label class="campo">Condições durante a medição (produção, equipamentos em operação, clima, ocupação)<textarea data-md="cond" rows="2" ${dis}>${esc(d.cond||"")}</textarea></label>
+  <div id="medRes"></div>
+  <label class="campo">Conclusão do avaliador<textarea data-md="conclusao" rows="3" ${dis}>${esc(d.conclusao||"")}</textarea></label>
+  ${bl.length&&!lock?`<div class="alerta">Para aprovar: ${bl.map(esc).join("; ")}.</div>`:""}
+  ${d.aprov?`<p class="mut">Aprovada por <b>${esc(d.aprov.por)}</b> em ${dataBR(d.aprov.em)} · SHA-256 ${esc((d.aprov.hash||"").slice(0,16))}…</p>`:""}
+  <div class="linha" style="margin-top:10px">${lock?"":`<button class="btn" data-med="salvar">Salvar</button><button class="btn verde" data-med="aprovar" ${apv?"":"disabled"} title="${apv?"":"Somente administrador ou aprovador"}">Aprovar e bloquear</button>`}${d.status==="aprovada"?`<button class="btn sec" data-med="reabrir" ${quemEdita()?"":"disabled"}>Reabrir (administrador)</button>`:""}<button class="btn sec" data-med="imprimir">Imprimir / PDF</button></div></div>`;
+}
+function atualizarMedRes(){
+  const b=$("#medRes");if(!b||!G.me)return;
+  const c=medCalc(G.me.d);
+  b.innerHTML=`<div class="card" style="background:var(--soft);box-shadow:none"><h3 style="margin-top:0">Resultado</h3>${c.linhas.map(l=>`<p style="margin:4px 0"><b>${esc(l[0])}:</b> ${esc(l[1])}</p>`).join("")}<p><span class="bd ${c.ver.cls}">${esc(c.ver.txt)}</span></p>${c.av.map(a=>`<p style="font-size:.84rem;margin:4px 0;${/vencida/.test(a)?"color:#FF3300;font-weight:700":""}">⚠ ${esc(a)}</p>`).join("")}</div>`;
+}
+function salvarMed(){
+  const r=regGet(G.me.id)||{id:G.me.id,tipo:"med",d:{}};
+  r.d=JSON.parse(JSON.stringify(G.me.d));regGravar(r);
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-med]");if(!b)return;const k=b.dataset.med;
+  if(k==="nova"){const n=novaMed();G.me={id:n.id,d:n.d};renderMedicoes();return}
+  if(k==="abrir"){const r=regGet(b.dataset.id);if(r){G.me={id:r.id,d:JSON.parse(JSON.stringify(r.d))};renderMedicoes()}return}
+  if(k==="excluir"){if(confirm("Excluir esta medição?")){regExcluir(b.dataset.id);renderMedicoes()}return}
+  if(!G.me)return;
+  if(k==="voltar"){if(!medLock(G.me.d))salvarMed();G.me=null;renderMedicoes();return}
+  if(k==="pt+"){G.me.d.pontos.push(PT_VAZIO(G.me.d.agente));renderMedicoes();return}
+  if(k==="pt-"){G.me.d.pontos.splice(Number(b.dataset.i),1);renderMedicoes();return}
+  if(k==="salvar"){salvarMed();aviso("Medição salva.");return}
+  if(k==="imprimir"){if(!medLock(G.me.d))salvarMed();const w=window.open("");if(w){w.document.write(`<html><head><meta charset="utf-8"><title>Medição</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#000}table{border-collapse:collapse;width:100%;margin:6px 0}th,td{border:1px solid #999;padding:4px 6px;font-size:12px;text-align:left}.bd{border:1px solid #333;padding:2px 6px;border-radius:6px;font-weight:700}</style></head><body><h2>Registro de medição quantitativa</h2>${medResumoHTML(G.me.d)}${G.me.d.aprov?`<p style="font-size:11px">Aprovada por ${esc(G.me.d.aprov.por)} em ${dataBR(G.me.d.aprov.em)}. SHA-256: ${esc(G.me.d.aprov.hash||"")}</p>`:""}<script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close()}return}
+  if(k==="aprovar"){
+    const d=G.me.d,bl=medBloqueios(d);
+    if(!quemAprova()){aviso("Somente administrador ou aprovador aprova.");return}
+    if(bl.length){aviso("Antes de aprovar: "+bl.join("; ")+".");return}
+    const a=autorAtual()||{};d.status="aprovada";(d.hist=d.hist||[]).push({em:hojeISO(),acao:"Aprovada",por:a.nome||"",motivo:""});
+    d.aprov={por:a.nome||"",porId:a.id||"",papel:(perfil&&perfil.papel)||"",em:hojeISO(),emHora:new Date().toISOString(),obs:"",algoritmo:"SHA-256",hash:hashDoc(d)};
+    salvarMed();renderMedicoes();aviso("Medição aprovada e bloqueada.");return}
+  if(k==="reabrir"){
+    if(!quemEdita()){aviso("Somente o administrador reabre.");return}
+    const d=G.me.d,a=autorAtual()||{};d.status="rascunho";d.versao=(d.versao||1)+1;(d.hist=d.hist||[]).push({em:hojeISO(),acao:"Reaberta",por:a.nome||"",motivo:""});delete d.aprov;salvarMed();renderMedicoes();return}
+});
+document.addEventListener("input",e=>{
+  const t=e.target;if(!t.dataset||t.dataset.md===undefined||!G.me||t.tagName==="SELECT")return;
+  gset(G.me.d,t.dataset.md,t.value);atualizarMedRes();
+});
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.id==="medFiltro"){G.meFiltro=t.value;renderMedicoes();return}
+  if(!t.dataset||t.dataset.md===undefined||!G.me)return;
+  const p=t.dataset.md;gset(G.me.d,p,t.value);
+  if(p==="agente"){const A=AG[t.value]||AG.outro;G.me.d.lim=JSON.parse(JSON.stringify(A.lim||{}));G.me.d.stat=A.stat||"max";G.me.d.pontos=[PT_VAZIO(t.value)];renderMedicoes();return}
+  if(p==="sol"||p==="lim.dir"||p==="circuito"){renderMedicoes();return}
+  atualizarMedRes();
+});
+const _irPara19=irPara;
+irPara=function(v){_irPara19(v);if(v==="medicoes")renderMedicoes()};
+/* =====================================================================
+   FASE 12B: DOCUMENTOS OFICIAIS COM ASSINATURA
+   Laudo de AET, parecer, relatório quantitativo, ata e termo, com signatários,
+   registro profissional, assinatura eletrônica desenhada e selo de integridade
+   (SHA-256 do conteúdo). A assinatura aqui é eletrônica simples. Para validade
+   com certificado ICP-Brasil ou gov.br, gere o PDF e assine externamente.
+   ===================================================================== */
+const TIPOS_DOC={
+ aet:{rot:"Laudo de Análise Ergonômica do Trabalho (AET)",secoes:["Identificação da empresa e do estabelecimento","Demanda e objetivo da análise","Metodologia e fontes de informação","Descrição das situações de trabalho analisadas (tarefa prescrita e atividade real)","Resultados das avaliações quantitativas","Diagnóstico ergonômico","Recomendações e plano de ação","Validação com os trabalhadores e a organização","Conclusão"]},
+ parecer:{rot:"Parecer técnico ergonômico",secoes:["Objeto do parecer","Fundamentação","Análise","Conclusão e recomendações"]},
+ quant:{rot:"Relatório de avaliação quantitativa",secoes:["Objetivo","Metodologia, instrumentos e calibração","Resultados","Análise dos resultados","Conclusão e recomendações"]},
+ ata:{rot:"Ata de validação com os trabalhadores",secoes:["Participantes e data","Resultados apresentados","Contribuições dos trabalhadores","Encaminhamentos"]},
+ ciencia:{rot:"Termo de recomendação e ciência da liderança",secoes:["Situação identificada","Recomendações","Prazos e responsáveis"]},
+ livre:{rot:"Documento livre",secoes:["Texto"]}
+};
+const PAPEL_ASSIN=["Elaborador / avaliador","Responsável técnico","Revisor","Aprovador","Representante da empresa","Representante dos trabalhadores","Testemunha"];
+G.dc=null;
+function novoDoc(tipo){
+  const T=TIPOS_DOC[tipo],a=autorAtual()||{};
+  return {id:rid(),tipo:"doc",d:{dtipo:tipo,titulo:T.rot,status:"rascunho",versao:1,hist:[],data:hojeISO(),empresa:"",cnpj:"",estab:"",postoId:"",aetId:"",medIds:[],
+    secoes:T.secoes.map(t=>({t,txt:""})),assin:[{nome:a.nome||"",funcao:"",registro:"",tipo:"Elaborador / avaliador",sig:null}]}};
+}
+const docLock=d=>d&&(d.status==="aprovada"||soLeitura());
+const docAssinado=d=>(d.assin||[]).some(a=>a.sig);
+function docConteudoHash(d){
+  const c=JSON.parse(JSON.stringify(d));
+  c.assin=(d.assin||[]).map(a=>({nome:a.nome,funcao:a.funcao,registro:a.registro,tipo:a.tipo}));
+  c.medHashes=(d.medIds||[]).map(id=>{const r=regGet(id);return r?hashDoc(r.d):"ausente"});
+  return hashDoc(c);
+}
+const sigOk=(d,a)=>a.sig&&a.sig.hash===docConteudoHash(d);
+function docBloqueios(d){
+  const b=[];
+  if(!(d.titulo||"").trim())b.push("informe o título");
+  if(!(d.empresa||"").trim())b.push("informe a empresa");
+  if(!(d.secoes||[]).some(s=>(s.txt||"").trim()))b.push("preencha ao menos uma seção");
+  if(!(d.assin||[]).length)b.push("inclua ao menos um signatário");
+  (d.assin||[]).forEach(a=>{if(!(a.nome||"").trim())b.push("signatário sem nome");else if(!a.sig)b.push(a.nome+" ainda não assinou");else if(!sigOk(d,a))b.push("a assinatura de "+a.nome+" não confere com o conteúdo atual")});
+  (d.medIds||[]).forEach(id=>{const r=regGet(id);if(r&&r.d.status!=="aprovada")b.push("a medição "+(r.d.numero||"")+" ainda não está aprovada")});
+  return [...new Set(b)];
+}
+function htmlDocImpressao(d){
+  const T=TIPOS_DOC[d.dtipo]||TIPOS_DOC.livre,loc=d.postoId?caminho(d.postoId):"";
+  const meds=(d.medIds||[]).map(id=>regGet(id)).filter(Boolean);
+  const secs=(d.secoes||[]).filter(s=>(s.txt||"").trim()||/Resultados das avaliações quantitativas|Resultados/.test(s.t)&&meds.length);
+  const sigs=(d.assin||[]).map(a=>`<div class="sig">${a.sig?`<img src="${a.sig.img}" alt="assinatura">`:`<div class="sigv"></div>`}<div class="linhasig"></div><b>${esc(a.nome)}</b><br>${esc(a.tipo||"")}${a.funcao?" · "+esc(a.funcao):""}${a.registro?"<br>"+esc(a.registro):""}${a.sig?`<br><small>Assinado eletronicamente em ${esc(a.sig.emHora.replace("T"," ").slice(0,16))} (UTC)${sigOk(d,a)?"":" · CONTEÚDO ALTERADO APÓS A ASSINATURA"}<br>SHA-256 ${esc(a.sig.hash.slice(0,20))}…</small>`:"<br><small>Pendente</small>"}</div>`).join("");
+  return `<html><head><meta charset="utf-8"><title>${esc(d.titulo)}</title><style>@page{size:A4;margin:18mm}body{font-family:Arial,sans-serif;color:#000;font-size:12px;line-height:1.45}h1{font-size:19px;margin:0 0 4px;color:#000}h2{font-size:14px;margin:16px 0 4px;border-bottom:2px solid #FF9900;padding-bottom:2px}.cab{border-bottom:3px solid #FF9900;margin-bottom:10px}.meta{font-size:11px;color:#333}table{border-collapse:collapse;width:100%;margin:6px 0}th,td{border:1px solid #999;padding:3px 5px;font-size:11px;text-align:left}.bd{border:1px solid #333;padding:1px 6px;border-radius:6px;font-weight:700}p{margin:4px 0;white-space:pre-wrap}.sigs{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:26px}.sig{page-break-inside:avoid;text-align:center;font-size:11px}.sig img{max-width:100%;height:70px;object-fit:contain}.sigv{height:70px}.linhasig{border-top:1px solid #000;margin:2px 10% 4px}.rod{margin-top:22px;font-size:10px;color:#333;border-top:1px solid #999;padding-top:6px;word-break:break-all}</style></head><body>
+  <div class="cab"><h1>${esc(d.titulo)}</h1><div class="meta">${esc(T.rot)}${d.numero?" · "+esc(d.numero):""} · versão ${d.versao||1} · ${dataBR(d.data)}<br>${esc(d.empresa||"")}${d.cnpj?" · CNPJ "+esc(d.cnpj):""}${d.estab?" · "+esc(d.estab):""}${loc?"<br>Local: "+esc(loc):""}</div></div>
+  ${secs.map((s,i)=>`<h2>${i+1}. ${esc(s.t)}</h2>${(s.txt||"").trim()?`<p>${esc(s.txt)}</p>`:""}${/Resultados/.test(s.t)&&meds.length?meds.map(m=>medResumoHTML(m.d)).join("<hr>"):""}`).join("")}
+  ${meds.length&&!secs.some(s=>/Resultados/.test(s.t))?`<h2>Medições quantitativas</h2>${meds.map(m=>medResumoHTML(m.d)).join("<hr>")}`:""}
+  <h2>Assinaturas</h2><div class="sigs">${sigs}</div>
+  <div class="rod">Selo de integridade (SHA-256 do conteúdo): ${esc(d.aprov?d.aprov.hash:docConteudoHash(d))}${d.aprov?"<br>Documento emitido por "+esc(d.aprov.por)+" em "+dataBR(d.aprov.em)+".":"<br>Documento em rascunho, ainda não emitido."}<br>As assinaturas deste documento são eletrônicas simples (assinatura desenhada e selo de integridade). Para validade com certificado digital ICP-Brasil ou assinatura gov.br, assine o arquivo PDF gerado.</div>
+  <script>window.onload=()=>window.print()<\/script></body></html>`;
+}
+// ---------- tela ----------
+function renderDocs(){
+  const el=$("#v-docs");if(!el)return;
+  if(G.dc){el.innerHTML=htmlDocEd();return}
+  const L=regOf("doc").sort((a,b)=>(b.atualizadoEm||0)-(a.atualizadoEm||0));
+  el.innerHTML=`<div class="card"><h2>Documentos oficiais</h2><p class="mut">Laudos, pareceres, relatórios, atas e termos, com signatários, registro profissional e assinatura eletrônica. Ao emitir, o conteúdo é bloqueado e recebe um selo de integridade.</p>
+  <div class="linha"><select id="docNovoTipo">${Object.keys(TIPOS_DOC).map(k=>`<option value="${k}">${esc(TIPOS_DOC[k].rot)}</option>`).join("")}</select><button class="btn" data-dc="novo">+ Novo documento</button></div></div>
+  <div class="card">${L.map(r=>{const d=r.d;return `<div class="sug"><span><b>${esc(d.numero||"(número após sincronizar)")}</b> · ${esc(d.titulo||"")}<br><small>${esc((TIPOS_DOC[d.dtipo]||TIPOS_DOC.livre).rot)} · ${dataBR(d.data)} · ${STATUS_REG[d.status]||d.status}${(d.assin||[]).length?" · "+(d.assin||[]).filter(a=>a.sig).length+"/"+d.assin.length+" assinaturas":""}</small></span><span class="linha"><button class="btn sec peq" data-dc="abrir" data-id="${r.id}">Abrir</button>${d.status==="aprovada"?"":`<button class="btn sec peq" data-dc="excluir" data-id="${r.id}">Excluir</button>`}</span></div>`}).join("")||`<p class="mut">Nenhum documento ainda.</p>`}</div>`;
+}
+function htmlDocEd(){
+  const {d}=G.dc,lock=docLock(d),ass=docAssinado(d),dis=(lock||ass)?"disabled":"";
+  const I=(p,rot,tp)=>`<label class="campo">${rot}<input data-dcf="${p}" ${tp?`type="${tp}"`:""} value="${esc(gget(d,p)||"")}" ${dis}></label>`;
+  const postos=cads("posto").map(r=>[r.id,caminho(r.id)]);
+  const aets=regOf("aet").map(r=>[r.id,(r.d.numero||"AET")+(r.d.postoId?" · "+caminho(r.d.postoId):"")]);
+  const meds=regOf("med");
+  const bl=docBloqueios(d),apv=quemAprova();
+  return `<div class="card"><div class="linha" style="justify-content:space-between"><h2 style="margin:0">${d.numero?esc(d.numero)+" · ":""}${esc((TIPOS_DOC[d.dtipo]||TIPOS_DOC.livre).rot)}</h2><button class="btn sec peq" data-dc="voltar">← Lista</button></div>
+  <p class="mut">Status: <b>${STATUS_REG[d.status]||d.status}</b> · v${d.versao||1}${ass&&!lock?" · conteúdo travado porque há assinatura":""}</p>
+  ${ass&&!lock?`<div class="alerta">Há assinaturas neste documento. Para editar o conteúdo, remova as assinaturas. <button class="btn sec peq" data-dc="limpar-assin">Remover assinaturas e editar</button></div>`:""}
+  <div class="grid2">${I("titulo","Título")}${I("data","Data do documento","date")}${I("empresa","Empresa *")}${I("cnpj","CNPJ")}${I("estab","Estabelecimento / unidade")}
+  <label class="campo">Posto relacionado<select data-dcf="postoId" ${dis}><option value=""></option>${sel1(postos,d.postoId||"")}</select></label></div>
+  ${lock||ass?"":`<div class="linha" style="margin:8px 0"><select id="docAet"><option value="">Importar de uma AET…</option>${sel1(aets,"")}</select><button class="btn sec peq" data-dc="imp-aet">Importar diagnóstico e recomendações</button></div>`}
+  <h3>Medições quantitativas incluídas</h3>${meds.length?meds.map(r=>`<label class="linha" style="gap:8px;font-size:.88rem"><input type="checkbox" data-dc-med="${r.id}" ${(d.medIds||[]).includes(r.id)?"checked":""} ${dis}> ${esc(r.d.numero||"(sem número)")} · ${esc((AG[r.d.agente]||AG.outro).rot)} · ${dataBR(r.d.data)} · ${STATUS_REG[r.d.status]||r.d.status}</label>`).join(""):`<p class="mut">Nenhuma medição registrada. Cadastre em Medições.</p>`}
+  <h3>Conteúdo</h3>${(d.secoes||[]).map((s,i)=>`<div class="metodo"><label class="campo">Título da seção<input data-dcf="secoes.${i}.t" value="${esc(s.t)}" ${dis}></label><label class="campo">Texto<textarea data-dcf="secoes.${i}.txt" rows="4" ${dis}>${esc(s.txt||"")}</textarea></label>${dis?"":`<button type="button" class="btn sec peq" data-dc="sec-" data-i="${i}">Remover seção</button>`}</div>`).join("")}
+  ${dis?"":`<button type="button" class="btn sec peq" data-dc="sec+">+ Adicionar seção</button>`}
+  <h3>Signatários e assinaturas</h3>${(d.assin||[]).map((a,i)=>`<div class="metodo"><div class="grid2"><label class="campo">Nome<input data-dcf="assin.${i}.nome" value="${esc(a.nome||"")}" ${a.sig||lock?"disabled":""}></label><label class="campo">Papel<select data-dcf="assin.${i}.tipo" ${a.sig||lock?"disabled":""}>${sel1(PAPEL_ASSIN,a.tipo||"")}</select></label><label class="campo">Função / cargo<input data-dcf="assin.${i}.funcao" value="${esc(a.funcao||"")}" ${a.sig||lock?"disabled":""}></label><label class="campo">Registro profissional (CREA, CRM, MTE...)<input data-dcf="assin.${i}.registro" value="${esc(a.registro||"")}" ${a.sig||lock?"disabled":""}></label></div>
+  ${a.sig?`<p style="margin:6px 0"><img src="${a.sig.img}" alt="assinatura" style="max-height:60px;background:#fff;border:1px solid var(--bd)"><br><small>Assinado em ${esc(a.sig.emHora.replace("T"," ").slice(0,16))} (UTC)</small> ${sigOk(d,a)?`<span class="bd n0">íntegra</span>`:`<span class="bd n3">conteúdo alterado</span>`}</p>`:(lock?"":`<button type="button" class="btn sec peq" data-dc="assinar" data-i="${i}">Assinar</button>`)}
+  ${a.sig||lock||d.assin.length<2?"":`<button type="button" class="btn sec peq" data-dc="assin-" data-i="${i}">Remover signatário</button>`}</div>`).join("")}
+  ${lock||ass?"":`<button type="button" class="btn sec peq" data-dc="assin+">+ Adicionar signatário</button>`}
+  ${bl.length&&!lock?`<div class="alerta" style="margin-top:10px">Para emitir: ${bl.map(esc).join("; ")}.</div>`:""}
+  ${d.aprov?`<p class="mut">Emitido por <b>${esc(d.aprov.por)}</b> em ${dataBR(d.aprov.em)} · SHA-256 ${esc((d.aprov.hash||"").slice(0,20))}…</p>`:""}
+  <div class="linha" style="margin-top:10px">${lock?"":`<button class="btn" data-dc="salvar">Salvar</button><button class="btn verde" data-dc="emitir" ${apv?"":"disabled"} title="${apv?"":"Somente administrador ou aprovador"}">Emitir e bloquear</button>`}${d.status==="aprovada"?`<button class="btn sec" data-dc="reabrir" ${quemEdita()?"":"disabled"}>Reabrir (administrador)</button>`:""}<button class="btn sec" data-dc="imprimir">Visualizar / imprimir PDF</button></div></div>`;
+}
+function salvarDoc(){const r=regGet(G.dc.id)||{id:G.dc.id,tipo:"doc",d:{}};r.d=JSON.parse(JSON.stringify(G.dc.d));regGravar(r)}
+// painel de assinatura (canvas)
+function abrirAssinatura(i){
+  const d=G.dc.d,a=d.assin[i];if(!(a.nome||"").trim()){aviso("Informe o nome do signatário antes de assinar.");return}
+  let m=$("#sigModal");if(m)m.remove();m=document.createElement("div");m.id="sigModal";
+  m.innerHTML=`<div class="modal-fundo" data-sig="cancelar"></div><div class="modal-caixa" role="dialog" aria-modal="true"><button type="button" class="modal-x" data-sig="cancelar" aria-label="Fechar">×</button>
+  <h2>Assinatura de ${esc(a.nome)}</h2><p class="mut" style="font-size:.86rem">Assine com o dedo ou o mouse na área abaixo. A assinatura fica vinculada ao conteúdo atual do documento por um código SHA-256.</p>
+  <canvas id="sigCv" width="560" height="200" style="width:100%;max-width:560px;height:auto;background:#fff;border:2px dashed #999;border-radius:10px;touch-action:none"></canvas>
+  <label class="linha" style="gap:8px;margin:8px 0;font-size:.88rem"><input type="checkbox" id="sigDecl"> Li o documento e declaro que esta é a minha assinatura.</label>
+  <div class="linha"><button type="button" class="btn sec" data-sig="limpar">Limpar</button><button type="button" class="btn verde" data-sig="ok" data-i="${i}">Assinar</button></div></div>`;
+  document.body.appendChild(m);
+  const cv=$("#sigCv"),cx=cv.getContext("2d");cx.lineWidth=2.4;cx.lineCap="round";cx.lineJoin="round";cx.strokeStyle="#000";
+  let des=false,tem=false;
+  const pos=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]};
+  cv.addEventListener("pointerdown",e=>{des=true;tem=true;cv.setPointerCapture(e.pointerId);const [x,y]=pos(e);cx.beginPath();cx.moveTo(x,y);cx.lineTo(x+.1,y+.1);cx.stroke()});
+  cv.addEventListener("pointermove",e=>{if(!des)return;const [x,y]=pos(e);cx.lineTo(x,y);cx.stroke()});
+  const fim=()=>{des=false};cv.addEventListener("pointerup",fim);cv.addEventListener("pointercancel",fim);
+  m._tem=()=>tem;m._limpar=()=>{cx.clearRect(0,0,cv.width,cv.height);tem=false};
+}
+document.addEventListener("click",e=>{
+  const s=e.target.closest("[data-sig]");if(!s)return;const m=$("#sigModal");if(!m)return;
+  if(s.dataset.sig==="cancelar"){m.remove();return}
+  if(s.dataset.sig==="limpar"){m._limpar();return}
+  if(s.dataset.sig==="ok"){
+    if(!m._tem()){aviso("Faça a assinatura na área indicada.");return}
+    if(!$("#sigDecl").checked){aviso("Marque a declaração para assinar.");return}
+    const i=Number(s.dataset.i),d=G.dc.d,a=autorAtual()||{};
+    d.assin[i].sig={img:$("#sigCv").toDataURL("image/png"),emHora:new Date().toISOString(),hash:docConteudoHash(d),por:a.nome||"",metodo:"assinatura eletrônica simples"};
+    (d.hist=d.hist||[]).push({em:hojeISO(),acao:"Assinado",por:d.assin[i].nome,motivo:""});
+    m.remove();salvarDoc();renderDocs();aviso("Assinatura registrada.");
+  }
+});
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-dc]");if(!b)return;const k=b.dataset.dc;
+  if(k==="novo"){const n=novoDoc($("#docNovoTipo").value);G.dc={id:n.id,d:n.d};renderDocs();return}
+  if(k==="abrir"){const r=regGet(b.dataset.id);if(r){G.dc={id:r.id,d:JSON.parse(JSON.stringify(r.d))};renderDocs()}return}
+  if(k==="excluir"){if(confirm("Excluir este documento?")){regExcluir(b.dataset.id);renderDocs()}return}
+  if(!G.dc)return;const d=G.dc.d;
+  if(k==="voltar"){if(!docLock(d))salvarDoc();G.dc=null;renderDocs();return}
+  if(k==="sec+"){d.secoes.push({t:"Nova seção",txt:""});renderDocs();return}
+  if(k==="sec-"){d.secoes.splice(Number(b.dataset.i),1);renderDocs();return}
+  if(k==="assin+"){d.assin.push({nome:"",funcao:"",registro:"",tipo:"Responsável técnico",sig:null});renderDocs();return}
+  if(k==="assin-"){d.assin.splice(Number(b.dataset.i),1);renderDocs();return}
+  if(k==="assinar"){salvarDoc();abrirAssinatura(Number(b.dataset.i));return}
+  if(k==="limpar-assin"){if(confirm("Remover todas as assinaturas deste documento?")){d.assin.forEach(a=>{a.sig=null});(d.hist=d.hist||[]).push({em:hojeISO(),acao:"Assinaturas removidas",por:(autorAtual()||{}).nome||"",motivo:""});salvarDoc();renderDocs()}return}
+  if(k==="salvar"){salvarDoc();aviso("Documento salvo.");return}
+  if(k==="imprimir"){if(!docLock(d))salvarDoc();const w=window.open("");if(w){w.document.write(htmlDocImpressao(d));w.document.close()}return}
+  if(k==="imp-aet"){const id=$("#docAet").value;const r=id&&regGet(id);if(!r){aviso("Escolha uma AET.");return}
+    const sc=r.d.sec||{},pu=(t,txt)=>{const s=d.secoes.find(x=>x.t===t);if(s&&!(s.txt||"").trim())s.txt=txt||"";else if(!s&&txt)d.secoes.push({t,txt})};
+    pu("Diagnóstico ergonômico",sc.diagnostico);pu("Recomendações e plano de ação",sc.recomendacoes);
+    if(r.d.postoId&&!d.postoId)d.postoId=r.d.postoId;d.aetId=id;
+    const rs=r.d.resp||{};if(rs.nome&&!d.assin.some(a=>a.nome===rs.nome))d.assin.push({nome:rs.nome,funcao:"",registro:rs.qualificacao||"",tipo:"Responsável técnico",sig:null});
+    renderDocs();aviso("Dados da AET importados. Revise o texto.");return}
+  if(k==="emitir"){
+    if(!quemAprova()){aviso("Somente administrador ou aprovador emite.");return}
+    const bl=docBloqueios(d);if(bl.length){aviso("Antes de emitir: "+bl.join("; ")+".");return}
+    const a=autorAtual()||{};d.status="aprovada";(d.hist=d.hist||[]).push({em:hojeISO(),acao:"Emitido",por:a.nome||"",motivo:""});
+    d.aprov={por:a.nome||"",porId:a.id||"",papel:(perfil&&perfil.papel)||"",em:hojeISO(),emHora:new Date().toISOString(),obs:"",algoritmo:"SHA-256",hash:docConteudoHash(d)};
+    salvarDoc();renderDocs();aviso("Documento emitido e bloqueado.");return}
+  if(k==="reabrir"){
+    if(!quemEdita()){aviso("Somente o administrador reabre.");return}
+    if(!confirm("Reabrir remove as assinaturas e cria uma nova versão. Continuar?"))return;
+    const a=autorAtual()||{};d.assin.forEach(x=>{x.sig=null});d.status="rascunho";d.versao=(d.versao||1)+1;(d.hist=d.hist||[]).push({em:hojeISO(),acao:"Reaberto",por:a.nome||"",motivo:""});delete d.aprov;salvarDoc();renderDocs();return}
+});
+document.addEventListener("input",e=>{const t=e.target;if(!t.dataset||t.dataset.dcf===undefined||!G.dc||t.tagName==="SELECT")return;gset(G.dc.d,t.dataset.dcf,t.value)});
+document.addEventListener("change",e=>{
+  const t=e.target;if(!G.dc)return;
+  if(t.dataset&&t.dataset.dcMed){const s=new Set(G.dc.d.medIds||[]);t.checked?s.add(t.dataset.dcMed):s.delete(t.dataset.dcMed);G.dc.d.medIds=[...s];return}
+  if(t.dataset&&t.dataset.dcf!==undefined&&t.tagName==="SELECT")gset(G.dc.d,t.dataset.dcf,t.value);
+});
+const _irPara20=irPara;
+irPara=function(v){_irPara20(v);if(v==="docs")renderDocs()};
 /* =====================================================================
    INÍCIO
    ===================================================================== */
