@@ -6755,6 +6755,127 @@ document.addEventListener("click",e=>{
 #cMenu button{display:block;width:100%;text-align:left;background:none;border:0;padding:9px 10px;border-radius:8px;cursor:pointer}#cMenu button:hover{background:#f3f3f3}.cm-t{padding:6px 10px;font-size:.78rem;color:#FF9900;font-weight:700;text-transform:uppercase}
 @media(max-width:600px){.tiles{grid-template-columns:1fr 1fr}.tile{flex-direction:column;align-items:flex-start;padding:14px}.tile-tri{grid-column:1/-1;flex-direction:row;align-items:center}.tile-tx small{display:none}.tile-tri .tile-tx small{display:block}}`;document.head.appendChild(s)})();
 pintarPerfil();
+/* FASE 20: Participação do trabalhador padronizada (roteiro estruturado, mapa de desconforto, formulário imprimível e consolidado) */
+const PT_REG=[["pescoco","Pescoço"],["ombros","Ombros"],["dorsal","Parte superior das costas"],["cotovelos","Cotovelos"],["punhos","Punhos e mãos"],["lombar","Parte inferior das costas"],["quadris","Quadris e coxas"],["joelhos","Joelhos"],["pes","Tornozelos e pés"]];
+const PT_ESC=["Nunca","Às vezes","Frequentemente","Sempre"],PT_SPN=["Sim","Parcialmente","Não"];
+const PT_Q=[
+ ["real","A tarefa realizada é igual à prescrita (procedimento)?","spn"],
+ ["ritmo","O ritmo é imposto por máquina, meta ou pressa?","esc"],
+ ["pausas","As pausas são suficientes para recuperar?","spn"],
+ ["autonomia","Você pode ajustar posto, ritmo ou método de trabalho?","spn"],
+ ["equip","Equipamentos, ferramentas e mobiliário são adequados?","spn"],
+ ["treino","O treinamento recebido foi suficiente para esta tarefa?","spn"],
+ ["apoio","Há apoio da liderança e dos colegas quando surge dificuldade?","spn"],
+ ["risco","Já se sentiu em risco ou quase se machucou nesta tarefa?","spn"]
+];
+const PT_T=[["dificil","O que é mais difícil ou desconfortável nesta tarefa?"],["pior","Quando a tarefa fica pior (pico, turno, falha de equipamento, pressa)?"],["sugestao","O que você mudaria para melhorar?"]];
+function partNovo(){return {cod:"",funcao:"",turno:"",tempo:"",consent:false,q:{},t:{},dor:{}}}
+function partOpc(v,L,ph){return `<option value="">${ph||"—"}</option>`+L.map(x=>`<option ${v===x?"selected":""}>${x}</option>`).join("")}
+function partResumo(d){
+  const P=(d.partic||[]).filter(x=>x),n=P.length;
+  const reg=PT_REG.map(([k,r])=>{const c=f=>P.filter(x=>((x.dor||{})[k]||{})[f]).length;return {k,r,m12:c("m12"),d7:c("d7"),imp:c("imp")}});
+  const dist=PT_Q.map(([k,r,t])=>{const L=t==="esc"?PT_ESC:PT_SPN;return {k,r,c:L.map(o=>({o,n:P.filter(x=>(x.q||{})[k]===o).length}))}});
+  const txt=k=>P.map(x=>((x.t||{})[k]||"").trim()).filter(Boolean);
+  return {n,reg,dist,txt,semConf:P.filter(x=>!x.conf).length};
+}
+const PT_FILES={};
+function ptUid(){return "pt"+Date.now().toString(36)+Math.random().toString(36).slice(2,5)}
+function ptResumoLinha(x){
+  const dor=PT_REG.filter(([k])=>((x.dor||{})[k]||{}).m12).map(([k,r])=>r+(((x.dor[k]||{}).d7)?" (7 dias)":""));
+  const resp=PT_Q.filter(([k])=>(x.q||{})[k]).map(([k,r])=>`${r.replace(/\?$/,"")}: <b>${esc(x.q[k])}</b>`);
+  return `<p style="margin:4px 0"><b>Desconforto (12 meses):</b> ${dor.length?esc(dor.join(", ")):"nenhum marcado"}</p>${resp.length?`<p style="margin:4px 0;font-size:.86rem">${resp.join("<br>")}</p>`:""}${PT_T.map(([k,r])=>(x.t||{})[k]?`<p style="margin:4px 0;font-size:.86rem"><b>${r}</b><br>${esc(x.t[k])}</p>`:"").join("")}`;
+}
+function htmlPartic(dis){
+  const d=G.ed.d,P=d.partic||[],R=partResumo(d);
+  const itens=P.map((x,i)=>{
+    const ia=x.ia||{},ev=(d.evid||[])[x.evi];
+    return `<div class="metodo"><div class="linha" style="align-items:flex-start;gap:12px;flex-wrap:nowrap">${ev&&ev.mini?`<img src="${esc(ev.mini)}" alt="Formulário" style="width:64px;height:84px;object-fit:cover;border-radius:6px;border:1px solid #ddd">`:""}<div style="flex:1;min-width:0">
+     <b>${esc(x.cod||"T"+(i+1))}</b> · ${esc(x.funcao||"função não informada")}${x.turno?" · turno "+esc(x.turno):""}${x.tempo?" · "+esc(x.tempo):""}<br>
+     ${ia.erro?`<span class="bd n3">Leitura pela IA falhou</span> <small>${esc(ia.erro)}</small>`:`<span class="bd ${ia.leg==="boa"?"nd":"n2"}">Lido pela IA · legibilidade ${esc(ia.leg||"?")}</span>`}${x.consent?"":` <span class="bd n2">consentimento não marcado</span>`}${x.conf?` <span class="bd n0">conferido</span>`:` <span class="bd n2">não conferido</span>`}</div></div>
+     ${ia.erro?"":ptResumoLinha(x)}
+     ${(ia.nl||[]).length?`<div class="alerta">Não deu para ler: ${esc(ia.nl.join(", "))}. Confira no papel.</div>`:""}${ia.obs?`<small class="mut">${esc(ia.obs)}</small>`:""}
+     ${dis?"":`<label class="chk"><input type="checkbox" data-g="partic.${i}.conf" data-re="1" ${x.conf?"checked":""}> Conferi a leitura da IA com o formulário em papel</label>
+     <div class="linha no-print">${ia.erro&&PT_FILES[x.uid]?`<button type="button" class="btn sec peq" data-pt="reler" data-i="${i}">Tentar ler de novo</button>`:""}<button type="button" class="btn sec peq" data-pt="del" data-i="${i}">Remover</button></div>
+     <details class="sub"><summary>Corrigir leitura (se a IA errou)</summary>
+      <div class="grid3"><label class="campo">Código<input data-g="partic.${i}.cod" value="${esc(x.cod||"")}"></label><label class="campo">Função / GSTS<input data-g="partic.${i}.funcao" value="${esc(x.funcao||"")}"></label><label class="campo">Turno<input data-g="partic.${i}.turno" value="${esc(x.turno||"")}"></label></div>
+      <label class="chk"><input type="checkbox" data-g="partic.${i}.consent" ${x.consent?"checked":""}> Participação voluntária marcada</label>
+      <div class="ptmapa"><div class="ptl"><b>Região</b><b>12 meses</b><b>7 dias</b><b>Limitou</b></div>${PT_REG.map(([k,r])=>{const o=(x.dor||{})[k]||{};const c=f=>`<input type="checkbox" data-g="partic.${i}.dor.${k}.${f}" ${o[f]?"checked":""} aria-label="${r} ${f}">`;return `<div class="ptl"><span>${r}</span>${c("m12")}${c("d7")}${c("imp")}</div>`}).join("")}</div>
+      ${PT_Q.map(([k,r,t])=>`<label class="campo">${r}<select data-g="partic.${i}.q.${k}">${partOpc((x.q||{})[k],t==="esc"?PT_ESC:PT_SPN)}</select></label>`).join("")}
+      ${PT_T.map(([k,r])=>`<label class="campo">${r}<textarea data-g="partic.${i}.t.${k}" rows="2">${esc((x.t||{})[k]||"")}</textarea></label>`).join("")}</details>`}</div>`}).join("");
+  const tab=R.n?`<h4>Consolidado (${R.n} formulário${R.n>1?"s":""})</h4>${R.semConf?`<div class="alerta">${R.semConf} formulário(s) ainda não conferido(s) com o papel. A leitura da IA pode errar marcações.</div>`:""}<div style="overflow-x:auto"><table class="tab"><tr><th>Região</th><th>12 meses</th><th>7 dias</th><th>Limitou</th></tr>${R.reg.filter(x=>x.m12||x.d7||x.imp).map(x=>`<tr><td>${x.r}</td><td>${x.m12}/${R.n}</td><td>${x.d7}/${R.n}</td><td>${x.imp}/${R.n}</td></tr>`).join("")||`<tr><td colspan="4">Nenhum desconforto relatado.</td></tr>`}</table></div>
+   <div style="overflow-x:auto"><table class="tab"><tr><th>Pergunta</th>${PT_ESC.concat(PT_SPN).filter((v,i,a)=>a.indexOf(v)===i).map(o=>`<th>${o}</th>`).join("")}</tr>${R.dist.map(q=>{const all=PT_ESC.concat(PT_SPN).filter((v,i,a)=>a.indexOf(v)===i);return `<tr><td>${esc(q.r)}</td>${all.map(o=>{const c=q.c.find(y=>y.o===o);return `<td>${c?c.n:"·"}</td>`}).join("")}</tr>`}).join("")}</table></div>
+   <small class="mut">Amostra pequena não representa toda a equipe. Leia como indício, junto com a observação e as medições.</small>`:"";
+  return `<div class="alerta" style="background:#FFF8EC;border-color:#FF9900"><b>Como funciona:</b> 1) imprima o formulário e converse com os executantes no posto, sem anotar nome; 2) fotografe ou escaneie cada formulário preenchido (página inteira, reta, com boa luz); 3) anexe aqui. A IA lê as marcações e preenche; você confere com o papel e confirma.</div>
+  <div class="linha no-print" style="margin:8px 0"><button type="button" class="btn sec" data-pt="imprimir">Imprimir formulário</button>${dis?"":`<label class="btn" style="cursor:pointer">📎 Anexar formulário preenchido<input type="file" id="ptIn" accept="image/*" capture="environment" hidden multiple></label><button type="button" class="btn sec" data-pt="resumir">Gerar texto consolidado</button>`}</div>
+  <small class="mut">A foto é enviada ao serviço de IA só para leitura e fica guardada em Evidências como anexo da AEP. Use somente formulários sem nome. Aceita foto ou scan em imagem (JPG ou PNG), não PDF.</small>
+  <div id="ptEst" class="mut" style="margin:6px 0"></div>
+  ${itens}${tab}`;
+}
+async function ptLer(file,uid){
+  let c=await comprimirImagem(file,1600,.7),url=c.url;
+  if(url.length>1000000){c=await comprimirImagem(file,1200,.6);url=c.url}
+  return await chamarIA("/api/ergo/formulario",{imagem:url});
+}
+function ptAplicar(x,j){
+  x.cod=j.cod||x.cod;x.funcao=j.funcao;x.turno=j.turno;x.tempo=j.tempo;x.consent=j.consent===true;
+  x.dor={};Object.keys(j.dor||{}).forEach(k=>{const o=j.dor[k],r={};["m12","d7","imp"].forEach(f=>{if(o[f]===true)r[f]=true});x.dor[k]=r});
+  x.q={};Object.keys(j.q||{}).forEach(k=>{if(j.q[k])x.q[k]=j.q[k]});x.t=j.t||{};
+  x.ia={em:Date.now(),leg:j.legibilidade,nl:j.naoLegiveis||[],obs:j.observacoes||""};x.conf=false;
+}
+document.addEventListener("change",async e=>{
+  const t=e.target;if(t.id!=="ptIn"||!G.ed)return;
+  const files=[...t.files];t.value="";const d=G.ed.d,id=G.ed.id;
+  for(const f of files){
+    const st=$("#ptEst");
+    try{
+      if(!/^image\//.test(f.type))throw new Error("Use foto ou scan em imagem (JPG/PNG).");
+      if(st)st.textContent="Anexando "+f.name+"…";
+      const ev=await anexarEvidencia(f,id);ev.legenda="Formulário de participação do trabalhador";ev.fase="participacao";(d.evid=d.evid||[]).push(ev);
+      const x=partNovo();x.uid=ptUid();x.evi=d.evid.length-1;x.cod="T"+((d.partic||[]).length+1);PT_FILES[x.uid]=f;(d.partic=d.partic||[]).push(x);gravarEd();
+      if(st)st.textContent="A IA está lendo o formulário…";
+      try{const j=await ptLer(f,x.uid);ptAplicar(x,j)}catch(err){x.ia={erro:(err.message&&err.message!=="falha"?err.message:"Não foi possível ler agora. Verifique a internet.")}}
+      gravarEd();reRender();
+    }catch(err){aviso(err.message);if(st)st.textContent=""}
+  }
+});
+const _htmlRegEd35=htmlRegEd;
+htmlRegEd=function(){
+  const h=_htmlRegEd35();if(!G.ed||G.ed.tipo!=="aep")return h;
+  const dis=travado(G.ed.d)||G.ed.ver?"disabled":"";
+  return h.replace(/(<summary>4\. Participação do trabalhador<\/summary><div class="bloco-c">)(<p class="mut">[^<]*<\/p>)/,(m,a,b)=>a+b+htmlPartic(dis)+`<details class="sub" style="margin-top:10px"><summary>Registro livre e consolidado (texto)</summary>`)
+   .replace(/(Consulta coletiva por equipe[\s\S]*?<\/textarea><\/label>)(<\/div><\/details>)/,(m,a,b)=>a+"</details>"+b);
+};
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-pt]");if(!b||!G.ed)return;const d=G.ed.d,k=b.dataset.pt;
+  if(k==="del"){if(!confirm("Remover esta leitura? O anexo continua em Evidências."))return;d.partic.splice(Number(b.dataset.i),1);gravarEd();reRender()}
+  else if(k==="reler"){const x=d.partic[Number(b.dataset.i)],f=x&&PT_FILES[x.uid];if(!f)return aviso("Anexe o formulário de novo.");aviso("Lendo…");ptLer(f,x.uid).then(j=>{ptAplicar(x,j);gravarEd();reRender()}).catch(err=>{aviso(err.message)})}
+  else if(k==="resumir"){
+    const R=partResumo(d);if(!R.n)return aviso("Registre ao menos uma entrevista.");d.part=d.part||{};
+    d.part.regioes=R.reg.filter(x=>x.m12||x.d7).map(x=>`${x.r}: ${x.m12}/${R.n} em 12 meses, ${x.d7}/${R.n} em 7 dias, ${x.imp}/${R.n} limitaram atividades`).join("\n");
+    d.part.dificuldades=R.txt("dificil").map(x=>"• "+x).join("\n");d.part.sugestoes=R.txt("sugestao").map(x=>"• "+x).join("\n");d.part.momento=R.txt("pior").map(x=>"• "+x).join("\n");
+    gravarEd();reRender();aviso("Texto consolidado gerado. Revise e ajuste.")}
+  else if(k==="imprimir"){
+    const w=window.open("");if(!w)return aviso("Libere pop-ups para imprimir.");
+    const lh=G.ed.d.postoId?caminho(G.ed.d.postoId):"";
+    const bx='<span class="bx"></span>',spn=PT_SPN.map(o=>bx+" "+o).join("&nbsp;&nbsp;&nbsp;"),esc4=PT_ESC.map(o=>bx+" "+o).join("&nbsp;&nbsp;&nbsp;");
+    w.document.write(`<html><head><meta charset="utf-8"><title>Formulário de participação do trabalhador</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:18px;color:#111}h1{font-size:17px;color:#FF9900;margin:0}h2{font-size:13px;margin:12px 0 4px;border-bottom:2px solid #FF9900}table{border-collapse:collapse;width:100%}td,th{border:1px solid #888;padding:4px;text-align:left}.ln{display:inline-block;border-bottom:1px solid #555;min-width:160px}.q{margin:5px 0}.t{height:56px;border:1px solid #888;margin:2px 0 6px}.bx{display:inline-block;width:15px;height:15px;border:2px solid #111;vertical-align:middle;margin-right:2px}td{height:26px}small{color:#555}</style></head><body>
+    <h1>ErgoContexto · Participação do trabalhador</h1><small><b>Formulário ERGO-PART-1</b>. Marque com um X forte (caneta preta ou azul) dentro da caixa. Escreva em letra de forma. Um formulário por trabalhador.</small><br><small>Conversa no posto sobre a situação de trabalho. Não avalia desempenho nem capacidade individual. Não escreva o nome do trabalhador.</small>
+    <h2>Identificação</h2><p>Posto/atividade: <b>${esc(lh)}</b> &nbsp; Data: <span class="ln"></span> &nbsp; Entrevistador: <span class="ln"></span></p><p>Código (T__): <span class="ln" style="min-width:60px"></span> Função/GSTS: <span class="ln"></span> Turno: <span class="ln" style="min-width:80px"></span> Tempo na função: <span class="ln" style="min-width:80px"></span></p>
+    <p>${bx} Participação voluntária e informada. Os dados não serão usados para avaliar desempenho individual.</p>
+    <h2>Mapa de desconforto (adaptado do Questionário Nórdico)</h2><table><tr><th>Região</th><th>Teve dor/desconforto nos últimos 12 meses</th><th>Nos últimos 7 dias</th><th>Limitou atividades</th></tr>${PT_REG.map(([k,r])=>`<tr><td>${r}</td><td>${bx} Sim &nbsp; ${bx} Não</td><td>${bx} Sim &nbsp; ${bx} Não</td><td>${bx} Sim &nbsp; ${bx} Não</td></tr>`).join("")}</table>
+    <h2>Perguntas</h2>${PT_Q.map(([k,r,t],i)=>`<div class="q">${i+1}. ${r}<br>${t==="esc"?esc4:spn}</div>`).join("")}
+    ${PT_T.map(([k,r],i)=>`<div class="q">${PT_Q.length+i+1}. ${r}<div class="t"></div></div>`).join("")}
+    <p><small>Depois de preencher: fotografe a página inteira (reta, com boa luz, sem sombra) e anexe na AEP, seção 4. A IA lê as marcações e você confere com este papel. Guarde o papel conforme a política de dados da empresa.</small></p><script>window.print()<\/script></body></html>`);w.document.close();
+  }
+});
+if(typeof ROTC!=="undefined")ROTC.partic="Entrevistas de participação do trabalhador";
+const _htmlRel35=htmlRelatorio;
+htmlRelatorio=function(){
+  const h=_htmlRel35();if(!G.ed||G.ed.tipo!=="aep"||!(G.ed.d.partic||[]).length)return h;
+  const R=partResumo(G.ed.d);
+  return h+`<h3>Participação do trabalhador (${R.n} entrevistado${R.n>1?"s":""})</h3><table class="tab"><tr><th>Região</th><th>12 meses</th><th>7 dias</th><th>Limitou</th></tr>${R.reg.filter(x=>x.m12||x.d7||x.imp).map(x=>`<tr><td>${x.r}</td><td>${x.m12}/${R.n}</td><td>${x.d7}/${R.n}</td><td>${x.imp}/${R.n}</td></tr>`).join("")||`<tr><td colspan="4">Nenhum desconforto relatado.</td></tr>`}</table>`;
+};
+(function(){const s=document.createElement("style");s.textContent=`.ptmapa{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden}.ptl{display:grid;grid-template-columns:1fr 70px 70px 70px;gap:4px;align-items:center;padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:.88rem}.ptl:first-child{background:#f9fafb}.ptl input{justify-self:center;width:20px;height:20px}.ptl b{text-align:center}.ptl b:first-child{text-align:left}@media(max-width:480px){.ptl{grid-template-columns:1fr 52px 52px 52px;padding:6px}}`;document.head.appendChild(s)})();
 /* =====================================================================
    INÍCIO
    ===================================================================== */
