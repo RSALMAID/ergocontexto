@@ -5361,7 +5361,7 @@ function renderAEP(){
   const chips=[["todas","Todas"],["rascunho","Rascunho"],["revisao","Em revisão"],["aprovada","Aprovadas"]].map(([k,t])=>`<button type="button" class="${f===k?"on":""}" data-aep="filtro" data-f="${k}">${t} <small>${k==="todas"?todas.length:todas.filter(a=>a.d.status===k).length}</small></button>`).join("");
   r.innerHTML=`<div class="card"><div class="linha" style="justify-content:space-between"><h2 style="margin:0">Avaliar: AEP</h2><button class="btn" data-aep="nova">+ Nova AEP</button></div>
   <p class="mut">Avaliação Ergonômica Preliminar: identifica e classifica os perigos ergonômicos com observação da atividade real, fatores de biomecânica, organização, cognição, ambiente e mobiliário, participação dos trabalhadores, evidências, métodos e encaminhamentos. A pontuação nunca esconde uma condição isolada grave.</p>
-  <div class="linha"><label class="campo" style="flex:1;min-width:200px;margin:0">Demanda de origem (opcional)<select id="aepDem"><option value="">(sem demanda)</option>${sel1(regOf("dem").filter(x=>!FECHADA(x.d.status)).map(x=>[x.id,(x.d.numero||"(pendente)")+" · "+(x.d.origem||"")]),G.aepDem||"")}</select></label><button class="btn sec" data-aep="tri">Triagem rápida de campo</button></div></div>
+  <div class="linha"><label class="campo" style="flex:1;min-width:200px;margin:0">Demanda de origem (opcional)<select id="aepDem"><option value="">(sem demanda)</option>${sel1(regOf("dem").filter(x=>!FECHADA(x.d.status)).map(x=>[x.id,(x.d.numero||"(pendente)")+" · "+(x.d.origem||"")]),G.aepDem||"")}</select></label></div></div>
   <div class="card"><div class="chips" style="margin-bottom:8px">${chips}</div><input id="aepBusca" placeholder="Buscar por número, posto ou avaliador" value="${esc(G.aepBusca||"")}" style="width:100%;margin-bottom:8px">
   ${L.map(a=>{const d=a.d,c=aepClasse(d),cor=c.nivel<0?"nd":"n"+c.nivel;return `<div class="sug"><span><b>${esc(d.numero||"(número após sincronizar)")}</b> · ${esc(d.postoId?caminho(d.postoId):"posto não vinculado")}<br><small>${dataBR(d.data)} · v${d.versao||1} · ${esc(STATUS_REG[d.status]||d.status)} · ${c.totResp}/${c.tot} fatores</small><br><span class="bd ${cor}">${c.nivel<0?"Dados insuficientes":NIV_F[c.nivel]}</span></span><span class="linha"><button class="btn sec peq" data-g-acao="abrir-reg" data-id="${a.id}">Abrir</button>${d.status==="aprovada"?"":`<button class="btn sec peq" data-aep="del" data-id="${a.id}">Excluir</button>`}</span></div>`}).join("")||`<p class="mut">Nenhuma AEP encontrada. Toque em "+ Nova AEP".</p>`}</div>`;
 }
@@ -5943,7 +5943,7 @@ html,body{max-width:100%;overflow-x:hidden}
 `;document.head.appendChild(s)})();
 
 // ---------- estrutura: menu, busca, perfil, novas telas ----------
-const NAV28=[["inicio","Início"],["demandas","Demandas"],["avaliar","AEP"],["aet","AET"],["acoes","Ações"],["alertas","Alertas"],["inventario","Inventário"],["painel","Painel"],["cadastros","Cadastros"],["docs","Documentos"],["sobre","Sobre o método"]];
+const NAV28=[["inicio","Início"],["demandas","Demandas"],["avaliar","AEP"],["aet","AET"],["acoes","Ações"],["alertas","Alertas"],["inventario","Inventário"],["painel","Painel"],["cadastros","Cadastros"],["docs","Documentos"]];
 const LEGADO_PAINEL={dash:"visao",relat:"relat",historico:"triagens",medicoes:"med"};
 (function montar(){
   const nav=$("#nav"),topo=$(".topo-in");if(!nav||!topo)return;
@@ -6084,7 +6084,7 @@ function listaAep(r){
   const ch=[["todas","Todas"],["andamento","Em andamento"],["rascunho","Rascunhos"],["revisao","Em revisão"],["aprovada","Aprovadas"],["gatilho","Com gatilho AET"],["arquivada","Arquivadas"]].map(([k,t])=>`<button type="button" class="${f===k?"on":""}" data-aep="filtro" data-f="${k}">${t} <small>${todas.filter(flt[k]).length}</small></button>`).join("");
   r.innerHTML=`<div class="card"><div class="linha" style="justify-content:space-between"><h2 style="margin:0">AEP – Avaliação Ergonômica Preliminar</h2><button class="btn" data-aep="nova">+ Nova AEP</button></div>
   <p class="mut">Identifica e classifica os perigos ergonômicos com observação da atividade real, fatores de biomecânica, organização, cognição, ambiente e mobiliário, participação dos trabalhadores, evidências, métodos e encaminhamentos. A pontuação nunca esconde uma condição grave isolada. A demanda de origem é opcional.</p>
-  <div class="linha"><label class="campo" style="flex:1;min-width:200px;margin:0">Demanda de origem (opcional)<select id="aepDem"><option value="">(sem demanda)</option>${sel1(regOf("dem").filter(x=>!FECHADA(x.d.status)).map(x=>[x.id,(x.d.numero||"(pendente)")+" · "+(x.d.origem||"")]),G.aepDem||"")}</select></label><button class="btn sec" data-aep="tri">Triagem rápida de campo</button></div></div>
+  <div class="linha"><label class="campo" style="flex:1;min-width:200px;margin:0">Demanda de origem (opcional)<select id="aepDem"><option value="">(sem demanda)</option>${sel1(regOf("dem").filter(x=>!FECHADA(x.d.status)).map(x=>[x.id,(x.d.numero||"(pendente)")+" · "+(x.d.origem||"")]),G.aepDem||"")}</select></label></div></div>
   <div class="card cardlist"><div class="chips" style="margin-bottom:8px">${ch}</div><input id="aepBusca" placeholder="Buscar por número, atividade, posto, área ou avaliador" value="${esc(G.aepBusca||"")}" style="width:100%;margin-bottom:8px">
   ${L.map(a=>{const d=a.d,c=aepClasse(d),cor=c.nivel<0?"nd":"n"+c.nivel,pr=progAep(d);return `<div class="sug"><span style="flex:1 1 280px;min-width:0"><b>${esc(d.numero||"(número após sincronizar)")}</b> · ${esc(ativTxt(d)||"atividade não informada")}<br><small>${esc(d.postoId?caminho(d.postoId):"posto não vinculado")} · ${esc(areaTxt(d)||"área não informada")}</small><br><small>${esc(d.avaliadores||"sem avaliador")} · v${d.versao||1} · ${quando(a.atualizadoEm)}</small><div class="pg"><i style="width:${pr}%"></i></div><small>${pr}% dos fatores avaliados</small></span>
   <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="bd ${cor}">${c.nivel<0?"Sem dados":NIV_F[c.nivel]}</span>${c.p>=0?`<span class="chp b">${NIV_PRI(c.p)}</span>`:""}<span class="chp b">${esc(STATUS_REG[d.status]||d.status)}</span>${c.gat.length?`<span class="chp o">Gatilho AET</span>`:""}${d.arquivada?`<span class="chp b">Arquivada</span>`:""}${menuReg(a.id,"aep")}</span></div>`}).join("")||`<p class="mut">Nenhuma AEP neste filtro.</p>`}</div>`;
@@ -6669,6 +6669,92 @@ function serieMes(rs,campo){const M=ultMeses(6);return {cats:M.map(m=>m.rot),v:M
 (function(){if(document.getElementById("css33"))return;const s=document.createElement("style");s.id="css33";s.textContent=`.grosca{display:flex;gap:16px;align-items:center;flex-wrap:wrap}.grosca svg{width:180px;flex:0 0 180px}.gleg-c{flex:1;min-width:150px}.gleg{display:flex;align-items:center;gap:8px;font-size:.86rem;padding:2px 0}.gleg i{width:12px;height:12px;border-radius:3px;flex:0 0 12px}.gleg b{margin-left:auto}.gleg-l{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px}.gtab{margin-top:6px;font-size:.84rem}.gm{cursor:default}.gm:hover rect,.gm:hover{opacity:.85}#gtip{position:fixed;z-index:9999;background:#111827;color:#fff;font-size:.8rem;padding:5px 9px;border-radius:6px;pointer-events:none;display:none;max-width:260px}`;document.head.appendChild(s);const t=document.createElement("div");t.id="gtip";document.body.appendChild(t)})();
 document.addEventListener("mousemove",e=>{const g=e.target.closest&&e.target.closest("[data-tip]"),t=document.getElementById("gtip");if(!t)return;if(g){t.textContent=g.dataset.tip;t.style.display="block";t.style.left=Math.min(e.clientX+12,innerWidth-270)+"px";t.style.top=(e.clientY+14)+"px"}else t.style.display="none"});
 document.addEventListener("click",e=>{const g=e.target.closest&&e.target.closest("[data-tip]"),t=document.getElementById("gtip");if(g&&t&&matchMedia("(hover:none)").matches){t.textContent=g.dataset.tip;t.style.display="block";t.style.left="12px";t.style.top=(e.clientY+14)+"px";setTimeout(()=>t.style.display="none",2500)}});
+/* FASE 19: Início moderno com blocos de acesso, Triagem rápida na tela inicial e menu de Configurações */
+const IC={
+ tri:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+ dem:'<path d="M4 4h16v12H8l-4 4z"/>',
+ aep:'<path d="M9 3h6l1 2h3v16H5V5h3zM9 12l2 2 4-4"/>',
+ aet:'<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M8 11h6M11 8v6"/>',
+ acoes:'<path d="M4 12l5 5L20 6"/>',
+ alertas:'<path d="M6 17V11a6 6 0 1 1 12 0v6l2 2H4zM10 21h4"/>',
+ inventario:'<path d="M4 7l8-4 8 4-8 4zM4 12l8 4 8-4M4 17l8 4 8-4"/>',
+ painel:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
+ cadastros:'<path d="M4 5h16v4H4zM4 11h16v4H4zM4 17h10v3H4z"/>',
+ docs:'<path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7"/>',
+ cfg:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>'
+};
+const svgIc=k=>`<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]||""}</svg>`;
+const TILES=[
+ ["tri","Triagem rápida","Avalie o risco em campo em poucos minutos","tri"],
+ ["demandas","Demandas","Solicitações e queixas aguardando atendimento","dem"],
+ ["avaliar","AEP","Avaliação ergonômica preliminar","aep"],
+ ["aet","AET","Análise ergonômica do trabalho","aet"],
+ ["acoes","Ações","Plano de ação e verificação de eficácia","acoes"],
+ ["alertas","Alertas","Pendências e prazos que pedem atenção","alertas"],
+ ["inventario","Inventário","Riscos importados e consolidados","inventario"],
+ ["painel","Painel","Indicadores, gráficos e relatórios","painel"],
+ ["cadastros","Cadastros","Plantas, áreas, postos e equipes","cadastros"],
+ ["docs","Documentos","Termos, assinaturas e registros","docs"]
+];
+const _renderInicio34=renderInicio;
+renderInicio=function(){
+  _renderInicio34();
+  const el=$("#v-inicio");if(!el)return;
+  const h=new Date().getHours(),sd=h<12?"Bom dia":h<18?"Boa tarde":"Boa noite",nome=((perfil&&perfil.nome)||"").split(" ")[0];
+  const dems=regOf("dem"),aeps=aepsVivas(),aets=aetsVivas(),acs=regOf("acao");
+  let nAl=0;try{nAl=calcAlertas().length}catch(e){}
+  const cont={demandas:dems.filter(r=>r.d.status==="aberta").length,avaliar:aeps.filter(r=>r.d.status!=="aprovada").length,aet:aets.filter(r=>r.d.status!=="aprovada").length,acoes:acs.filter(r=>diasAtraso(r.d)>0).length,alertas:nAl};
+  const tl=TILES.map(([v,t,s,ic])=>`<button type="button" class="tile ${v==="tri"?"tile-tri":""}" data-tile="${v}"><span class="tile-ic">${svgIc(ic)}</span><span class="tile-tx"><b>${t}</b><small>${s}</small></span>${cont[v]?`<em class="tile-n ${v==="acoes"||v==="alertas"?"r":""}">${cont[v]}</em>`:""}</button>`).join("");
+  const head=`<div class="card ini"><div class="linha" style="justify-content:space-between;flex-wrap:wrap"><div><h2>${sd}${nome?", "+esc(nome):""}</h2><p class="sub">O que você quer fazer agora?</p></div>
+  <div class="linha"><button class="btn" data-ini="nova-aep">+ Nova AEP</button><button class="btn sec" data-ini="nova-dem">+ Nova demanda</button><button class="btn sec" data-ini="nova-aet">+ Nova AET</button></div></div></div>
+  <div class="tiles">${tl}</div>
+  <p class="mut" style="margin:6px 4px 12px;font-size:.84rem">Fluxo: demanda (opcional), triagem (opcional), AEP, decisão sobre AET, AET, plano de ação, verificação de eficácia e reavaliação.</p>`;
+  const html=el.innerHTML,i=html.indexOf('<div class="card"><h3 style="margin-top:0">Continuar');
+  if(i>=0)el.innerHTML=head+html.slice(i);
+};
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-tile]");if(!b)return;
+  const v=b.dataset.tile;
+  if(v==="tri"){G.triagemOn=true;irPara("avaliar")}
+  else{if(v==="avaliar"){G.triagemOn=false;G.aepFiltro="todas"}irPara(v)}
+});
+// Triagem: o botão de voltar leva ao Início
+document.addEventListener("click",e=>{const b=e.target.closest('[data-aep="sair-tri"]');if(!b)return;e.stopImmediatePropagation();e.preventDefault();G.triagemOn=false;irPara("inicio")},true);
+const _renderAEP34=renderAEP;
+renderAEP=function(){_renderAEP34();const b=document.querySelector('#triBar [data-aep="sair-tri"]');if(b&&G.triagemOn)b.textContent="← Voltar ao Início"};
+// ---------- Configurações ----------
+const _pintarPerfil34=pintarPerfil;
+pintarPerfil=function(){
+  _pintarPerfil34();
+  const pf=$("#pf");if(!pf)return;
+  let c=$("#cfg");
+  if(!c){c=document.createElement("div");c.id="cfg";pf.parentNode.insertBefore(c,pf)}
+  c.innerHTML=`<button type="button" class="cfg-b" data-cfg="toggle" aria-haspopup="menu" aria-label="Configurações" title="Configurações">${svgIc("cfg")}</button><div id="cMenu" role="menu"><div class="cm-t">Configurações</div><button type="button" data-cfg="priv">Privacidade</button><button type="button" data-cfg="sobre">Sobre o método</button></div>`;
+};
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-cfg]"),m=$("#cMenu");
+  if(!b){if(m&&!e.target.closest("#cfg"))m.classList.remove("on");return}
+  const k=b.dataset.cfg;
+  if(k==="toggle")m.classList.toggle("on");
+  else{m.classList.remove("on");
+    if(k==="sobre")irPara("sobre");
+    else if(k==="priv"){irPara("conta");setTimeout(()=>{const x=document.querySelector("#v-conta [data-lgpd=exportar]");const cd=x&&x.closest(".card");if(cd)cd.scrollIntoView({behavior:"smooth",block:"start"})},80)}}
+});
+(function(){const s=document.createElement("style");s.textContent=`
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin:12px 0 4px}
+.tile{position:relative;display:flex;align-items:center;gap:14px;text-align:left;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:16px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:transform .15s,box-shadow .15s,border-color .15s;min-height:84px;font:inherit;color:#111827}
+.tile:hover,.tile:focus-visible{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.10);border-color:#FF9900;outline:none}
+.tile-ic{flex:0 0 auto;width:46px;height:46px;border-radius:12px;background:#FFF4E0;color:#FF9900;display:flex;align-items:center;justify-content:center}
+.tile-tx{display:flex;flex-direction:column;gap:2px;min-width:0}.tile-tx b{font-size:1rem}.tile-tx small{color:#6B7280;font-size:.8rem;line-height:1.25}
+.tile-n{position:absolute;top:10px;right:12px;background:#FF9900;color:#fff;font-style:normal;font-size:.74rem;font-weight:700;border-radius:999px;min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;padding:0 6px}.tile-n.r{background:#FF3300}
+.tile-tri{background:#FF9900;border-color:#FF9900;color:#fff;grid-column:1/-1;min-height:92px}
+.tile-tri .tile-ic{background:rgba(255,255,255,.22);color:#fff}.tile-tri .tile-tx small{color:#fff}.tile-tri .tile-tx b{font-size:1.15rem}
+.tile-tri:hover{background:#F08C00}
+#cfg{position:relative}.cfg-b{background:#fff;border:1px solid #ddd;border-radius:999px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#374151}.cfg-b:hover{border-color:#FF9900;color:#FF9900}.cfg-b svg{width:20px;height:20px}
+#cMenu{position:absolute;right:0;top:112%;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:200px;padding:6px;display:none;z-index:60}#cMenu.on{display:block}
+#cMenu button{display:block;width:100%;text-align:left;background:none;border:0;padding:9px 10px;border-radius:8px;cursor:pointer}#cMenu button:hover{background:#f3f3f3}.cm-t{padding:6px 10px;font-size:.78rem;color:#FF9900;font-weight:700;text-transform:uppercase}
+@media(max-width:600px){.tiles{grid-template-columns:1fr 1fr}.tile{flex-direction:column;align-items:flex-start;padding:14px}.tile-tri{grid-column:1/-1;flex-direction:row;align-items:center}.tile-tx small{display:none}.tile-tri .tile-tx small{display:block}}`;document.head.appendChild(s)})();
+pintarPerfil();
 /* =====================================================================
    INÍCIO
    ===================================================================== */
