@@ -355,6 +355,7 @@ details.sub>summary{cursor:pointer;font-weight:600;padding:6px 0}
       <button data-v="demandas">Demandas</button>
       <button data-v="acoes">Ações</button>
       <button data-v="alertas">Alertas</button>
+      <button data-v="inventario">Inventário</button>
       <button data-v="cadastros">Cadastros</button>
       <button data-v="historico">Histórico</button>
       <button data-v="painel">Painel</button>
@@ -373,6 +374,7 @@ details.sub>summary{cursor:pointer;font-weight:600;padding:6px 0}
   <section id="v-demandas" class="view"></section>
   <section id="v-acoes" class="view"></section>
   <section id="v-alertas" class="view"></section>
+  <section id="v-inventario" class="view"></section>
   <section id="v-cadastros" class="view"></section>
   <section id="v-historico" class="view"></section>
   <section id="v-painel" class="view"></section>
@@ -3087,6 +3089,251 @@ document.addEventListener("click",e=>{
 const _htmlClasse9=htmlClasse;
 htmlClasse=function(c,dis){
   return _htmlClasse9(c,dis).replace('<h4>Métodos aplicados (registro)</h4>','<h4>Métodos aplicados (registro)</h4>'+(dis?"":'<div class="linha" style="margin:6px 0"><button type="button" class="btn sec peq" data-mt-abrir="niosh">Calcular NIOSH</button><button type="button" class="btn sec peq" data-mt-abrir="rula">Calcular RULA</button></div>')).replace('Calculadoras de RULA, REBA, NIOSH, OCRA, Snook/Ciriello e ROSA chegam na próxima fase.','Calculadoras disponíveis: NIOSH e RULA. REBA, OCRA, Snook/Ciriello e ROSA ainda são registrados à mão.');
+};
+
+/* =====================================================================
+   FASE 4: INVENTÁRIO DE RISCOS (Excel/CSV), COBERTURA E EXPORTAÇÃO
+   - lê .xlsx (sem biblioteca externa) e .csv no próprio navegador
+   - mapeia as colunas da planilha da empresa para campos padrão
+   - cruza o inventário com postos/atividades e com as AEPs
+   - exporta CSV (PGR, Power BI) de AEPs, ações e demandas
+   ===================================================================== */
+const INV_CAMPOS=[["unidade","Unidade / planta"],["area","Área"],["local","Local / posto / equipamento"],["atividade","Atividade / processo"],["funcao","Função / cargo / GHE"],["tipoRisco","Tipo de risco (físico, químico, ergonômico…)"],["perigo","Perigo / fator de risco"],["descricao","Descrição / fonte geradora"],["nivel","Classificação / nível de risco"],["medidas","Medidas de controle existentes"],["resp","Responsável"],["expostos","Nº de expostos"]];
+const INV_DICA={unidade:/unidade|planta|site|fabrica|empresa/,area:/^area|setor|gerencia|departamento|coordenacao/,local:/local|posto|equipamento|maquina|tag|instalacao/,atividade:/atividade|processo|tarefa|operacao/,funcao:/funcao|cargo|ghe|gse|gts|ocupacao/,tipoRisco:/tipo.*risco|grupo.*risco|categoria|natureza|classe.*risco/,perigo:/perigo|fator.*risco|agente|risco(?!.*nivel)|exposicao/,descricao:/descricao|fonte|causa|observ/,nivel:/nivel|classificacao|grau|severidade|prioridade|avaliacao.*risco/,medidas:/medida|controle|epc|epi|barreira/,resp:/responsavel|gestor|dono/,expostos:/exposto|trabalhador|numero.*pessoa|colaborador|qtd|quantidade/};
+const INV_MAX=5000;
+G.inv={etapa:"lista",arq:null,mapa:{},soErgo:true,loteId:null,busca:"",filtro:"todos"};
+
+/* ---------- leitura de xlsx (zip + XML) e csv ---------- */
+async function inflar(dados){
+  const ds=new DecompressionStream("deflate-raw"),w=ds.writable.getWriter();
+  w.write(dados);w.close();
+  return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+}
+async function zipLer(buf){
+  const u=new Uint8Array(buf),dv=new DataView(buf);let e=u.length-22;
+  while(e>=0&&dv.getUint32(e,true)!==0x06054b50)e--;
+  if(e<0)throw new Error("Arquivo não é um .xlsx válido.");
+  const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const out={};
+  for(let i=0;i<n;i++){
+    if(dv.getUint32(p,true)!==0x02014b50)break;
+    const met=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+    const nome=new TextDecoder().decode(u.subarray(p+46,p+46+nl));
+    const lnl=dv.getUint16(off+26,true),lxl=dv.getUint16(off+28,true),ini=off+30+lnl+lxl,dados=u.subarray(ini,ini+cs);
+    out[nome]=async()=>new TextDecoder().decode(met===0?dados:await inflar(dados));
+    p+=46+nl+xl+cl;
+  }
+  return out;
+}
+const colIdx=r=>{let n=0;for(const ch of r.replace(/\d/g,""))n=n*26+ch.charCodeAt(0)-64;return n-1};
+async function lerXlsx(buf){
+  const z=await zipLer(buf),xml=s=>new DOMParser().parseFromString(s,"application/xml");
+  if(!z["xl/workbook.xml"])throw new Error("Planilha sem workbook. Salve novamente como .xlsx.");
+  const ss=[];
+  if(z["xl/sharedStrings.xml"]){xml(await z["xl/sharedStrings.xml"]()).querySelectorAll("si").forEach(si=>ss.push([...si.getElementsByTagName("t")].map(t=>t.textContent).join("")))}
+  let alvo="xl/worksheets/sheet1.xml";
+  try{
+    const wb=xml(await z["xl/workbook.xml"]()),sh=wb.getElementsByTagName("sheet")[0],rid=sh.getAttribute("r:id")||sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");
+    const rels=xml(await z["xl/_rels/workbook.xml.rels"]());
+    for(const r of rels.getElementsByTagName("Relationship"))if(r.getAttribute("Id")===rid){const t=r.getAttribute("Target");alvo=t.startsWith("/")?t.slice(1):"xl/"+t.replace(/^\.?\//,"")}
+  }catch(e){}
+  if(!z[alvo]){alvo=Object.keys(z).filter(k=>/^xl\/worksheets\/sheet\d+\.xml$/.test(k)).sort()[0];if(!alvo)throw new Error("Nenhuma aba encontrada.")}
+  const doc=xml(await z[alvo]()),rows=[];
+  doc.querySelectorAll("sheetData > row").forEach(r=>{
+    const linha=[];
+    r.querySelectorAll(":scope > c").forEach(c=>{
+      const i=colIdx(c.getAttribute("r")||"A1"),t=c.getAttribute("t"),v=c.querySelector("v"),is=c.querySelector("is");
+      let val="";
+      if(t==="s"&&v)val=ss[Number(v.textContent)]||"";
+      else if(t==="inlineStr"&&is)val=[...is.getElementsByTagName("t")].map(x=>x.textContent).join("");
+      else if(v)val=v.textContent;
+      linha[i]=val;
+    });
+    for(let k=0;k<linha.length;k++)if(linha[k]===undefined)linha[k]="";
+    rows.push(linha);
+  });
+  return rows;
+}
+function lerCsv(txt){
+  txt=txt.replace(/^﻿/,"");
+  const primeira=txt.split(/\r?\n/)[0]||"",sep=[";","\t",","].map(s=>[s,primeira.split(s).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const rows=[];let l=[],c="",q=false;
+  for(let i=0;i<txt.length;i++){
+    const ch=txt[i];
+    if(q){if(ch==='"'){if(txt[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}
+    else if(ch==='"')q=true;
+    else if(ch===sep){l.push(c);c=""}
+    else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&txt[i+1]==="\n")i++;l.push(c);c="";if(l.some(x=>x!==""))rows.push(l);l=[]}
+    else c+=ch;
+  }
+  if(c!==""||l.length){l.push(c);if(l.some(x=>x!==""))rows.push(l)}
+  return rows;
+}
+async function lerArquivoInv(file){
+  const buf=await file.arrayBuffer();
+  let rows;
+  if(/\.xlsx$/i.test(file.name)||(new Uint8Array(buf)[0]===0x50&&new Uint8Array(buf)[1]===0x4b))rows=await lerXlsx(buf);
+  else if(/\.xls$/i.test(file.name))throw new Error("Formato .xls antigo. Abra no Excel e salve como .xlsx ou .csv.");
+  else rows=lerCsv(new TextDecoder("utf-8").decode(buf));
+  rows=rows.filter(r=>r.some(x=>String(x).trim()!==""));
+  if(rows.length<2)throw new Error("A planilha precisa ter cabeçalho e pelo menos uma linha.");
+  // cabeçalho = primeira linha com 3 ou mais células preenchidas
+  let h=rows.findIndex(r=>r.filter(x=>String(x).trim()!=="").length>=3);if(h<0)h=0;
+  const cab=rows[h].map((x,i)=>String(x).trim()||"Coluna "+(i+1));
+  return {nome:file.name,cabecalhos:cab,linhas:rows.slice(h+1)};
+}
+function adivinharMapa(cab){
+  const mapa={},usadas=new Set();
+  INV_CAMPOS.forEach(([k])=>{
+    const i=cab.findIndex((c,j)=>!usadas.has(j)&&INV_DICA[k].test(norm(c)));
+    if(i>=0){mapa[k]=i;usadas.add(i)}
+  });
+  return mapa;
+}
+
+/* ---------- cruzamento com cadastros e AEPs ---------- */
+function invStatus(l){
+  const a=norm(l.local||""),b=norm(l.atividade||"");
+  const iguais=(x,y)=>x&&y&&x.length>2&&y.length>2&&(x.includes(y)||y.includes(x));
+  const postos=regOf("cad").filter(r=>r.d.tc==="posto"&&(iguais(norm(r.d.nome),a)||iguais(norm(r.d.tag||""),a)||iguais(norm(r.d.nome),b))).map(r=>r.id);
+  const ativs=regOf("cad").filter(r=>r.d.tc==="atividade"&&(iguais(norm(r.d.nome),b)||iguais(norm(r.d.nome),a))).map(r=>r.id);
+  const aeps=regOf("aep").filter(r=>postos.includes(r.d.postoId)||ativs.includes(r.d.atividadeId));
+  if(aeps.some(r=>r.d.status==="aprovada"))return {s:"aprovada",postos,aeps};
+  if(aeps.length)return {s:"andamento",postos,aeps};
+  return {s:"sem",postos,aeps};
+}
+const INV_ROT={aprovada:["Com AEP aprovada","n0"],andamento:["AEP em andamento","n1"],sem:["Sem avaliação","n3"]};
+const ehErgo=(d,l)=>!d.mapa||d.mapa.tipoRisco===undefined||/ergon/i.test(l.tipoRisco||"");
+
+/* ---------- interface ---------- */
+function renderInventario(){
+  const el=$("#v-inventario");if(!el)return;
+  const I=G.inv;
+  if(I.etapa==="mapear"){el.innerHTML=htmlInvMapa();return}
+  if(I.etapa==="ver"){el.innerHTML=htmlInvVer();return}
+  const lotes=regOf("inv").sort((a,b)=>b.atualizadoEm-a.atualizadoEm);
+  el.innerHTML=`<div class="card"><h2>Inventário de riscos</h2><p class="mut">Importe a planilha do inventário da empresa (Excel .xlsx ou .csv). O app cruza cada linha com os postos e AEPs cadastrados e mostra o que ainda <b>não foi avaliado</b>. A leitura acontece no seu aparelho; só o resultado do mapeamento é guardado.</p>
+  <label class="btn" style="cursor:pointer">📂 Importar planilha<input type="file" id="invArq" accept=".xlsx,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden></label>
+  <small class="mut"> Limite de ${INV_MAX} linhas por planilha.</small></div>
+  <div class="card"><h3>Lotes importados</h3>${lotes.map(r=>{const d=r.d,erg=d.linhas.filter(l=>ehErgo(d,l)),cob=erg.filter(l=>invStatus(l).s!=="sem").length;
+    return `<div class="sug"><span><b>${esc(d.nome)}</b><br><small>${dataBR(d.importadoEm)} · ${d.linhas.length} linhas${d.mapa.tipoRisco!==undefined?" · "+erg.length+" ergonômicas":""} · cobertura ${erg.length?Math.round(100*cob/erg.length):0}%</small></span><span class="linha"><button class="btn sec peq" data-g-acao="inv-ver" data-id="${r.id}">Abrir</button><button class="btn sec peq" data-g-acao="inv-del" data-id="${r.id}">Excluir</button></span></div>`}).join("")||`<p class="mut">Nenhuma planilha importada ainda.</p>`}</div>
+  <div class="card"><h3>Exportar dados (CSV)</h3><p class="mut">Arquivos CSV abrem no Excel e alimentam o Power BI. Dados por situação de trabalho, nunca por trabalhador.</p>
+  <div class="linha"><button class="btn sec" data-g-acao="exp" data-t="aep">Inventário ergonômico (AEPs)</button><button class="btn sec" data-g-acao="exp" data-t="acao">Plano de ação</button><button class="btn sec" data-g-acao="exp" data-t="dem">Demandas</button></div></div>`;
+}
+function htmlInvMapa(){
+  const I=G.inv,a=I.arq,cab=a.cabecalhos;
+  const prev=a.linhas.slice(0,4);
+  return `<div class="card"><button class="btn sec peq" data-g-acao="inv-cancel">← Cancelar</button><h2 style="margin-top:12px">Mapear colunas</h2><p class="mut">Arquivo: <b>${esc(a.nome)}</b> · ${a.linhas.length} linhas. Indique qual coluna da sua planilha corresponde a cada campo (deixe em branco o que não existir).</p>
+  <div class="grid2">${INV_CAMPOS.map(([k,r])=>`<label class="campo">${r}<select data-inv-map="${k}"><option value="">(não usar)</option>${cab.map((c,i)=>`<option value="${i}" ${String(I.mapa[k])===String(i)?"selected":""}>${esc(c)}</option>`).join("")}</select></label>`).join("")}</div>
+  ${I.mapa.tipoRisco!==undefined?`<label class="chk"><input type="checkbox" id="invErgo" ${I.soErgo?"checked":""}> Importar apenas linhas de risco <b>ergonômico</b> (coluna "tipo de risco" contendo "ergon")</label>`:""}
+  <h4>Prévia</h4><div style="overflow:auto"><table class="tab"><tr>${cab.map(c=>`<th>${esc(c)}</th>`).join("")}</tr>${prev.map(r=>`<tr>${cab.map((_,i)=>`<td>${esc(String(r[i]??"").slice(0,60))}</td>`).join("")}</tr>`).join("")}</table></div>
+  <div class="linha" style="margin-top:12px"><button class="btn verde" data-g-acao="inv-importar">Importar</button></div></div>`;
+}
+function linhasDoLote(d,termo,filtro){
+  return d.linhas.map((l,i)=>({l,i})).filter(({l})=>ehErgo(d,l)).filter(({l})=>{
+    if(termo&&!norm(Object.values(l).join(" ")).includes(termo))return false;
+    if(filtro!=="todos"&&invStatus(l).s!==filtro)return false;return true});
+}
+function htmlInvVer(){
+  const I=G.inv,r=regGet(I.loteId);if(!r){I.etapa="lista";return htmlInvVer()}
+  const d=r.d,erg=d.linhas.filter(l=>ehErgo(d,l)),st={aprovada:0,andamento:0,sem:0};erg.forEach(l=>st[invStatus(l).s]++);
+  const L=linhasDoLote(d,norm(I.busca),I.filtro),mostra=L.slice(0,200);
+  return `<div class="card"><button class="btn sec peq" data-g-acao="inv-voltar">← Inventário</button><h2 style="margin-top:12px">${esc(d.nome)}</h2>
+  <div class="kpis"><div><b>${erg.length}</b><small>linhas ergonômicas</small></div><div><b style="color:#1b7f3a">${st.aprovada}</b><small>com AEP aprovada</small></div><div><b>${st.andamento}</b><small>em andamento</small></div><div><b style="color:#b71c1c">${st.sem}</b><small>sem avaliação</small></div></div>
+  <div class="grid2"><label class="campo">Buscar<input id="invBusca" value="${esc(I.busca)}" placeholder="posto, atividade, perigo…"></label>
+  <label class="campo">Situação<select id="invFiltro">${sel1([["todos","Todas"],["sem","Sem avaliação"],["andamento","AEP em andamento"],["aprovada","Com AEP aprovada"]],I.filtro)}</select></label></div>
+  <small class="mut">O cruzamento compara o nome do posto/atividade da planilha com seus cadastros. Cadastre os postos em Cadastros para melhorar a correspondência.</small></div>
+  <div class="card">${mostra.map(({l,i})=>{const s=invStatus(l),[rot,cl]=INV_ROT[s.s];return `<div class="sug"><span><b>${esc(l.perigo||l.descricao||"(sem perigo informado)")}</b><br><small>${esc([l.unidade,l.area,l.local].filter(Boolean).join(" › "))}${l.atividade?" · "+esc(l.atividade):""}${l.nivel?" · nível: "+esc(l.nivel):""}</small></span><span class="linha" style="flex-direction:column;align-items:flex-end;gap:4px"><span class="bd ${cl}">${rot}</span>${s.s==="sem"?`<button class="btn sec peq" data-g-acao="inv-demanda" data-i="${i}">Criar demanda</button>`:s.aeps[0]?`<button class="btn sec peq" data-g-acao="abrir-reg" data-id="${s.aeps[0].id}">Abrir AEP</button>`:""}</span></div>`}).join("")||`<p class="mut">Nenhuma linha neste filtro.</p>`}${L.length>mostra.length?`<p class="mut">Mostrando ${mostra.length} de ${L.length}. Use a busca para refinar.</p>`:""}</div>`;
+}
+async function importarInv(){
+  const I=G.inv,a=I.arq;
+  if(Object.keys(I.mapa).length<2){aviso("Mapeie pelo menos duas colunas.");return}
+  const linhas=[];
+  a.linhas.forEach((r,n)=>{
+    const o={_n:n+2};let tem=false;
+    Object.keys(I.mapa).forEach(k=>{let v=r[I.mapa[k]];v=v===undefined?"":String(v).trim();if(v){tem=true;o[k]=v.slice(0,400)}});
+    if(!tem)return;
+    if(I.mapa.tipoRisco!==undefined&&I.soErgo&&!/ergon/i.test(o.tipoRisco||""))return;
+    linhas.push(o);
+  });
+  if(!linhas.length){aviso("Nenhuma linha atendeu ao filtro. Revise o mapeamento ou desmarque o filtro de ergonômicos.");return}
+  if(linhas.length>INV_MAX){aviso("A planilha tem "+linhas.length+" linhas úteis. O limite é "+INV_MAX+". Filtre antes de importar.");return}
+  const r={id:rid(),tipo:"inv",d:{nome:a.nome,importadoEm:hojeISO(),mapa:{...I.mapa},colunas:a.cabecalhos,linhas,soErgo:I.soErgo}};
+  regGravar(r);I.etapa="ver";I.loteId=r.id;I.arq=null;renderInventario();aviso(linhas.length+" linhas importadas.");
+}
+function demandaDaLinha(i){
+  const r=regGet(G.inv.loteId);if(!r)return;const l=r.d.linhas[i],s=invStatus(l);
+  const n=novaDemanda();
+  n.d.origem="Avaliação programada";
+  n.d.motivo="Inventário de riscos: "+(l.perigo||l.descricao||"risco ergonômico")+(l.atividade?" · atividade: "+l.atividade:"")+(l.nivel?" · nível no inventário: "+l.nivel:"");
+  n.d.areaTxt=[l.unidade,l.area,l.local].filter(Boolean).join(" › ");
+  if(s.postos[0])n.d.postoId=s.postos[0];
+  G.ed=n;irPara("demandas");
+}
+
+/* ---------- exportação CSV ---------- */
+function csvBaixar(nome,cab,linhas){
+  const q=v=>{v=v==null?"":String(v);return /[";\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const txt="﻿"+[cab,...linhas].map(l=>l.map(q).join(";")).join("\r\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/csv;charset=utf-8"}));a.download=nome+"-"+hojeISO()+".csv";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
+function exportar(t){
+  const loc=id=>id?caminho(id):"",ativ=id=>id?(regGet(id)?regGet(id).d.nome:""):"";
+  if(t==="aep"){
+    const L=[];
+    regOf("aep").forEach(r=>{const d=r.d,c=aepClasse(d),acs=regOf("acao").filter(a=>a.d.origemId===r.id);
+      c.cats.forEach(cat=>cat.itens.forEach(i=>{const ac=acs.filter(a=>a.d.origemItem===i.k);
+        L.push([d.numero||"",d.versao||1,d.status,dataBR(d.data),loc(d.postoId),ativ(d.atividadeId),cat.nome,i.t,NIV_F[i.n],c.nivel<0?"":NIV_F[c.nivel],c.p<0?"":NIV_PRI(c.p),d.nExpostos||"",(d.provisoria||"").replace(/\s+/g," "),ac.map(a=>(a.d.numero||"")+" ("+stAcao(a.d.status)+")").join(" | ")])}))});
+    csvBaixar("inventario-ergonomico-aep",["AEP","Versão","Status","Data","Local","Atividade","Categoria","Fator","Nível do fator","Classificação da AEP","Prioridade","Nº de expostos","Medida provisória","Ações vinculadas"],L);
+  }else if(t==="acao"){
+    csvBaixar("plano-de-acao",["Ação","Status","Prioridade","Local","Atividade","Problema","Ação proposta","Tipo (hierarquia)","Responsável","Área responsável","Custo estimado","Orçamento aprovado","Prazo","Data realizada","Dias de atraso","Escalonamento","Risco residual","Decisão de eficácia","Demanda","Origem"],
+      regOf("acao").map(r=>{const d=r.d,dm=d.demandaId&&regGet(d.demandaId);return [d.numero||"",stAcao(d.status),PRI_AC[Number(d.prioridade)||0],loc(d.postoId),ativ(d.atividadeId),(d.problema||"").replace(/\s+/g," "),(d.acao||"").replace(/\s+/g," "),d.hier!==""&&d.hier!=null?HIER[Number(d.hier)]:"",d.responsavel,d.area,d.custo,d.orcamento,dataBR(d.prazo),dataBR(d.dataReal),diasAtraso(d),escalonar(diasAtraso(d)),d.ef.residual,d.ef.decisao,dm?dm.d.numero:"",d.origemId?(regGet(d.origemId)||{d:{}}).d.numero||"":""]}));
+  }else{
+    csvBaixar("demandas",["Demanda","Origem","Data","Solicitante","Local","Atividade","Motivo","Prioridade","Prazo","Status","Responsável pela triagem"],
+      regOf("dem").map(r=>{const d=r.d;return [d.numero||"",d.origem,dataBR(d.data),d.solicitante,loc(d.postoId)||d.areaTxt,ativ(d.atividadeId),(d.motivo||"").replace(/\s+/g," "),PRI_DEM[Number(d.prioridade)||0],dataBR(d.prazo),(ST_DEM.find(s=>s[0]===d.status)||[0,d.status])[1],d.triagem]}));
+  }
+}
+
+/* ---------- ganchos ---------- */
+const _irPara10=irPara;
+irPara=function(v){_irPara10(v);if(v==="inventario")renderInventario()};
+document.addEventListener("change",async e=>{
+  const t=e.target;
+  if(t.id==="invArq"){
+    const f=t.files[0];t.value="";if(!f)return;
+    try{aviso("Lendo "+f.name+"…");const a=await lerArquivoInv(f);G.inv.arq=a;G.inv.mapa=adivinharMapa(a.cabecalhos);G.inv.soErgo=true;G.inv.etapa="mapear";renderInventario()}
+    catch(err){aviso(err.message)}
+    return;
+  }
+  if(t.dataset&&t.dataset.invMap!==undefined){if(t.value==="")delete G.inv.mapa[t.dataset.invMap];else G.inv.mapa[t.dataset.invMap]=Number(t.value);renderInventario();return}
+  if(t.id==="invErgo"){G.inv.soErgo=t.checked;return}
+  if(t.id==="invFiltro"){G.inv.filtro=t.value;renderInventario();return}
+});
+let tmrInv=null;
+document.addEventListener("input",e=>{if(e.target.id==="invBusca"){G.inv.busca=e.target.value;clearTimeout(tmrInv);tmrInv=setTimeout(()=>{renderInventario();const b=$("#invBusca");if(b){b.focus();b.setSelectionRange(b.value.length,b.value.length)}},350)}});
+document.addEventListener("click",e=>{
+  const nb=e.target.closest("#nav button");
+  if(nb&&nb.dataset.v==="inventario"){G.inv.etapa="lista";G.inv.arq=null}
+  const b=e.target.closest("[data-g-acao]");if(!b)return;
+  const id=b.dataset.id;
+  switch(b.dataset.gAcao){
+    case "inv-cancel":G.inv.etapa="lista";G.inv.arq=null;renderInventario();break;
+    case "inv-importar":importarInv();break;
+    case "inv-ver":G.inv.etapa="ver";G.inv.loteId=id;G.inv.busca="";G.inv.filtro="todos";if(($(".view.on")||{}).id!=="v-inventario")irPara("inventario");else{renderInventario();window.scrollTo(0,0)}break;
+    case "inv-voltar":G.inv.etapa="lista";renderInventario();break;
+    case "inv-del":if(confirm("Excluir este lote do inventário? As AEPs e demandas não são afetadas.")){regExcluir(id);renderInventario()}break;
+    case "inv-demanda":demandaDaLinha(Number(b.dataset.i));break;
+    case "exp":exportar(b.dataset.t);break;
+  }
+},true);
+// alerta de cobertura do inventário
+const _calcAlertas=calcAlertas;
+calcAlertas=function(){
+  const A=_calcAlertas();
+  regOf("inv").forEach(r=>{
+    const erg=r.d.linhas.filter(l=>ehErgo(r.d,l)),sem=erg.filter(l=>invStatus(l).s==="sem").length;
+    if(sem)A.push({sev:2,tipo:"Inventário sem avaliação",txt:`${r.d.nome}: ${sem} de ${erg.length} linhas ergonômicas ainda sem AEP.`,ac:["inv-ver",r.id]});
+  });
+  return A.sort((a,b)=>a.sev-b.sev);
 };
 /* =====================================================================
    INÍCIO
