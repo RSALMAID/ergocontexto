@@ -3336,6 +3336,315 @@ calcAlertas=function(){
   return A.sort((a,b)=>a.sev-b.sev);
 };
 /* =====================================================================
+   FASE 5: MODELO DE INVENTÁRIO DE RISCO ERGONÔMICO
+   - cria o inventário dentro do app (formulário por linha + tabela)
+   - classificação por probabilidade x severidade (matriz padrão 5x5)
+   - gera Excel (.xlsx, sem biblioteca) e CSV; baixa modelo em branco
+   - carga em massa (Excel/CSV) para um inventário novo ou existente
+   ===================================================================== */
+
+/* ---------- definição do modelo ---------- */
+const EXPO_OP=["Eventual","Intermitente","Frequente","Contínua"];
+const SIT_OP=["Sem ação","Planejada","Em andamento","Concluída"];
+const NIV_INV=["Baixo","Médio","Alto","Crítico"];
+const PROB_ROT=["1 - Muito baixa","2 - Baixa","3 - Média","4 - Alta","5 - Muito alta"];
+const SEV_ROT=["1 - Leve","2 - Moderada","3 - Significativa","4 - Grave","5 - Muito grave"];
+// [chave, rótulo, tipo, largura da coluna no Excel]
+const MOD=[
+ ["unidade","Unidade / planta","t",18],["area","Área / setor","t",20],["local","Posto / local de trabalho","t",26],
+ ["atividade","Atividade / processo","t",28],["funcao","Função / GHE","t",20],["tipoRisco","Tipo de risco","t",14],
+ ["perigo","Fator de risco ergonômico","t",32],["descricao","Descrição / fonte geradora","a",40],["expostos","Nº de expostos","n",11],
+ ["exposicao","Exposição (frequência e duração)","s",16],["prob","Probabilidade (1-5)","n",13],["sev","Severidade (1-5)","n",13],
+ ["nivel","Nível de risco","s",12],["medidas","Medidas de controle existentes","a",36],["recomend","Medidas recomendadas","a",36],
+ ["resp","Responsável","t",18],["prazo","Prazo","d",12],["situacao","Situação da ação","s",15],["dataAval","Data da avaliação","d",13],["obs","Observações","a",32]];
+const MOD_OP={exposicao:EXPO_OP,situacao:SIT_OP,nivel:NIV_INV,prob:["1","2","3","4","5"],sev:["1","2","3","4","5"]};
+// campos extras no mapeamento da carga em massa
+const _inv0=new Set(INV_CAMPOS.map(c=>c[0]));
+MOD.forEach(m=>{if(!_inv0.has(m[0]))INV_CAMPOS.push([m[0],m[1]])});
+Object.assign(INV_DICA,{exposicao:/exposicao|frequencia|duracao/,prob:/probabilidade|prob\b/,sev:/severidade|gravidade|consequencia/,recomend:/recomend|proposta|plano/,prazo:/prazo|vencimento/,situacao:/situacao.*acao|status/,dataAval:/data.*avalia|avaliado em/,obs:/observa|comentario/});
+INV_DICA.nivel=/nivel|classificacao|grau|prioridade|avaliacao.*risco/;
+const pontosInv=l=>{const p=parseInt(l.prob),s=parseInt(l.sev);return p>=1&&p<=5&&s>=1&&s<=5?p*s:null};
+const nivelInv=pt=>pt==null?"":pt<=4?"Baixo":pt<=9?"Médio":pt<=16?"Alto":"Crítico";
+const CL_NIV={Baixo:"n0","Médio":"n1",Alto:"n2","Crítico":"n3"};
+function dtInv(v){ // aceita AAAA-MM-DD, DD/MM/AAAA ou número de série do Excel
+  v=String(v||"").trim();if(!v)return "";
+  if(/^\d{4}-\d{2}-\d{2}/.test(v))return v.slice(8,10)+"/"+v.slice(5,7)+"/"+v.slice(0,4);
+  if(/^\d{5}(\.\d+)?$/.test(v)){const d=new Date(Date.UTC(1899,11,30)+Math.floor(Number(v))*864e5);return String(d.getUTCDate()).padStart(2,"0")+"/"+String(d.getUTCMonth()+1).padStart(2,"0")+"/"+d.getUTCFullYear()}
+  return v;
+}
+function isoInv(v){
+  v=String(v||"").trim();let m;
+  if((m=v.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/)))return m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0");
+  if(/^\d{5}(\.\d+)?$/.test(v))return new Date(Date.UTC(1899,11,30)+Math.floor(Number(v))*864e5).toISOString().slice(0,10);
+  return v;
+}
+// mapeamento automático: cabeçalho idêntico ao do modelo tem prioridade
+const _adivinhar0=adivinharMapa;
+adivinharMapa=function(cab){
+  const m=_adivinhar0(cab),usadas=new Set();
+  const ex={};
+  MOD.forEach(([k,r])=>{const i=cab.findIndex(c=>norm(c)===norm(r));if(i>=0&&!usadas.has(i)){ex[k]=i;usadas.add(i)}});
+  if(Object.keys(ex).length>=5)return ex;
+  return m;
+};
+
+/* ---------- gerador de .xlsx (ZIP sem compressão) ---------- */
+const CRC_T=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc32=b=>{let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRC_T[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0};
+function zipCriar(arqs){
+  const enc=new TextEncoder(),partes=[],central=[];let pos=0;
+  const d=new Date(),hora=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1),data=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+  for(const [nome,txt] of arqs){
+    const nb=enc.encode(nome),db=enc.encode(txt),crc=crc32(db);
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint16(8,0,true);lh.setUint16(10,hora,true);lh.setUint16(12,data,true);
+    lh.setUint32(14,crc,true);lh.setUint32(18,db.length,true);lh.setUint32(22,db.length,true);lh.setUint16(26,nb.length,true);lh.setUint16(28,0,true);
+    partes.push(new Uint8Array(lh.buffer),nb,db);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x0800,true);ch.setUint16(10,0,true);ch.setUint16(12,hora,true);ch.setUint16(14,data,true);
+    ch.setUint32(16,crc,true);ch.setUint32(20,db.length,true);ch.setUint32(24,db.length,true);ch.setUint16(28,nb.length,true);ch.setUint32(42,pos,true);
+    central.push(new Uint8Array(ch.buffer),nb);
+    pos+=30+nb.length+db.length;
+  }
+  const tamC=central.reduce((s,x)=>s+x.length,0),fim=new DataView(new ArrayBuffer(22));
+  fim.setUint32(0,0x06054b50,true);fim.setUint16(8,arqs.length,true);fim.setUint16(10,arqs.length,true);fim.setUint32(12,tamC,true);fim.setUint32(16,pos,true);
+  return new Blob([...partes,...central,new Uint8Array(fim.buffer)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+const xe=s=>String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const colL=n=>{let s="";n++;while(n>0){const r=(n-1)%26;s=String.fromCharCode(65+r)+s;n=Math.floor((n-1)/26)}return s};
+// aba = {nome, cab:[], linhas:[[]], larg:[], num:Set(indices numéricos), valid:{indiceColuna:[opções]}, filtro:bool}
+function xmlAba(a){
+  const nC=a.cab.length,nL=a.linhas.length+1;
+  const cel=(r,c,v,s,num)=>{
+    const ref=colL(c)+(r+1);
+    if(v===""||v==null)return `<c r="${ref}" s="${s}"/>`;
+    if(num&&/^-?\d+([.,]\d+)?$/.test(String(v).trim()))return `<c r="${ref}" s="${s}"><v>${String(v).trim().replace(",",".")}</v></c>`;
+    return `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${xe(v)}</t></is></c>`;
+  };
+  let x=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${colL(Math.max(nC-1,0))}${nL}"/>`;
+  x+=`<sheetViews><sheetView workbookViewId="0"${a.filtro?"":""}>${a.filtro?`<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>`:""}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>`;
+  x+=`<cols>${a.larg.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>`;
+  x+=`<row r="1" ht="32" customHeight="1">${a.cab.map((h,c)=>cel(0,c,h,1,false)).join("")}</row>`;
+  a.linhas.forEach((l,i)=>{x+=`<row r="${i+2}">${a.cab.map((_,c)=>cel(i+1,c,l[c],2,a.num&&a.num.has(c))).join("")}</row>`});
+  x+=`</sheetData>`;
+  if(a.filtro&&nC)x+=`<autoFilter ref="A1:${colL(nC-1)}${Math.max(nL,2)}"/>`;
+  const vs=Object.entries(a.valid||{});
+  if(vs.length)x+=`<dataValidations count="${vs.length}">${vs.map(([c,op])=>`<dataValidation type="list" allowBlank="1" showErrorMessage="0" sqref="${colL(Number(c))}2:${colL(Number(c))}5000"><formula1>"${xe(op.join(","))}"</formula1></dataValidation>`).join("")}</dataValidations>`;
+  return x+`</worksheet>`;
+}
+function xlsxCriar(abas){
+  const ns='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',rn='xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const arqs=[
+   ["[Content_Types].xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${abas.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>`],
+   ["_rels/.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+   ["xl/workbook.xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook ${ns} ${rn}><sheets>${abas.map((a,i)=>`<sheet name="${xe(a.nome.slice(0,31))}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join("")}</sheets></workbook>`],
+   ["xl/_rels/workbook.xml.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${abas.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join("")}<Relationship Id="rId${abas.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+   ["xl/styles.xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet ${ns}><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF004F3D"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBBBBBB"/></left><right style="thin"><color rgb="FFBBBBBB"/></right><top style="thin"><color rgb="FFBBBBBB"/></top><bottom style="thin"><color rgb="FFBBBBBB"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`],
+   ...abas.map((a,i)=>[`xl/worksheets/sheet${i+1}.xml`,xmlAba(a)])];
+  return zipCriar(arqs);
+}
+function baixarBlob(blob,nome){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+const nomeArq=s=>norm(s).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40)||"inventario";
+
+/* ---------- conteúdo exportado ---------- */
+const valorCel=(k,t,l)=>t==="d"?dtInv(l[k]):(l[k]||"");
+function legendaInv(){
+  return {nome:"Legenda",cab:["Item","Descrição"],larg:[30,90],linhas:[
+   ["Classificação","Nível de risco = probabilidade (1-5) x severidade (1-5). Baixo: até 4 · Médio: 5 a 9 · Alto: 10 a 16 · Crítico: 17 a 25."],
+   ["Probabilidade",PROB_ROT.join(" · ")+" (considere frequência, duração e queixas recorrentes)."],
+   ["Severidade",SEV_ROT.join(" · ")+" (considere a consequência potencial para a saúde)."],
+   ["Exposição",EXPO_OP.join(" · ")],["Situação da ação",SIT_OP.join(" · ")],
+   ["Aviso","Matriz e escalas são o padrão do ErgoContexto. Ajuste ao procedimento de gerenciamento de riscos da empresa antes de uso oficial no PGR."],
+   ["Situação da AEP / AEP vinculada","Colunas calculadas pelo app, cruzando posto e atividade com as AEPs cadastradas. Não são lidas na carga em massa."],
+   ["Privacidade","Registro por situação de trabalho. Não inclua nome de trabalhador."]]};
+}
+function abaInventario(d){
+  const cab=[...MOD.map(m=>m[1]),"Pontuação (P x S)","Situação da AEP","AEP vinculada"];
+  const linhas=d.linhas.map(l=>{
+    const s=invStatus(l),pt=pontosInv(l);
+    return [...MOD.map(([k,,t])=>valorCel(k,t,l)),pt==null?"":pt,INV_ROT[s.s][0],s.aeps.map(a=>a.d.numero).filter(Boolean).join(" | ")];
+  });
+  const num=new Set();MOD.forEach((m,i)=>{if(m[2]==="n")num.add(i)});num.add(MOD.length);
+  const valid={};MOD.forEach((m,i)=>{if(MOD_OP[m[0]])valid[i]=MOD_OP[m[0]]});
+  return {nome:"Inventário",cab,linhas,larg:[...MOD.map(m=>m[3]),12,20,20],num,valid,filtro:true};
+}
+function exportarLote(id,fmt){
+  const r=regGet(id);if(!r)return;const d=r.d;
+  if(!d.linhas.length){aviso("Inventário sem linhas. Adicione ou importe linhas antes de exportar.");return}
+  const a=abaInventario(d),base="inventario-risco-ergonomico-"+nomeArq(d.nome)+"-"+hojeISO();
+  if(fmt==="xlsx"){baixarBlob(xlsxCriar([a,legendaInv()]),base+".xlsx");aviso("Excel gerado: "+d.linhas.length+" linhas.")}
+  else{
+    const seg=v=>{v=String(v);return /^[=+\-@]/.test(v)&&!/^-?\d+([.,]\d+)?$/.test(v)?"'"+v:v};
+    csvBaixar(base.replace(/-\d{4}-\d{2}-\d{2}$/,""),a.cab,a.linhas.map(l=>l.map(seg)));
+    aviso("CSV gerado: "+d.linhas.length+" linhas.");
+  }
+}
+function modeloBranco(fmt){
+  const cab=MOD.map(m=>m[1]),valid={};MOD.forEach((m,i)=>{if(MOD_OP[m[0]])valid[i]=MOD_OP[m[0]]});
+  if(fmt==="xlsx"){
+    const num=new Set();MOD.forEach((m,i)=>{if(m[2]==="n")num.add(i)});
+    const instr={nome:"Instruções",cab:["Como preencher","Descrição"],larg:[30,90],linhas:[
+      ["Uso","Preencha a aba Modelo, uma linha por perigo ergonômico em cada posto/atividade. Depois, no ErgoContexto, abra Inventário > Importar planilha. Os cabeçalhos já são reconhecidos automaticamente."],
+      ["Obrigatório","Informe ao menos posto/local ou atividade, e o fator de risco. As demais colunas são opcionais."],
+      ["Datas","Use o formato DD/MM/AAAA."],["Nível de risco","Se deixar em branco, mas informar probabilidade e severidade, o app calcula na tela de edição."],
+      ["Privacidade","Descreva a situação de trabalho. Não escreva nomes de trabalhadores."],...legendaInv().linhas.slice(0,5)]};
+    baixarBlob(xlsxCriar([{nome:"Modelo",cab,linhas:[],larg:MOD.map(m=>m[3]),num,valid,filtro:true},instr]),"modelo-inventario-risco-ergonomico.xlsx");
+  }else csvBaixar("modelo-inventario-risco-ergonomico",cab,[]);
+}
+
+/* ---------- criação e edição de linhas ---------- */
+function novoInventario(){
+  const nome=($("#invNovoNome")||{}).value||"",un=($("#invNovoUn")||{}).value||"";
+  if(!nome.trim()){aviso("Dê um nome ao inventário (ex.: Inventário ergonômico 2026 - Laminação).");return}
+  const r={id:rid(),tipo:"inv",d:{nome:nome.trim().slice(0,120),importadoEm:hojeISO(),modelo:true,mapa:{},colunas:[],unidade:un.trim().slice(0,80),linhas:[]}};
+  regGravar(r);G.inv.etapa="ver";G.inv.loteId=r.id;G.inv.busca="";G.inv.filtro="todos";renderInventario();
+}
+function sugestoes(d){
+  const S={};["unidade","area","local","atividade","funcao","perigo","resp"].forEach(k=>S[k]=new Set());
+  d.linhas.forEach(l=>Object.keys(S).forEach(k=>{if(l[k])S[k].add(l[k])}));
+  regOf("cad").forEach(c=>{if(c.d.tc==="planta")S.unidade.add(c.d.nome);if(c.d.tc==="area")S.area.add(c.d.nome);if(c.d.tc==="posto")S.local.add(c.d.nome);if(c.d.tc==="atividade")S.atividade.add(c.d.nome)});
+  CATS.forEach(c=>c.itens.forEach(i=>S.perigo.add(i.t)));
+  return S;
+}
+function abrirLinha(i,base){
+  const r=regGet(G.inv.loteId);if(!r)return;
+  const l=i==null?{tipoRisco:"Ergonômico",unidade:r.d.unidade||"",situacao:"Sem ação",dataAval:hojeISO(),...(base||{})}:{...r.d.linhas[i]};
+  G.inv.row={i,v:l};desenharLinha();
+}
+function desenharLinha(){
+  const r=regGet(G.inv.loteId);if(!r||!G.inv.row)return;
+  let el=$("#invModal");if(!el){el=document.createElement("div");el.id="invModal";document.body.appendChild(el)}
+  const v=G.inv.row.v,S=sugestoes(r.d);
+  const dl=k=>`<datalist id="dl_${k}">${[...S[k]].slice(0,300).map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`;
+  const t=(k,rot,extra="")=>`<label class="campo">${rot}<input data-ir="${k}" value="${esc(v[k]||"")}" ${S[k]?`list="dl_${k}"`:""} ${extra}></label>`;
+  const s=(k,rot,op)=>`<label class="campo">${rot}<select data-ir="${k}"><option value="">(selecione)</option>${sel1(op,v[k]||"")}</select></label>`;
+  const a=(k,rot,ph)=>`<label class="campo">${rot}<textarea data-ir="${k}" rows="2" placeholder="${ph||""}">${esc(v[k]||"")}</textarea></label>`;
+  const pt=pontosInv(v);
+  el.innerHTML=`<div class="modal-fundo" data-ir-fechar="1"></div><div class="modal-caixa" role="dialog" aria-modal="true"><button type="button" class="modal-x" data-ir-fechar="1" aria-label="Fechar">×</button>
+  <h2>${G.inv.row.i==null?"Nova linha do inventário":"Editar linha"}</h2><p class="mut" style="font-size:.86rem">Uma linha por perigo ergonômico em cada posto/atividade. Descreva a situação de trabalho, sem nome de trabalhador.</p>
+  <h4>Onde</h4><div class="grid2">${t("unidade","Unidade / planta")}${t("area","Área / setor")}${t("local","Posto / local de trabalho")}${t("atividade","Atividade / processo")}${t("funcao","Função / GHE")}${t("expostos","Nº de expostos",'inputmode="numeric"')}</div>
+  <h4>Risco</h4><div class="grid2">${t("tipoRisco","Tipo de risco")}${t("perigo","Fator de risco ergonômico",'placeholder="ex.: Postura do tronco, Ritmo, Iluminação"')}</div>
+  ${a("descricao","Descrição / fonte geradora","O que acontece na tarefa e por que gera risco")}
+  <div class="grid3">${s("exposicao","Exposição",EXPO_OP)}${s("prob","Probabilidade",PROB_ROT.map((x,k)=>[String(k+1),x]))}${s("sev","Severidade",SEV_ROT.map((x,k)=>[String(k+1),x]))}</div>
+  <label class="campo">Nível de risco <small class="mut" id="irPts">${pt!=null?"(P x S = "+pt+", sugerido: "+nivelInv(pt)+")":"(preencha probabilidade e severidade para calcular)"}</small><select data-ir="nivel"><option value="">(selecione)</option>${sel1(NIV_INV,v.nivel||"")}</select></label>
+  <h4>Controle</h4>${a("medidas","Medidas de controle existentes")}${a("recomend","Medidas recomendadas")}
+  <div class="grid2">${t("resp","Responsável")}<label class="campo">Prazo<input type="date" data-ir="prazo" value="${esc(v.prazo||"")}"></label>${s("situacao","Situação da ação",SIT_OP)}<label class="campo">Data da avaliação<input type="date" data-ir="dataAval" value="${esc(v.dataAval||"")}"></label></div>
+  ${a("obs","Observações")}
+  ${["unidade","area","local","funcao","perigo","resp"].map(dl).join("")}${["atividade"].map(dl).join("")}
+  <div class="linha" style="margin-top:12px"><button type="button" class="btn verde" data-ir-salvar="1">Salvar</button>${G.inv.row.i==null?`<button type="button" class="btn sec" data-ir-salvar="outra">Salvar e adicionar outra</button>`:""}<button type="button" class="btn sec" data-ir-fechar="1">Cancelar</button></div></div>`;
+}
+function fecharLinha(){const el=$("#invModal");if(el)el.remove();G.inv.row=null}
+function salvarLinha(modo){
+  const r=regGet(G.inv.loteId),R=G.inv.row;if(!r||!R)return;
+  const v={...R.v};Object.keys(v).forEach(k=>{if(typeof v[k]==="string")v[k]=v[k].trim().slice(0,600);if(v[k]==="")delete v[k]});
+  if(!v.local&&!v.atividade){aviso("Informe ao menos o posto/local ou a atividade.");return}
+  if(!v.perigo&&!v.descricao){aviso("Informe o fator de risco ou a descrição.");return}
+  if(R.i==null){if(r.d.linhas.length>=INV_MAX){aviso("Limite de "+INV_MAX+" linhas por inventário.");return}v._n=r.d.linhas.length+2;r.d.linhas.push(v)}
+  else r.d.linhas[R.i]={...r.d.linhas[R.i],...v};
+  regGravar(r);
+  if(modo==="outra"){const b={tipoRisco:v.tipoRisco||"Ergonômico",unidade:v.unidade,area:v.area,local:v.local,atividade:v.atividade,funcao:v.funcao,resp:v.resp,situacao:"Sem ação",dataAval:v.dataAval};Object.keys(b).forEach(k=>{if(b[k]==null)delete b[k]});fecharLinha();abrirLinha(null,b)}
+  else fecharLinha();
+  renderInventario();aviso("Linha salva.");
+}
+
+/* ---------- tela do inventário (substitui a visão de lote) ---------- */
+htmlInvVer=function(){
+  const I=G.inv,r=regGet(I.loteId);if(!r){I.etapa="lista";return ""}
+  const d=r.d,erg=d.linhas.filter(l=>ehErgo(d,l)),st={aprovada:0,andamento:0,sem:0};erg.forEach(l=>st[invStatus(l).s]++);
+  const niv={};d.linhas.forEach(l=>{const n=l.nivel||nivelInv(pontosInv(l));if(n)niv[n]=(niv[n]||0)+1});
+  const L=linhasDoLote(d,norm(I.busca),I.filtro),mostra=L.slice(0,200);
+  return `<div class="card"><button class="btn sec peq" data-g-acao="inv-voltar">← Inventários</button>
+  <label class="campo" style="margin-top:12px">Nome do inventário<input id="invNome" value="${esc(d.nome)}" maxlength="120"></label>
+  <div class="linha" style="margin:8px 0"><button class="btn verde" data-g-acao="inv-nova-linha">＋ Nova linha</button><label class="btn sec" style="cursor:pointer" data-dest="${r.id}">📂 Carga em massa<input type="file" id="invArq" accept=".xlsx,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden></label><button class="btn sec" data-g-acao="inv-exp" data-fmt="xlsx">⬇ Excel (.xlsx)</button><button class="btn sec" data-g-acao="inv-exp" data-fmt="csv">⬇ CSV</button></div>
+  <div class="kpis"><div><b>${d.linhas.length}</b><small>linhas</small></div><div><b style="color:#b71c1c">${(niv["Crítico"]||0)+(niv.Alto||0)}</b><small>risco alto ou crítico</small></div><div><b>${st.aprovada}</b><small>com AEP aprovada</small></div><div><b style="color:#b71c1c">${st.sem}</b><small>sem avaliação</small></div></div>
+  <div class="grid2"><label class="campo">Buscar<input id="invBusca" value="${esc(I.busca)}" placeholder="posto, atividade, perigo…"></label>
+  <label class="campo">Situação da AEP<select id="invFiltro">${sel1([["todos","Todas"],["sem","Sem avaliação"],["andamento","AEP em andamento"],["aprovada","Com AEP aprovada"]],I.filtro)}</select></label></div>
+  <small class="mut">O cruzamento compara o nome do posto/atividade com seus cadastros. Cadastre os postos em Cadastros para melhorar a correspondência.</small></div>
+  <div class="card">${mostra.map(({l,i})=>{const s=invStatus(l),[rot,cl]=INV_ROT[s.s],pt=pontosInv(l),n=l.nivel||nivelInv(pt);
+    return `<div class="sug"><span><b>${esc(l.perigo||l.descricao||"(sem fator informado)")}</b> ${n?`<span class="bd ${CL_NIV[n]||"n1"}">${esc(n)}${pt?" · "+pt:""}</span>`:""}<br><small>${esc([l.unidade,l.area,l.local].filter(Boolean).join(" › "))}${l.atividade?" · "+esc(l.atividade):""}${l.funcao?" · "+esc(l.funcao):""}${l.situacao?" · ação: "+esc(l.situacao):""}</small></span>
+    <span class="linha" style="flex-direction:column;align-items:flex-end;gap:4px"><span class="bd ${cl}">${rot}</span><span class="linha"><button class="btn sec peq" data-g-acao="inv-editar" data-i="${i}">Editar</button><button class="btn sec peq" data-g-acao="inv-dup" data-i="${i}">Duplicar</button><button class="btn sec peq" data-g-acao="inv-linha-del" data-i="${i}">Excluir</button></span>${s.s==="sem"?`<button class="btn sec peq" data-g-acao="inv-demanda" data-i="${i}">Criar demanda</button>`:s.aeps[0]?`<button class="btn sec peq" data-g-acao="abrir-reg" data-id="${s.aeps[0].id}">Abrir AEP</button>`:""}</span></div>`}).join("")||`<p class="mut">${d.linhas.length?"Nenhuma linha neste filtro.":"Inventário vazio. Use <b>＋ Nova linha</b> ou a <b>Carga em massa</b> com o modelo em branco."}</p>`}${L.length>mostra.length?`<p class="mut">Mostrando ${mostra.length} de ${L.length}. Use a busca para refinar.</p>`:""}</div>`;
+};
+
+/* ---------- tela inicial: criar inventário e baixar modelo ---------- */
+const _renderInv11=renderInventario;
+renderInventario=function(){
+  _renderInv11();
+  const el=$("#v-inventario");if(!el)return;
+  if(G.inv.etapa==="lista"){
+    el.insertAdjacentHTML("afterbegin",`<div class="card"><h2>Criar inventário de risco ergonômico</h2><p class="mut">Monte o inventário aqui, linha a linha, e depois gere Excel ou CSV. Para muitas linhas de uma vez, baixe o modelo em branco, preencha e use a carga em massa.</p>
+    <div class="grid2"><label class="campo">Nome do inventário<input id="invNovoNome" placeholder="ex.: Inventário ergonômico 2026 - Laminação" maxlength="120"></label><label class="campo">Unidade / planta (opcional)<input id="invNovoUn" maxlength="80"></label></div>
+    <div class="linha"><button class="btn verde" data-g-acao="inv-novo">Criar inventário</button><button class="btn sec" data-g-acao="inv-modelo" data-fmt="xlsx">⬇ Modelo em branco (Excel)</button><button class="btn sec" data-g-acao="inv-modelo" data-fmt="csv">⬇ Modelo em branco (CSV)</button></div></div>`);
+    const lb=$("#invArq");if(lb&&lb.closest("label"))lb.closest("label").dataset.dest="novo";
+  }
+  if(G.inv.etapa==="mapear"){
+    const lotes=regOf("inv").sort((a,b)=>b.atualizadoEm-a.atualizadoEm),btn=el.querySelector('[data-g-acao="inv-importar"]');
+    if(btn&&!el.querySelector("#invDest")){
+      if(!lotes.find(r=>r.id===G.inv.dest))G.inv.dest="novo";
+      btn.parentElement.insertAdjacentHTML("beforebegin",`<label class="campo" style="margin-top:12px">Destino das linhas<select id="invDest"><option value="novo" ${G.inv.dest==="novo"?"selected":""}>Criar um inventário novo com este arquivo</option>${lotes.map(r=>`<option value="${r.id}" ${G.inv.dest===r.id?"selected":""}>Acrescentar a: ${esc(r.d.nome)} (${r.d.linhas.length} linhas)</option>`).join("")}</select></label>`);
+    }
+  }
+};
+importarInv=async function(){
+  const I=G.inv,a=I.arq;
+  if(Object.keys(I.mapa).length<2){aviso("Mapeie pelo menos duas colunas.");return}
+  const linhas=[];
+  a.linhas.forEach((r,n)=>{
+    const o={_n:n+2};let tem=false;
+    Object.keys(I.mapa).forEach(k=>{let v=r[I.mapa[k]];v=v===undefined?"":String(v).trim().replace(/^'(?=[=+\-@])/,"");if(v){tem=true;o[k]=v.slice(0,600)}});
+    if(!tem)return;
+    if(I.mapa.tipoRisco!==undefined&&I.soErgo&&!/ergon/i.test(o.tipoRisco||""))return;
+    if(o.prob&&!(parseInt(o.prob)>=1&&parseInt(o.prob)<=5))delete o.prob;
+    if(o.sev&&!(parseInt(o.sev)>=1&&parseInt(o.sev)<=5))delete o.sev;
+    ["prazo","dataAval"].forEach(k=>{if(o[k])o[k]=isoInv(o[k])});
+    if(o.prob)o.prob=String(parseInt(o.prob));if(o.sev)o.sev=String(parseInt(o.sev));
+    if(!o.nivel){const n=nivelInv(pontosInv(o));if(n)o.nivel=n}
+    linhas.push(o);
+  });
+  if(!linhas.length){aviso("Nenhuma linha atendeu ao filtro. Revise o mapeamento ou desmarque o filtro de ergonômicos.");return}
+  const dest=I.dest&&I.dest!=="novo"?regGet(I.dest):null;
+  const total=(dest?dest.d.linhas.length:0)+linhas.length;
+  if(total>INV_MAX){aviso("O inventário passaria de "+INV_MAX+" linhas ("+total+"). Divida a planilha em partes.");return}
+  let r;
+  if(dest){dest.d.linhas.push(...linhas);r=dest}
+  else r={id:rid(),tipo:"inv",d:{nome:a.nome.replace(/\.(xlsx|csv|txt)$/i,""),importadoEm:hojeISO(),mapa:{...I.mapa},colunas:a.cabecalhos,linhas,soErgo:I.soErgo}};
+  regGravar(r);I.etapa="ver";I.loteId=r.id;I.arq=null;I.dest="novo";renderInventario();
+  aviso(linhas.length+(dest?" linhas acrescentadas ao inventário.":" linhas importadas."));
+};
+
+/* ---------- eventos ---------- */
+document.addEventListener("input",e=>{
+  const t=e.target;if(!t.dataset||t.dataset.ir===undefined||!G.inv.row)return;
+  G.inv.row.v[t.dataset.ir]=t.value;
+  if(t.dataset.ir==="prob"||t.dataset.ir==="sev"){
+    const pt=pontosInv(G.inv.row.v),sel=$('#invModal [data-ir="nivel"]'),inf=$("#irPts");
+    if(pt!=null){G.inv.row.v.nivel=nivelInv(pt);if(sel)sel.value=G.inv.row.v.nivel;if(inf)inf.textContent="(P x S = "+pt+", sugerido: "+nivelInv(pt)+")"}
+  }
+});
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset&&t.dataset.ir!==undefined&&G.inv.row){G.inv.row.v[t.dataset.ir]=t.value;if(t.dataset.ir==="prob"||t.dataset.ir==="sev"){const pt=pontosInv(G.inv.row.v),sel=$('#invModal [data-ir="nivel"]'),inf=$("#irPts");if(pt!=null){G.inv.row.v.nivel=nivelInv(pt);if(sel)sel.value=G.inv.row.v.nivel;if(inf)inf.textContent="(P x S = "+pt+", sugerido: "+nivelInv(pt)+")"}}return}
+  if(t.id==="invDest"){G.inv.dest=t.value;return}
+  if(t.id==="invArq"){const lb=t.closest("[data-dest]");if(lb)G.inv.dest=lb.dataset.dest;return}
+  if(t.id==="invNome"){const r=regGet(G.inv.loteId);if(r&&t.value.trim()){r.d.nome=t.value.trim().slice(0,120);regGravar(r)}return}
+});
+document.addEventListener("click",e=>{
+  const dz=e.target.closest("[data-dest]");if(dz)G.inv.dest=dz.dataset.dest;
+  if(e.target.closest("[data-ir-fechar]")){fecharLinha();return}
+  const sv=e.target.closest("[data-ir-salvar]");if(sv){salvarLinha(sv.dataset.irSalvar);return}
+  const b=e.target.closest("[data-g-acao]");if(!b)return;
+  const i=Number(b.dataset.i);
+  switch(b.dataset.gAcao){
+    case "inv-novo":novoInventario();break;
+    case "inv-modelo":modeloBranco(b.dataset.fmt);break;
+    case "inv-exp":exportarLote(G.inv.loteId,b.dataset.fmt);break;
+    case "inv-nova-linha":{const r=regGet(G.inv.loteId),u=r&&r.d.linhas[r.d.linhas.length-1];abrirLinha(null,u?{unidade:u.unidade,area:u.area}:null);break}
+    case "inv-editar":abrirLinha(i);break;
+    case "inv-dup":{const r=regGet(G.inv.loteId);if(!r)break;if(r.d.linhas.length>=INV_MAX){aviso("Limite de "+INV_MAX+" linhas por inventário.");break}const c={...r.d.linhas[i],_n:r.d.linhas.length+2};r.d.linhas.splice(i+1,0,c);regGravar(r);renderInventario();aviso("Linha duplicada. Clique em Editar para ajustar.");break}
+    case "inv-linha-del":{const r=regGet(G.inv.loteId);if(r&&confirm("Excluir esta linha do inventário?")){r.d.linhas.splice(i,1);regGravar(r);renderInventario()}break}
+  }
+},true);
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&G.inv.row)fecharLinha()});
+/* =====================================================================
    INÍCIO
    ===================================================================== */
 migrarLegado();
