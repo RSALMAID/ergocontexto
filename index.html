@@ -4196,6 +4196,154 @@ document.addEventListener("click",e=>{
 const _irPara15=irPara;
 irPara=function(v){_irPara15(v);if(v==="relat")renderRelat()};
 /* =====================================================================
+   FASE 9: REBA, STRAIN INDEX, PILOTO DE CONCORDÂNCIA ENTRE AVALIADORES,
+   INDICADORES POR TURNO/CONTRATADA E MAPA DE QUEIXAS
+   Tabelas conferidas: REBA, Hignett e McAtamney, Applied Ergonomics 31 (2000) 201-205
+   (Tabelas A, B e C como publicadas na planilha da Univ. do Sul da Flórida);
+   Strain Index, Moore e Garg, AIHAJ 56 (1995) 443-458.
+   ===================================================================== */
+const REBA_A=[[[1,2,3,4],[1,2,3,4],[3,3,5,6]],[[2,3,4,5],[3,4,5,6],[4,5,6,7]],[[2,4,5,6],[4,5,6,7],[5,6,7,8]],[[3,5,6,7],[5,6,7,8],[6,7,8,9]],[[4,6,7,8],[6,7,8,9],[7,8,9,9]]];
+const REBA_B=[[[1,2,2],[1,2,3]],[[1,2,3],[2,3,4]],[[3,4,5],[4,5,5]],[[4,5,5],[5,6,7]],[[6,7,8],[7,8,8]],[[7,8,8],[8,9,9]]];
+const REBA_C=[[1,1,1,2,3,3,4,5,6,7,7,7],[1,2,2,3,4,4,5,6,6,7,7,8],[2,3,3,3,4,5,6,7,7,8,8,8],[3,4,4,4,5,6,7,8,8,9,9,9],[4,4,4,5,6,7,8,8,9,9,9,9],[6,6,6,7,8,8,9,9,10,10,10,10],[7,7,7,8,9,9,9,10,10,11,11,11],[8,8,8,9,10,10,10,10,10,11,11,11],[9,9,9,10,10,10,11,11,11,12,12,12],[10,10,10,11,11,11,11,12,12,12,12,12],[11,11,11,11,12,12,12,12,12,12,12,12],[12,12,12,12,12,12,12,12,12,12,12,12]];
+const SN=[["0","Não"],["1","Sim"]];
+const REBA_CAMPOS=[
+ ["pesc","Pescoço",[["1","0° a 20° de flexão"],["2","Flexão acima de 20° ou extensão"]]],["pescAj","Pescoço torcido ou inclinado de lado",SN],
+ ["tron","Tronco",[["1","Ereto"],["2","Flexão ou extensão de 0° a 20°"],["3","Flexão de 20° a 60° ou extensão acima de 20°"],["4","Flexão acima de 60°"]]],["tronAj","Tronco torcido ou inclinado de lado",SN],
+ ["perna","Pernas",[["1","Apoio bilateral, caminhando ou sentado"],["2","Apoio unilateral, instável ou peso mal distribuído"]]],["pernaAj","Joelhos",[["0","Sem flexão acentuada"],["1","Flexionados de 30° a 60°"],["2","Flexionados acima de 60° (em pé)"]]],
+ ["braco","Braço (ombro ao cotovelo)",[["1","Extensão até 20° ou flexão até 20°"],["2","Extensão acima de 20° ou flexão de 20° a 45°"],["3","Flexão de 45° a 90°"],["4","Flexão acima de 90°"]]],["bracoElev","Ombro elevado",SN],["bracoAbd","Braço afastado do corpo (abduzido)",SN],["bracoApoio","Braço apoiado ou pessoa inclinada (apoio)",SN],
+ ["antebraco","Antebraço",[["1","Flexão de 60° a 100°"],["2","Flexão abaixo de 60° ou acima de 100°"]]],
+ ["punho","Punho",[["1","0° a 15° de flexão ou extensão"],["2","Acima de 15° de flexão ou extensão"]]],["punhoAj","Punho com desvio ou torção",SN],
+ ["carga","Carga ou força",[["0","Menos de 5 kg"],["1","5 a 10 kg"],["2","Mais de 10 kg"]]],["choque","Força com impacto ou aumento brusco",SN],
+ ["pega","Pega (acoplamento)",[["0","Boa: alça adequada, pegada firme"],["1","Razoável: aceitável, mas não ideal"],["2","Ruim: possível, mas inadequada"],["3","Inaceitável: sem alça ou insegura"]]],
+ ["atEst","Uma ou mais partes do corpo estáticas por mais de 1 minuto",SN],["atRep","Ações repetidas em pequena amplitude, mais de 4 vezes por minuto",SN],["atBrus","Mudanças rápidas e amplas de postura ou base instável",SN]];
+const REBA_RISCO=s=>s<=1?["Desprezível","Nenhuma ação necessária"]:s<=3?["Baixo","Mudança pode ser necessária"]:s<=7?["Médio","Investigar mais e mudar em breve"]:s<=10?["Alto","Investigar e implementar mudança"]:["Muito alto","Implementar mudança imediatamente"];
+const REBA_OK=v=>REBA_CAMPOS.every(([k])=>v[k]!==undefined&&v[k]!=="");
+function reba(v){
+  const n=k=>Number(v[k]),cl=(x,a,b)=>Math.min(Math.max(x,a),b);
+  const pesc=cl(n("pesc")+n("pescAj"),1,3),tron=cl(n("tron")+n("tronAj"),1,5),perna=cl(n("perna")+n("pernaAj"),1,4);
+  const braco=cl(n("braco")+n("bracoElev")+n("bracoAbd")-n("bracoApoio"),1,6),ante=n("antebraco"),punho=cl(n("punho")+n("punhoAj"),1,3);
+  const ta=REBA_A[tron-1][pesc-1][perna-1],carga=n("carga")+n("choque"),A=cl(ta+carga,1,12);
+  const tb=REBA_B[braco-1][ante-1][punho-1],B=cl(tb+n("pega"),1,12);
+  const tc=REBA_C[A-1][B-1],at=n("atEst")+n("atRep")+n("atBrus"),final=tc+at;
+  return {pesc,tron,perna,braco,ante,punho,ta,carga,A,tb,B,tc,at,final};
+}
+const SI_CAMPOS=[
+ ["ie","Intensidade do esforço",[["1","Leve: esforço quase imperceptível (Borg 0 a 2): 1"],["3","Um pouco pesado: esforço perceptível (Borg 3): 3"],["6","Pesado: esforço evidente, sem mudar a expressão (Borg 4 a 5): 6"],["9","Muito pesado: esforço substancial, muda a expressão (Borg 6 a 7): 9"],["13","Quase máximo: usa ombro ou tronco para fazer força (Borg 8 a 10): 13"]]],
+ ["hw","Postura de mão e punho",[["1","Muito boa: perfeitamente neutra: 1,0"],["1.0","Boa: quase neutra: 1,0"],["1.5","Razoável: não neutra: 1,5"],["2","Ruim: desvio acentuado: 2,0"],["3","Muito ruim: próxima do extremo: 3,0"]]],
+ ["sw","Velocidade do trabalho",[["1","Muito lenta ou lenta ou normal: 1,0"],["1.5","Rápida: apressado, mas acompanha: 1,5"],["2","Muito rápida: apressado e quase não acompanha: 2,0"]]]];
+const siDE=p=>p<10?.5:p<30?1:p<50?1.5:p<80?2:3;
+const siEM=e=>e<4?.5:e<=8?1:e<=14?1.5:e<=19?2:3;
+const siDD=h=>h<=1?.25:h<=2?.5:h<=4?.75:h<=8?1:1.5;
+const siCat=s=>s<3?"Seguro":s<=5?"Incerto":s<=7?"Algum risco":"Perigoso";
+const NG=(s)=>{const x=parseFloat(String(s).replace(",","."));return isFinite(x)?x:NaN};
+
+const _abrirMetodo16=abrirMetodo;
+abrirMetodo=function(t){_abrirMetodo16(t)};
+const _desenharMetodo16=desenharMetodo;
+desenharMetodo=function(){
+  if(M.tipo!=="reba"&&M.tipo!=="si")return _desenharMetodo16();
+  const el=$("#metodoModal");if(!el)return;
+  let corpo;
+  if(M.tipo==="reba"){
+    corpo=`<h2>REBA</h2><p class="mut" style="font-size:.86rem">Triagem de postura do corpo inteiro, útil em tarefas com manuseio de cargas e posturas variadas. Escolha a faixa observada em cada item, avaliando o lado mais exigido.</p>
+    <div class="grid2">${REBA_CAMPOS.map(([k,r,o])=>`<label class="campo">${r}<select data-mt="${k}"><option value="">Selecione…</option>${sel1(o,M.v[k]??"")}</select></label>`).join("")}</div>`;
+  }else{
+    corpo=`<h2>Strain Index (Moore e Garg)</h2><p class="mut" style="font-size:.86rem">Risco de distúrbios da mão, punho e antebraço em tarefas repetitivas. Avalie uma tarefa por vez.</p>
+    <div class="grid2">${SI_CAMPOS.map(([k,r,o])=>`<label class="campo">${r}<select data-mt="${k}"><option value="">Selecione…</option>${sel1(o,M.v[k]??"")}</select></label>`).join("")}
+    ${mi("de","Duração do esforço","","% do ciclo")}${mi("em","Esforços por minuto","","nº")}${mi("dd","Duração da tarefa por dia","","horas")}</div>`;
+  }
+  el.innerHTML=`<div class="modal-fundo" data-mt-fechar="1"></div><div class="modal-caixa" role="dialog" aria-modal="true"><button type="button" class="modal-x" data-mt-fechar="1" aria-label="Fechar">×</button>${corpo}<div id="metodoRes"></div></div>`;
+  atualizarMetodo();
+};
+const _resultadoMetodo16=resultadoMetodo;
+resultadoMetodo=function(){
+  if(M.tipo==="reba"){
+    if(!REBA_OK(M.v))return null;
+    const r=reba(M.v),rk=REBA_RISCO(r.final);
+    return {nome:"REBA",versao:"Hignett e McAtamney, 2000 (Applied Ergonomics 31(2): 201-205)",
+      resultado:`Pontuação final ${r.final} · risco ${rk[0].toLowerCase()}: ${rk[1].toLowerCase()}`,
+      parametros:`Pescoço ${r.pesc} · tronco ${r.tron} · pernas ${r.perna} → Tabela A ${r.ta} + carga/força ${r.carga} = pontuação A ${r.A}. Braço ${r.braco} · antebraço ${r.ante} · punho ${r.punho} → Tabela B ${r.tb} + pega ${M.v.pega} = pontuação B ${r.B}. Tabela C ${r.tc} + atividade ${r.at} = ${r.final}.`,
+      limites:"Método de triagem de postura de uma situação ou instante representativo. Não mede a duração total da jornada, vibração, frio nem fatores psicossociais. Pontuação média ou maior indica necessidade de investigar e priorizar mudanças; não é diagnóstico.",
+      html:`<table class="tab"><tr><th>Pescoço</th><th>Tronco</th><th>Pernas</th><th>A</th><th>Braço</th><th>Antebraço</th><th>Punho</th><th>B</th><th>C</th><th>Final</th></tr><tr><td>${r.pesc}</td><td>${r.tron}</td><td>${r.perna}</td><td>${r.A}</td><td>${r.braco}</td><td>${r.ante}</td><td>${r.punho}</td><td>${r.B}</td><td>${r.tc}</td><td><b>${r.final}</b></td></tr></table><p><b>${esc(rk[0])}</b>: ${esc(rk[1])}.</p>`};
+  }
+  if(M.tipo==="si"){
+    const de=NG(M.v.de),em=NG(M.v.em),dd=NG(M.v.dd);
+    if(!M.v.ie||!M.v.hw||!M.v.sw||[de,em,dd].some(isNaN)||de<0||de>100||em<0||dd<=0)return null;
+    const ie=Number(M.v.ie),hw=Number(M.v.hw),sw=Number(M.v.sw),mde=siDE(de),mem=de>=100?3:siEM(em),mdd=siDD(dd);
+    const si=ie*mde*mem*hw*sw*mdd,cat=siCat(si);
+    return {nome:"Strain Index",versao:"Moore e Garg, 1995 (AIHAJ 56: 443-458)",
+      resultado:`SI = ${nf(si,1)} · ${cat}`,
+      parametros:`Intensidade ${ie} · duração do esforço ${nf(de,0)}% (${nf(mde,1)}) · ${nf(em,1)} esforços/min (${nf(mem,1)}${de>=100?", fixado em 3,0 por esforço contínuo":""}) · postura ${nf(hw,1)} · velocidade ${nf(sw,1)} · ${nf(dd,1)} h/dia (${nf(mdd)}). SI = produto dos seis multiplicadores.`,
+      limites:"Avalia distúrbios distais de membros superiores em tarefa repetitiva, uma tarefa por vez. Depende de boa estimativa da intensidade do esforço (escala de Borg) e não considera vibração, frio ou fatores psicossociais. Faixas: abaixo de 3 seguro; 3 a 5 incerto; 5 a 7 algum risco; acima de 7 perigoso.",
+      html:`<table class="tab"><tr><th>Intensidade</th><th>Duração</th><th>Esforços/min</th><th>Postura</th><th>Velocidade</th><th>Horas/dia</th><th>SI</th></tr><tr><td>${ie}</td><td>${nf(mde,1)}</td><td>${nf(mem,1)}</td><td>${nf(hw,1)}</td><td>${nf(sw,1)}</td><td>${nf(mdd)}</td><td><b>${nf(si,1)}</b></td></tr></table><p><b>${cat}</b></p>`};
+  }
+  return _resultadoMetodo16();
+};
+const _htmlClasse16=htmlClasse;
+htmlClasse=function(c,dis){
+  const h=_htmlClasse16(c,dis);
+  return dis?h:h.replace('data-mt-abrir="rula">','data-mt-abrir="rula">').replace(/(<button[^>]*data-mt-abrir="rula">[^<]*<\/button>)/,'$1<button type="button" class="btn sec peq" data-mt-abrir="reba">Calcular REBA</button><button type="button" class="btn sec peq" data-mt-abrir="si">Calcular Strain Index</button>');
+};
+
+/* ---------- piloto de concordância entre avaliadores ---------- */
+function kappaPond(pares){ // pares [[a,b]] com categorias 0..3, ponderação quadrática
+  const K=4,n=pares.length;if(!n)return null;
+  const O=Array.from({length:K},()=>Array(K).fill(0)),ra=Array(K).fill(0),rb=Array(K).fill(0);
+  pares.forEach(([a,b])=>{O[a][b]++;ra[a]++;rb[b]++});
+  let num=0,den=0;
+  for(let i=0;i<K;i++)for(let j=0;j<K;j++){const w=(i-j)*(i-j)/9;num+=w*O[i][j]/n;den+=w*ra[i]*rb[j]/(n*n)}
+  return den===0?null:1-num/den;
+}
+const kapTxt=k=>k==null?"não calculável":k<0.2?"fraca":k<0.4?"regular":k<0.6?"moderada":k<0.8?"substancial":"quase perfeita";
+function relPiloto(){
+  const porPosto={};
+  regOf("aep").filter(r=>!aepVazia(r)&&r.d.postoId&&r.autor&&r.autor.id).forEach(r=>{(porPosto[r.d.postoId]=porPosto[r.d.postoId]||[]).push(r)});
+  const linhas=[],todos=[],disc=[];
+  Object.keys(porPosto).forEach(pid=>{
+    const L=porPosto[pid];
+    for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++){
+      const a=L[i],b=L[j];if(a.autor.id===b.autor.id)continue;
+      const pares=[];
+      CATS.forEach(c=>c.itens.forEach(it=>{const x=a.d.f&&a.d.f[it.k],y=b.d.f&&b.d.f[it.k];
+        if(x===undefined||x===""||x==="na"||y===undefined||y===""||y==="na")return;
+        pares.push([Number(x),Number(y)]);if(Math.abs(Number(x)-Number(y))>=2)disc.push([nomePosto15(pid),it.t,a.autor.nome+": "+NIV_F[Number(x)],b.autor.nome+": "+NIV_F[Number(y)]])}));
+      if(pares.length<3)continue;
+      todos.push(...pares);
+      const ig=pares.filter(p=>p[0]===p[1]).length,k=kappaPond(pares);
+      linhas.push([nomePosto15(pid),(a.d.numero||"AEP")+" × "+(b.d.numero||"AEP"),a.autor.nome+" × "+b.autor.nome,pares.length,Math.round(100*ig/pares.length)+"%",k==null?"—":nf(k)+" ("+kapTxt(k)+")"]);
+    }
+  });
+  const kg=kappaPond(todos),igG=todos.length?Math.round(100*todos.filter(p=>p[0]===p[1]).length/todos.length):null;
+  return relCab("Piloto de validação entre avaliadores","Concordância entre avaliações independentes do mesmo posto")+
+  `<p class="mut">Como usar: peça a dois avaliadores que façam a AEP do mesmo posto, cada um com seu login, sem consultar o outro. O sistema compara os itens avaliados pelos dois. Concordância ponderada (kappa quadrático): abaixo de 0,40 indica critérios que precisam ser esclarecidos antes de padronizar.</p>`+
+  (todos.length?`<div class="kpis"><div class="kpi"><b>${linhas.length}</b><small>Pares comparados</small></div><div class="kpi"><b>${todos.length}</b><small>Itens comparados</small></div><div class="kpi"><b>${igG}%</b><small>Concordância exata</small></div><div class="kpi"><b>${kg==null?"—":nf(kg)}</b><small>Kappa ponderado${kg==null?"":" ("+kapTxt(kg)+")"}</small></div></div>`:"")+
+  relTab(["Posto","Avaliações","Avaliadores","Itens","Concordância exata","Kappa ponderado"],linhas)+
+  `<h3>Itens com divergência de 2 níveis ou mais</h3>`+relTab(["Posto","Item","Avaliador 1","Avaliador 2"],disc.slice(0,40));
+}
+const _renderRelat16=renderRelat;
+renderRelat=function(){
+  _renderRelat16();
+  const l=$("#v-relat .linha");if(l)l.insertAdjacentHTML("beforeend",`<button class="btn sec" data-rel="piloto">Piloto: concordância entre avaliadores</button>`);
+};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-rel=piloto]");if(b)mostrarRel(relPiloto())});
+
+/* ---------- indicadores por turno, contratada e mapa de queixas ---------- */
+const REGIOES=[["Pescoço",/pesco|cervical/i],["Ombros",/ombro/i],["Cotovelos",/cotovelo/i],["Punhos e mãos",/punho|m[aã]o|dedo/i],["Coluna dorsal",/dorsal|costas/i],["Coluna lombar",/lombar/i],["Quadril",/quadril/i],["Joelhos",/joelho/i],["Tornozelos e pés",/tornozelo|p[eé]s?\b/i]];
+const _renderDash16=renderDash;
+renderDash=function(){
+  _renderDash16();
+  const el=$("#v-dash");if(!el)return;
+  const gs=regOf("cad").filter(r=>r.d.tc==="gsts"),porT={},porC={};
+  gs.forEach(r=>{const n=Number(r.d.nExpostos)||0;const t=r.d.turno||"Não informado",c=r.d.contratada||"Equipe própria";porT[t]=(porT[t]||0)+n;porC[c]=(porC[c]||0)+n});
+  const lst=o=>Object.keys(o).map(k=>({rot:k,v:o[k],tip:k+": "+o[k]+" trabalhadores expostos"})).sort((a,b)=>b.v-a.v);
+  const q={};regOf("aep").filter(r=>!aepVazia(r)).forEach(r=>{const t=((r.d.part||{}).regioes||"");REGIOES.forEach(([n,re])=>{if(re.test(t))q[n]=(q[n]||0)+1})});
+  const ql=Object.keys(q).map(k=>({rot:k,v:q[k],tip:k+": citada em "+q[k]+" AEP(s)"})).sort((a,b)=>b.v-a.v);
+  const div=document.createElement("div");div.className="card";
+  div.innerHTML=`<h3>Exposição por turno e por empresa</h3>${gs.length?`<p class="mut">Trabalhadores expostos informados em Cadastros, em Funções e GSTS.</p>${barras(lst(porT))}<h4 style="margin-top:12px">Por equipe própria ou contratada</h4>${barras(lst(porC))}`:`<p class="mut">Cadastre funções e GSTS com turno e nº de expostos para ver este indicador.</p>`}
+  <h3 style="margin-top:14px">Regiões do corpo com desconforto relatado</h3>${ql.length?barras(ql):`<p class="mut">Preencha "Regiões com desconforto" na participação do trabalhador da AEP.</p>`}`;
+  el.appendChild(div);
+};
+/* =====================================================================
    INÍCIO
    ===================================================================== */
 migrarLegado();
