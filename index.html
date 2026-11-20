@@ -2165,7 +2165,7 @@ const sha256=(()=>{const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c2
     return H.map(v=>(v>>>0).toString(16).padStart(8,"0")).join("")}})();
 const canon=o=>o===null||typeof o!=="object"?JSON.stringify(o):Array.isArray(o)?"["+o.map(canon).join(",")+"]":"{"+Object.keys(o).sort().map(k=>JSON.stringify(k)+":"+canon(o[k])).join(",")+"}";
 // o hash cobre o conteúdo técnico do registro (não cobre status, histórico, assinatura nem os bytes dos anexos)
-const hashDoc=d=>{const {aprov,hist,status,versao,evid,revisao,_autor,_criadoEm,versoes,arquivada,encerrada,aetId,...c}=d;return sha256(canon(c))};
+const hashDoc=d=>{const {aprov,hist,status,versao,evid,revisao,_autor,_criadoEm,versoes,arquivada,encerrada,aetId,ia,importado,...c}=d;return sha256(canon(c))};
 const autorReg=()=>{const r=G.ed&&regGet(G.ed.id);return r&&r.autor?r.autor.id:null};
 const faltaRevisao=d=>{if(!perfil||(typeof membros!=="undefined"&&membros.length<2))return false;const a=autorReg();return !(d.revisao&&d.revisao.porId&&d.revisao.porId!==a)};
 
@@ -6923,6 +6923,546 @@ document.addEventListener("click",e=>{if(e.target.closest(".marca")){if(G.ed&&G.
 #barraIni{display:none;align-items:center;gap:12px;max-width:2200px;margin:8px auto 0;padding:0 16px}#barraIni .btn{padding:8px 16px}#barraTit{font-weight:700;color:#FF9900}
 @media(max-width:600px){.tiles{grid-template-columns:1fr 1fr!important;gap:12px!important}.tile{padding:16px!important;min-height:116px!important;flex-direction:column;align-items:flex-start;gap:10px!important}.tile-tri{grid-column:1/-1;flex-direction:row!important;align-items:center}.tile-ic{width:52px!important;height:52px!important}.tile-tx b{font-size:1.05rem!important}}`;document.head.appendChild(s)})();
 barraInicio();irPara("inicio");
+/* FASE 23: Plano de ação → Ações → Tarefas, tudo numerado, com pesquisa no Painel */
+G.acVista="planos";G.ptQ="";G.ptTipo="todos";G.ptSt="todos";
+const ST_TAR=a=>a.feito?"Feita":(a.prazo&&a.prazo<hojeISO()?"Atrasada":"Pendente");
+function tarNum(a,t){return (a.numero||"ACA-pendente")+"-T"+t.n}
+function acoesDoPlano(p){return regOf("acao").filter(a=>!a.excluido&&(a.d.planoId===p.id||(!a.d.planoId&&p.d.origemId&&a.d.origemId===p.d.origemId)))}
+function tarefasAbertasAtrasadas(a){return (a.d.tarefas||[]).filter(t=>!t.feito&&t.prazo&&t.prazo<hojeISO()).length}
+function stPlano(p){
+  if(p.d.cancelado)return "Cancelado";
+  const A=acoesDoPlano(p);if(!A.length)return "Planejado";
+  const ab=A.filter(a=>ABERTA_AC(a.d.status)||AGUARDA(a.d.status));
+  if(!ab.length)return "Concluído";
+  if(A.some(a=>diasAtraso(a.d)>0||tarefasAbertasAtrasadas(a)>0))return "Atrasado";
+  if(A.every(a=>a.d.status==="proposta"))return "Planejado";
+  return "Em execução";
+}
+function progPlano(p){
+  const A=acoesDoPlano(p);if(!A.length)return 0;
+  const T=A.flatMap(a=>a.d.tarefas||[]);
+  if(T.length)return Math.round(T.filter(t=>t.feito).length/T.length*100);
+  return Math.round(A.filter(a=>!ABERTA_AC(a.d.status)).length/A.length*100);
+}
+function novoPlano(base){
+  return {id:rid(),tipo:"plano",novo:true,d:Object.assign({data:hojeISO(),titulo:"",objetivo:"",origemId:"",postoId:"",atividadeId:"",responsavel:(perfil&&perfil.nome)||"",prazo:somaDias(90),cancelado:false,hist:[]},base||{})};
+}
+function planoDaOrigem(oid){
+  let p=regOf("plano").find(r=>!r.excluido&&r.d.origemId===oid);if(p)return p;
+  const o=regGet(oid);if(!o)return null;
+  const rot={aep:"AEP",aet:"AET",dem:"Demanda"}[o.tipo]||o.tipo;
+  p={id:rid(),tipo:"plano",d:{data:hojeISO(),titulo:"Plano de ação · "+rot+" "+(o.d.numero||""),objetivo:"",origemId:oid,postoId:o.d.postoId||"",atividadeId:o.d.atividadeId||"",responsavel:(perfil&&perfil.nome)||"",prazo:somaDias(90),cancelado:false,hist:[]}};
+  regGravar(p);return regGet(p.id);
+}
+// numeração local quando não há servidor (com login, o servidor numera)
+(function(){const rg=regGravar,PF={plano:"PLA",acao:"ACA",dem:"DEM",aep:"AEP",aet:"AET",med:"MED",doc:"DOC"};
+  regGravar=function(r,t){
+    if(r&&PF[r.tipo]&&r.d&&!r.d.numero&&!(typeof SB_ON!=="undefined"&&SB_ON)){
+      const ano=new Date().getFullYear(),n=regOf(r.tipo).filter(x=>x.d&&x.d.numero&&x.id!==r.id).length+1;r.d.numero=PF[r.tipo]+"-"+ano+"-"+String(n).padStart(4,"0");
+    }
+    return rg.apply(this,arguments);
+  };
+})();
+// ---------- lista, pesquisa ----------
+function linhasPT(){
+  const L=[];
+  regOf("plano").filter(r=>!r.excluido).forEach(p=>{const A=acoesDoPlano(p);L.push({k:"plano",num:p.d.numero||"(pendente)",tx:p.d.titulo||"(sem título)",pai:"",resp:p.d.responsavel,prazo:p.d.prazo,st:stPlano(p),extra:A.length+" ação(ões) · "+progPlano(p)+"%",posto:p.d.postoId,id:p.id})});
+  regOf("acao").filter(r=>!r.excluido).forEach(a=>{const pl=a.d.planoId&&regGet(a.d.planoId);L.push({k:"acao",num:a.d.numero||"(pendente)",tx:a.d.acao||a.d.problema||"(sem descrição)",pai:pl?(pl.d.numero||"plano"):"sem plano",resp:a.d.responsavel,prazo:a.d.prazo,st:stAcao(a.d.status),stk:ABERTA_AC(a.d.status)?(diasAtraso(a.d)>0?"atrasado":"aberto"):(a.d.status==="eficaz"||a.d.status==="concluida"||a.d.status==="verificacao"?"concluido":"aberto"),extra:(a.d.tarefas||[]).length?(a.d.tarefas.filter(t=>t.feito).length+"/"+a.d.tarefas.length+" tarefas"):"",posto:a.d.postoId,id:a.id});
+    (a.d.tarefas||[]).forEach(t=>L.push({k:"tarefa",num:tarNum(a.d,t),tx:t.t||"(sem descrição)",pai:a.d.numero||"ação",resp:t.resp||a.d.responsavel,prazo:t.prazo,st:ST_TAR(t),stk:t.feito?"concluido":(t.prazo&&t.prazo<hojeISO()?"atrasado":"aberto"),extra:"",posto:a.d.postoId,id:a.id}))});
+  L.forEach(x=>{if(!x.stk){x.stk=x.st==="Concluído"?"concluido":x.st==="Atrasado"?"atrasado":x.st==="Cancelado"?"concluido":"aberto"}});
+  return L;
+}
+function resultadosPT(tipoFixo){
+  const q=normB(G.ptQ||""),t=tipoFixo||G.ptTipo,s=G.ptSt;
+  const L=linhasPT().filter(x=>(t==="todos"||t===x.k)&&(s==="todos"||s===x.stk)&&(!q||normB([x.num,x.tx,x.pai,x.resp,x.st,x.posto?caminho(x.posto):""].join(" ")).includes(q)));
+  const rot={plano:"Plano",acao:"Ação",tarefa:"Tarefa"};
+  L.sort((a,b)=>(a.prazo||"9").localeCompare(b.prazo||"9"));
+  return `<small class="mut">${L.length} resultado(s)</small>`+(L.length?L.slice(0,150).map(x=>`<div class="sug"><span><span class="chp ${x.k==="plano"?"o":x.k==="acao"?"b":""}">${rot[x.k]}</span> <b>${esc(x.num)}</b> · ${esc(String(x.tx).slice(0,100))}<br><small>${x.pai?"em "+esc(x.pai)+" · ":""}${esc(x.st)}${x.resp?" · "+esc(x.resp):""}${x.prazo?" · prazo "+dataBR(x.prazo):""}${x.extra?" · "+esc(x.extra):""}${x.posto?" · "+esc(caminho(x.posto)):""}</small></span><button type="button" class="btn sec peq" data-pt-ab="${x.k}" data-id="${x.id}">Abrir</button></div>`).join(""):`<p class="mut">Nada encontrado.</p>`);
+}
+function htmlPT(tipoFixo){
+  const sf=tipoFixo?"a":"";
+  const ch=(k,t,cur,at)=>`<button type="button" class="${cur===k?"on":""}" data-pt-f="${at}" data-v="${k}">${t}</button>`;
+  return `<div class="card"><h3 style="margin-top:0">Planos, ações e tarefas</h3><input id="ptQ${sf}" type="search" placeholder="Buscar por número (PLA, ACA, T), texto, responsável, posto ou status" value="${esc(G.ptQ||"")}" style="width:100%;margin-bottom:8px">
+  ${tipoFixo?"":`<div class="chips" style="margin-bottom:6px">${ch("todos","Tudo",G.ptTipo,"tipo")}${ch("plano","Planos",G.ptTipo,"tipo")}${ch("acao","Ações",G.ptTipo,"tipo")}${ch("tarefa","Tarefas",G.ptTipo,"tipo")}</div>`}
+  <div class="chips" style="margin-bottom:8px">${ch("todos","Qualquer situação",G.ptSt,"st")}${ch("aberto","Em aberto",G.ptSt,"st")}${ch("atrasado","Atrasados",G.ptSt,"st")}${ch("concluido","Concluídos",G.ptSt,"st")}</div>
+  <div id="ptRes${sf}">${resultadosPT(tipoFixo)}</div></div>`;
+}
+const _pnlHtml37=pnlHtml;
+pnlHtml=function(tab){return tab==="planos"?htmlPT():_pnlHtml37(tab)};
+if(!PNL_TABS.some(x=>x[0]==="planos"))PNL_TABS.splice(PNL_TABS.findIndex(x=>x[0]==="acoes")+1,0,["planos","Planos e tarefas"]);
+document.addEventListener("input",e=>{
+  if(e.target.id!=="ptQ"&&e.target.id!=="ptQa")return;G.ptQ=e.target.value;const a=e.target.id==="ptQa",r=$(a?"#ptResa":"#ptRes");if(r)r.innerHTML=resultadosPT(a?(G.acVista==="tarefas"?"tarefa":"plano"):null);
+});
+document.addEventListener("click",e=>{
+  const f=e.target.closest("[data-pt-f]");
+  if(f){if(f.dataset.ptF==="tipo")G.ptTipo=f.dataset.v;else G.ptSt=f.dataset.v;if($("#v-acoes.on"))renderAcoes();else renderPnl();return}
+  const a=e.target.closest("[data-pt-ab]");
+  if(a){const k=a.dataset.ptAb,id=a.dataset.id,r=regGet(id);if(!r)return;
+    if(k==="plano"){G.ed={id,tipo:"plano",d:JSON.parse(JSON.stringify(r.d))};irPara("acoes")}
+    else{G.ed={id,tipo:"acao",d:JSON.parse(JSON.stringify(r.d))};irPara("acoes")}}
+});
+// ---------- tela Ações: Planos | Ações | Tarefas ----------
+const _renderAcoes37=renderAcoes;
+renderAcoes=function(){
+  const el=$("#v-acoes");if(!el)return;
+  if(G.ed&&G.ed.tipo==="plano"){el.innerHTML=htmlPlanoEd();return}
+  if(G.ed&&G.ed.tipo==="acao"){_renderAcoes37();return}
+  const v=G.acVista||"planos";
+  const tabs=`<div class="card"><div class="linha" style="justify-content:space-between;flex-wrap:wrap"><h2 style="margin:0">Plano de ação</h2><div class="linha"><button class="btn" data-pl="novo">+ Novo plano</button>${v==="acoes"?"":`<button class="btn sec" data-g-acao="ac-nova">+ Nova ação</button>`}</div></div>
+   <div class="chips" style="margin-top:10px"><button type="button" class="${v==="planos"?"on":""}" data-pl="vista" data-v="planos">Planos</button><button type="button" class="${v==="acoes"?"on":""}" data-pl="vista" data-v="acoes">Ações</button><button type="button" class="${v==="tarefas"?"on":""}" data-pl="vista" data-v="tarefas">Tarefas</button></div>
+   <p class="mut" style="margin:8px 0 0;font-size:.86rem">Um plano reúne ações. Cada ação tem tarefas. Tudo tem número e pode ser pesquisado aqui e no Painel.</p></div>`;
+  if(v==="acoes"){_renderAcoes37();el.insertAdjacentHTML("afterbegin",tabs);return}
+  const sem=regOf("acao").filter(a=>!a.excluido&&!a.d.planoId&&!regOf("plano").some(p=>!p.excluido&&p.d.origemId&&p.d.origemId===a.d.origemId)).length;
+  el.innerHTML=tabs+(sem?`<div class="alerta">${sem} ação(ões) ainda sem plano. <button type="button" class="btn sec peq" data-pl="organizar">Organizar em planos</button></div>`:"")+htmlPT(v==="planos"?"plano":"tarefa");
+};
+// ---------- editor do plano ----------
+function htmlPlanoEd(){
+  const {d,id}=G.ed,P={id,d},A=acoesDoPlano(P),pr=progPlano(P);
+  const origens=regOf("aep").concat(regOf("aet"),regOf("dem")).filter(r=>!r.excluido).map(r=>[r.id,r.tipo.toUpperCase()+" "+(r.d.numero||"(pendente)")+(r.d.postoId?" · "+caminho(r.d.postoId):"")]);
+  const livres=regOf("acao").filter(a=>!a.excluido&&a.d.planoId!==id).map(a=>[a.id,(a.d.numero||"(pendente)")+" · "+String(a.d.acao||a.d.problema||"").slice(0,50)]);
+  const T=tarefasPlano(P);
+  return `<div class="card no-print"><button class="btn sec peq" data-g-acao="ed-voltar">← Plano de ação</button><h2 style="margin-top:12px">Plano ${esc(d.numero||"(número após sincronizar)")} <span class="bd ${stPlano(P)==="Atrasado"?"n3":stPlano(P)==="Concluído"?"n0":"nd"}">${stPlano(P)}</span></h2>
+  ${I("titulo","Título do plano","","text")}${T_("objetivo","Objetivo (que condição de trabalho este plano quer mudar)",2)}
+  <label class="campo">Origem<select data-g="origemId" data-re="1"><option value="">(sem origem)</option>${sel1(origens,d.origemId||"")}</select></label>${vinculoHtml(d,"")}
+  <div class="grid2">${I("responsavel","Responsável pelo plano","")}${I("prazo","Prazo do plano","","date")}</div>
+  <div class="st-bar" aria-label="Progresso"><i style="width:${pr}%"></i></div><small class="mut">Progresso ${pr}% · ${A.length} ação(ões) · ${T.length} tarefa(s)</small>
+  <label class="chk"><input type="checkbox" data-g="cancelado" data-re="1" ${d.cancelado?"checked":""}> Plano cancelado</label></div>
+  <div class="card"><div class="linha" style="justify-content:space-between"><h3 style="margin:0">Ações do plano (${A.length})</h3><button class="btn" data-pl="nova-acao">+ Nova ação neste plano</button></div>
+  ${A.map(a=>`<div class="sug"><span><b>${esc(a.d.numero||"(pendente)")}</b> · ${esc(String(a.d.acao||a.d.problema||"").slice(0,90))}<br><small>${stAcao(a.d.status)}${a.d.responsavel?" · "+esc(a.d.responsavel):""}${a.d.prazo?" · prazo "+dataBR(a.d.prazo):""}${(a.d.tarefas||[]).length?" · "+a.d.tarefas.filter(t=>t.feito).length+"/"+a.d.tarefas.length+" tarefas":""}</small></span><button type="button" class="btn sec peq" data-g-acao="ac-abrir" data-id="${a.id}">Abrir</button></div>`).join("")||`<p class="mut">Nenhuma ação ainda.</p>`}
+  <div class="linha" style="margin-top:8px"><select id="plLiga" style="flex:1"><option value="">Vincular ação existente…</option>${sel1(livres,"")}</select><button type="button" class="btn sec" data-pl="ligar">Vincular</button></div></div>
+  ${T.length?`<div class="card"><h3 style="margin-top:0">Tarefas (${T.length})</h3>${T.map(x=>`<div class="sug"><span><b>${esc(tarNum(x.a.d,x.t))}</b> · ${esc(x.t.t||"")}<br><small>${ST_TAR(x.t)}${x.t.resp?" · "+esc(x.t.resp):""}${x.t.prazo?" · prazo "+dataBR(x.t.prazo):""}</small></span><button type="button" class="btn sec peq" data-g-acao="ac-abrir" data-id="${x.a.id}">Abrir ação</button></div>`).join("")}</div>`:""}`;
+}
+function tarefasPlano(P){return acoesDoPlano(P).flatMap(a=>(a.d.tarefas||[]).map(t=>({a,t})))}
+const T_=(p,r,rows)=>`<label class="campo">${r}<textarea data-g="${p}" rows="${rows||2}">${esc(gget(G.ed.d,p)||"")}</textarea></label>`;
+// ---------- ação: plano e tarefas ----------
+const _htmlAcaoEd37=htmlAcaoEd;
+htmlAcaoEd=function(){
+  const h=_htmlAcaoEd37(),{d}=G.ed,lock=["eficaz","parcial","naoeficaz","cancelada"].includes(d.status)||!podeEditarAcao(d),dis=lock?"disabled":"";
+  const planos=regOf("plano").filter(r=>!r.excluido).map(r=>[r.id,(r.d.numero||"(pendente)")+" · "+(r.d.titulo||"")]);
+  const tars=(d.tarefas||[]).map((t,i)=>`<div class="metodo"><div class="linha" style="flex-wrap:nowrap;align-items:center"><b style="flex:0 0 auto">${esc(tarNum(d,t))}</b><label class="chk" style="margin:0 0 0 auto"><input type="checkbox" data-g="tarefas.${i}.feito" data-re="1" ${t.feito?"checked":""} ${dis}> Feita${t.feito&&t.em?" em "+dataBR(t.em):""}</label></div>
+   <input data-g="tarefas.${i}.t" value="${esc(t.t||"")}" placeholder="Descrição da tarefa" ${dis}><div class="grid2"><input data-g="tarefas.${i}.resp" value="${esc(t.resp||"")}" placeholder="Responsável" ${dis}><input type="date" data-g="tarefas.${i}.prazo" value="${esc(t.prazo||"")}" ${dis}></div>
+   ${dis?"":`<button type="button" class="btn sec peq" data-pl="tar-del" data-i="${i}">Remover tarefa</button>`}</div>`).join("");
+  const blk=`<details class="bloco" open><summary>Plano e tarefas</summary><div class="bloco-c"><label class="campo">Plano de ação<select data-g="planoId" data-re="1" ${dis}><option value="">(sem plano)</option>${sel1(planos,d.planoId||"")}</select></label>
+   <h4>Tarefas (${(d.tarefas||[]).filter(t=>t.feito).length}/${(d.tarefas||[]).length})</h4>${tars||`<p class="mut">Quebre a ação em tarefas com responsável e prazo.</p>`}${dis?"":`<button type="button" class="btn sec peq" data-pl="tar-add">+ Tarefa</button>`}</div></details>`;
+  return h.replace(/<details class="bloco" ?(open)?><summary>4\. Evidências/,m=>blk+m);
+};
+document.addEventListener("change",e=>{
+  const t=e.target;if(!G.ed||G.ed.tipo!=="acao"||!(t.dataset&&/^tarefas\.\d+\.feito$/.test(t.dataset.g||"")))return;
+  const i=Number(t.dataset.g.split(".")[1]),x=(G.ed.d.tarefas||[])[i];if(x){if(x.feito&&!x.em)x.em=hojeISO();if(!x.feito)x.em=""}
+});
+// ---------- ações dos botões ----------
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-pl]");if(!b)return;const k=b.dataset.pl;
+  if(k==="vista"){G.acVista=b.dataset.v;renderAcoes();return}
+  if(k==="novo"){G.ed=novoPlano();irPara("acoes");return}
+  if(k==="organizar"){
+    let n=0;regOf("acao").filter(a=>!a.excluido&&!a.d.planoId&&a.d.origemId&&ABERTA_AC(a.d.status)||(!a.excluido&&!a.d.planoId&&a.d.origemId&&AGUARDA(a.d.status))).forEach(a=>{const p=planoDaOrigem(a.d.origemId);if(p){a.d.planoId=p.id;regGravar(a);n++}});
+    aviso(n+" ação(ões) organizada(s) em planos.");renderAcoes();return}
+  if(!G.ed)return;
+  if(k==="tar-add"&&G.ed.tipo==="acao"){const d=G.ed.d;d.tarSeq=(d.tarSeq||(d.tarefas||[]).reduce((m,t)=>Math.max(m,t.n),0))+1;(d.tarefas=d.tarefas||[]).push({n:d.tarSeq,t:"",resp:d.responsavel||"",prazo:"",feito:false,em:""});gravarEd();reRender()}
+  else if(k==="tar-del"&&G.ed.tipo==="acao"){if(!confirm("Remover esta tarefa?"))return;G.ed.d.tarefas.splice(Number(b.dataset.i),1);gravarEd();reRender()}
+  else if(k==="nova-acao"&&G.ed.tipo==="plano"){gravarEd();const p=G.ed;const n=novaAcao({planoId:p.id,origemId:p.d.origemId||"",postoId:p.d.postoId||"",atividadeId:p.d.atividadeId||""});G.ed=n;irPara("acoes")}
+  else if(k==="ligar"&&G.ed.tipo==="plano"){const id=$("#plLiga").value;if(!id)return aviso("Escolha a ação.");const a=regGet(id);if(a){if(["eficaz","parcial","naoeficaz"].includes(a.d.status)&&!quemEdita())return aviso("Ação encerrada: só o administrador altera.");a.d.planoId=G.ed.id;regGravar(a)}renderAcoes()}
+});
+document.addEventListener("click",e=>{
+  const b=e.target.closest('[data-g-acao="ed-voltar"]');if(!b||!G.ed||G.ed.tipo!=="plano")return;
+  e.stopImmediatePropagation();gravarEd();G.ed=null;renderAcoes();window.scrollTo(0,0);
+},true);
+const _gravarEd37=gravarEd;
+gravarEd=function(){
+  if(G.ed&&G.ed.tipo==="plano"&&G.ed.novo){
+    if(!(G.ed.d.titulo||"").trim())return;
+    regGravar({id:G.ed.id,tipo:"plano",d:JSON.parse(JSON.stringify(G.ed.d))});G.ed.novo=false;return;
+  }
+  if(G.ed&&G.ed.tipo==="acao"&&G.ed.novo&&!G.ed.d.planoId&&G.ed.d.origemId&&(G.ed.d.problema||G.ed.d.acao||"").trim()){const p=planoDaOrigem(G.ed.d.origemId);if(p)G.ed.d.planoId=p.id}
+  _gravarEd37();
+};
+const _irPara37=irPara;
+irPara=function(v){if(v!=="acoes"&&G.ed&&G.ed.tipo==="plano"){gravarEd();G.ed=null}_irPara37(v)};
+// alertas
+const _calcAlertas37=calcAlertas;
+calcAlertas=function(){
+  const A=_calcAlertas37(),push=(sev,tipo,txt,ac)=>A.push({sev,tipo,txt,ac});
+  regOf("acao").filter(r=>!r.excluido&&ABERTA_AC(r.d.status)).forEach(r=>(r.d.tarefas||[]).filter(t=>!t.feito&&t.prazo&&t.prazo<hojeISO()).forEach(t=>push(2,"Tarefa vencida",`${tarNum(r.d,t)}: ${(t.t||"sem descrição").slice(0,70)} (prazo ${dataBR(t.prazo)}).`,["ac-abrir",r.id])));
+  regOf("plano").filter(r=>!r.excluido&&!r.d.cancelado&&!acoesDoPlano(r).length).forEach(r=>push(2,"Plano sem ações",`${r.d.numero||"Plano"}: ${r.d.titulo||""} ainda não tem ações.`,["pl-abrir",r.id]));
+  return A.sort((a,b)=>a.sev-b.sev);
+};
+document.addEventListener("click",e=>{const b=e.target.closest('[data-g-acao="pl-abrir"]');if(!b)return;e.stopImmediatePropagation();const r=regGet(b.dataset.id);if(r){G.ed={id:r.id,tipo:"plano",d:JSON.parse(JSON.stringify(r.d))};irPara("acoes")}},true);
+/* FASE 24: IA como apoio (sempre com decisão humana): prescrito × real, revisão crítica, importação de documentos antigos e memória de eficácia */
+const IA_AVISO="A IA só sugere. Confira com a realidade do posto antes de usar.";
+const nl2=s=>String(s||"").trim();
+async function iaImagem(file){
+  let c=await comprimirImagem(file,1600,.7),u=c.url;
+  if(u.length>1000000){c=await comprimirImagem(file,1200,.6);u=c.url}
+  return u;
+}
+function carregarScript(src){return new Promise((ok,err)=>{if(document.querySelector(`script[src="${src}"]`))return ok();const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=()=>err(new Error("Não foi possível carregar o leitor de PDF (sem internet?)."));document.head.appendChild(s)})}
+async function textoDePDF(file){
+  const V="3.11.174",B="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/"+V+"/";
+  await carregarScript(B+"pdf.min.js");
+  if(!window.pdfjsLib)throw new Error("Leitor de PDF indisponível.");
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc=B+"pdf.worker.min.js";
+  const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+  let t="";
+  for(let i=1;i<=Math.min(pdf.numPages,15)&&t.length<14000;i++){const pg=await pdf.getPage(i),c=await pg.getTextContent();t+=c.items.map(x=>x.str).join(" ")+"\n"}
+  if(t.trim().length<200)throw new Error("Este PDF parece escaneado (sem texto). Envie como foto (JPG/PNG) de cada página.");
+  return t.slice(0,14000);
+}
+const lerComoTexto=f=>new Promise((ok,err)=>{const r=new FileReader();r.onload=()=>ok(String(r.result));r.onerror=()=>err(new Error("Falha ao ler o arquivo."));r.readAsText(f)});
+
+// ---------- 1. Prescrito × real ----------
+function textoReal(tipo,d){
+  if(tipo==="aet"){const s=d.sec||{};return [s.real,s.campo,s.variabilidade,s.estrategias].filter(Boolean).join("\n")}
+  const o=d.obs||{};return [o.realizada,(d.etapas||[]).map(e=>"Etapa: "+e.n+(e.dur?" ("+e.dur+")":"")).join("\n"),o.variacoes,o.pior,o.interferencias].filter(Boolean).join("\n");
+}
+function htmlIAPresc(dis){
+  const {d,tipo}=G.ed,ia=(d.ia||{}).presc;
+  const lst=ia?`${ia.div.length?ia.div.map(x=>`<div class="sug"><span><span class="chp ${x.relevancia==="alta"?"r":x.relevancia==="media"?"o":"b"}">${x.relevancia}</span> <b>${esc(x.tema)}</b> <small>(${esc(x.tipo)})</small><br><small>Prescrito: ${esc(x.prescrito||"— (não previsto)")}<br>Real: ${esc(x.real||"— (não ocorre)")}</small>${x.porque?`<br><small>Hipótese: ${esc(x.porque)}</small>`:""}${x.pergunta?`<br><small><b>Pergunta de campo:</b> ${esc(x.pergunta)}</small>`:""}</span></div>`).join(""):`<p class="mut">Nenhuma divergência encontrada nos textos.</p>`}
+   ${ia.sem&&ia.sem.length?`<small class="mut">Coincidem: ${esc(ia.sem.join("; "))}.</small><br>`:""}${ia.lim?`<small class="mut">Limite: ${esc(ia.lim)}</small>`:""}
+   ${dis?"":`<div class="linha"><button type="button" class="btn sec peq" data-ia="presc-reg">Registrar divergências no texto do registro</button></div>`}<small class="mut">${IA_AVISO}</small>`:"";
+  return `<details class="sub" style="margin:10px 0"><summary><b>Comparar com o procedimento (IA)</b></summary>
+   <p class="mut" style="font-size:.86rem">Anexe a foto do procedimento ou instrução de trabalho, ou cole o texto. A IA compara com a atividade real descrita acima e lista divergências, sem julgar o trabalhador.</p>
+   ${dis?"":`<textarea id="ipTxt" rows="3" placeholder="Cole aqui o texto do procedimento (opcional se anexar foto)" style="width:100%"></textarea>
+   <div class="linha no-print"><label class="btn sec peq" style="cursor:pointer">📷 Foto do procedimento<input type="file" id="ipFile" accept="image/*" hidden></label><button type="button" class="btn" data-ia="presc">Comparar com a IA</button></div><div id="ipEst" class="mut"></div>`}${lst}</details>`;
+}
+// ---------- 2. Revisão crítica ----------
+function resumoRegistro(tipo,d,id){
+  const o={tipo:tipo.toUpperCase(),numero:d.numero||"",versao:d.versao||1};
+  if(tipo==="aep"){
+    const c=aepClasse(d);
+    o.classificacao=c.nivel<0?"sem dados":NIV_F[c.nivel];o.motivos=c.motivos;o.gatilhosAET=c.gat.map(g=>g.rot);
+    o.fatoresAltoCritico=c.cats.flatMap(k=>k.itens.filter(i=>i.n>=2).map(i=>k.nome+": "+i.t+" ("+NIV_F[i.n]+")"));
+    o.atividade={prescrita:nl2((d.obs||{}).prescrita),realizada:nl2((d.obs||{}).realizada),variacoes:nl2((d.obs||{}).variacoes),pior:nl2((d.obs||{}).pior)};
+    o.participacao={dificuldades:nl2((d.part||{}).dificuldades),regioes:nl2((d.part||{}).regioes),sugestoes:nl2((d.part||{}).sugestoes),validou:(d.part||{}).validou||"",entrevistas:(d.partic||[]).length};
+    o.metodos=(d.metodosAp||[]).map(m=>m.m+": "+(m.r||"sem resultado"));o.medidaProvisoria=nl2(d.provisoria);o.conclusao=nl2(d.conclusao);o.decisaoAET=d.aetDec||"";o.justAET=nl2(d.aetJust);
+  }else{
+    const s=d.sec||{};o.secoes={};Object.keys(s).forEach(k=>{if(nl2(s[k]))o.secoes[k]=nl2(s[k]).slice(0,900)});
+    o.recomendacoes=(d.recs||[]).map(r=>({t:r.t,tipo:r.hier!==""&&HIER[Number(r.hier)]?HIER[Number(r.hier)]:"sem tipo",prazo:r.prazo,resp:r.resp}));
+    o.entrevistas=(d.entrev||[]).length;
+  }
+  o.evidencias=(d.evid||[]).length;
+  o.acoesVinculadas=regOf("acao").filter(a=>a.d.origemId===id||(d.aepId&&a.d.origemId===d.aepId)).map(a=>({acao:String(a.d.acao||"").slice(0,160),tipo:a.d.hier!==""&&HIER[Number(a.d.hier)]?HIER[Number(a.d.hier)]:"sem tipo",status:stAcao(a.d.status)}));
+  return JSON.stringify(o);
+}
+function htmlIARev(dis){
+  const r=(G.ed.d.ia||{}).rev;
+  const lst=r?`${r.achados.length?r.achados.map(x=>`<div class="sug"><span><span class="chp ${x.severidade==="alta"?"r":x.severidade==="media"?"o":"b"}">${x.severidade}</span> <b>${esc(x.titulo)}</b>${x.onde?` <small>(${esc(x.onde)})</small>`:""}<br><small>${esc(x.detalhe)}</small></span></div>`).join(""):`<p class="mut">A IA não apontou incoerências.</p>`}
+   ${r.fortes&&r.fortes.length?`<small class="mut">Pontos sólidos: ${esc(r.fortes.join("; "))}</small><br>`:""}${r.lim?`<small class="mut">Não verificado: ${esc(r.lim)}</small><br>`:""}<small class="mut">Revisão em ${esc((r.em||"").slice(0,16).replace("T"," "))}. ${IA_AVISO}</small>`:"";
+  return `<details class="sub" style="margin:10px 0"><summary><b>Revisão crítica por IA (antes de aprovar)</b></summary><p class="mut" style="font-size:.86rem">A IA lê o registro inteiro e aponta incoerências e lacunas. Ela não aprova nem muda nada: quem decide é a pessoa responsável.</p>
+   ${dis?"":`<div class="linha"><button type="button" class="btn" data-ia="rev">Revisar com a IA</button></div><div id="irEst" class="mut"></div>`}${lst}</details>`;
+}
+// ---------- injeção nas telas ----------
+const _htmlRegEd38=htmlRegEd;
+htmlRegEd=function(){
+  let h=_htmlRegEd38();if(!G.ed||G.ed.ver)return h;
+  const {d,tipo}=G.ed,dis=travado(d)?"disabled":"";
+  if(d.importado){const im=d.importado;h=h.replace(/(<h2 style="margin-top:12px">)/,`<div class="alerta no-print"><b>Rascunho criado por IA</b> a partir de «${esc(im.origem||"documento")}». Confira cada campo com o documento original antes de usar.${(im.nao||[]).length?" Não encontrado no documento: "+esc(im.nao.join(", "))+".":""}${im.obs?" "+esc(im.obs):""}</div>$1`)}
+  if(tipo==="aep")h=h.replace("<h4>Etapas, duração e frequência</h4>",htmlIAPresc(dis)+"<h4>Etapas, duração e frequência</h4>");
+  if(tipo==="aet"&&G.aetPasso&&(G.aetPasso[G.ed.id]===7))h=h.replace('<div class="st-corpo">','<div class="st-corpo">'+htmlIAPresc(dis));
+  return h;
+};
+const _htmlGov38=htmlGovernanca;
+htmlGovernanca=function(dis){
+  const h=_htmlGov38(dis);if(!G.ed||(G.ed.tipo!=="aep"&&G.ed.tipo!=="aet"))return h;
+  return htmlIARev(dis)+h;
+};
+// ---------- ações ----------
+document.addEventListener("change",e=>{if(e.target.id==="ipFile"){const f=e.target.files[0];const s=$("#ipEst");if(s)s.textContent=f?"Foto escolhida: "+f.name:""}});
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-ia]");if(!b||!G.ed)return;const k=b.dataset.ia,{d,tipo,id}=G.ed;
+  if(k==="presc"){
+    const st=$("#ipEst"),txt=nl2(($("#ipTxt")||{}).value),f=($("#ipFile")||{}).files&&$("#ipFile").files[0];
+    if(!txt&&!f)return aviso("Cole o texto do procedimento ou anexe uma foto.");
+    const real=textoReal(tipo,d);if(real.length<30)return aviso("Descreva antes a atividade real.");
+    b.disabled=true;if(st)st.textContent="A IA está comparando…";
+    try{
+      const corpo={real};if(txt)corpo.procedimentoTexto=txt;else corpo.imagem=await iaImagem(f);
+      const j=await chamarIA("/api/ergo/prescrito",corpo);
+      d.ia=d.ia||{};d.ia.presc={em:new Date().toISOString(),div:j.divergencias||[],sem:j.semDivergencia||[],lim:j.limitacoes||""};
+      gravarEd();reRender();
+    }catch(err){if(st)st.textContent=(err.message&&err.message!=="falha"?err.message:"Não foi possível comparar agora.")}
+    b.disabled=false;
+  }else if(k==="presc-reg"){
+    const p=(d.ia||{}).presc;if(!p||!p.div.length)return;
+    const txt="Divergências prescrito × real (sugeridas pela IA, conferir):\n"+p.div.map(x=>`• ${x.tema}: prescrito "${x.prescrito||"não previsto"}" × real "${x.real||"não ocorre"}"`).join("\n");
+    if(tipo==="aet"){d.sec=d.sec||{};d.sec.variabilidade=nl2(d.sec.variabilidade)?d.sec.variabilidade+"\n\n"+txt:txt}
+    else{d.obs=d.obs||{};d.obs.variacoes=nl2(d.obs.variacoes)?d.obs.variacoes+"\n\n"+txt:txt}
+    gravarEd();reRender();aviso("Divergências registradas no texto.");
+  }else if(k==="rev"){
+    const st=$("#irEst");gravarEd();
+    const resumo=resumoRegistro(tipo,d,id);
+    if(resumo.length<200)return aviso("Há pouco conteúdo no registro para revisar.");
+    b.disabled=true;if(st)st.textContent="A IA está revisando…";
+    try{
+      const j=await chamarIA("/api/ergo/revisar",{resumo});
+      d.ia=d.ia||{};d.ia.rev={em:new Date().toISOString(),achados:j.achados||[],fortes:j.pontosFortes||[],lim:j.limitacoes||""};
+      gravarEd();reRender();
+    }catch(err){if(st)st.textContent=(err.message&&err.message!=="falha"?err.message:"Não foi possível revisar agora.")}
+    b.disabled=false;
+  }
+});
+// ---------- 3. Importar documento antigo ----------
+function modalImportar(dest){
+  let m=$("#modalImp");if(m)m.remove();m=document.createElement("div");m.id="modalImp";
+  m.innerHTML=`<div class="modal-fundo" data-imp="x"></div><div class="modal-caixa" role="dialog" aria-modal="true"><button type="button" class="modal-x" data-imp="x" aria-label="Fechar">×</button><h2>Importar documento antigo</h2>
+  <p class="mut">A IA lê um laudo, AEP, AET ou planilha antiga e cria um <b>rascunho</b> para você conferir. Ela copia o que está no documento: não classifica risco nem preenche o que falta. Nomes e dados de saúde individuais são omitidos.</p>
+  <label class="campo">Criar como<select id="impDest"><option value="aet" ${dest==="aet"?"selected":""}>AET (rascunho)</option><option value="aep" ${dest==="aep"?"selected":""}>AEP (rascunho)</option></select></label>
+  <label class="campo">Arquivo (foto/scan JPG ou PNG, PDF com texto, ou .txt/.csv)<input type="file" id="impFile" accept="image/*,application/pdf,.txt,.csv,text/plain"></label>
+  <label class="campo">ou cole o texto<textarea id="impTxt" rows="4"></textarea></label>
+  <div class="linha"><button type="button" class="btn" data-imp="ler">Ler e criar rascunho</button><button type="button" class="btn sec" data-imp="x">Cancelar</button></div><div id="impEst" class="mut" style="margin-top:8px"></div></div>`;
+  document.body.appendChild(m);
+}
+function aplicarImportacao(dest,j,origem){
+  const n=novoReg(dest,""),d=n.d,S=j.secoes||{},idn=j.identificacao||{};
+  const ident=["Documento importado"+(origem?" de «"+origem+"»":""),idn.area?"Área: "+idn.area:"",idn.posto?"Posto: "+idn.posto:"",idn.atividade?"Atividade: "+idn.atividade:"",idn.data?"Data do documento: "+dataBR(idn.data):"",idn.responsavel?"Responsável: "+idn.responsavel:""].filter(Boolean).join(" · ");
+  if(dest==="aet"){
+    d.sec=d.sec||{};Object.keys(S).forEach(k=>{d.sec[k]=S[k]});
+    d.sec.contexto=d.sec.contexto?ident+"\n"+d.sec.contexto:ident;
+    d.recs=(j.recomendacoes||[]).map(r=>({t:r.texto,hier:"",prio:({baixa:"0",media:"1",alta:"2",imediata:"3"})[r.prioridade]||"1",prazo:r.prazo||"",resp:r.responsavel||"",crit:r.criterio||"",just:"",tipoDoc:r.tipo||""}));
+    if(!nl2(d.sec.recomendacoes)&&d.recs.length)d.sec.recomendacoes=d.recs.map(r=>"• "+r.t).join("\n");
+  }else{
+    d.obs=d.obs||{};d.obs.prescrita=S.prescrita||"";d.obs.realizada=S.real||"";d.obs.estrategias=S.estrategias||"";d.obs.variacoes=[S.variabilidade,"("+ident+")"].filter(Boolean).join("\n");
+    d.conclusao=[S.diagnostico,S.conclusao,(j.recomendacoes||[]).length?"Recomendações do documento:\n"+j.recomendacoes.map(r=>"• "+r.texto).join("\n"):""].filter(Boolean).join("\n\n");
+  }
+  d.importado={em:new Date().toISOString(),origem:origem||"",nao:j.naoEncontrado||[],obs:j.observacoes||"",tipoDoc:j.tipoDocumento};
+  regGravar({id:n.id,tipo:dest,d});
+  G.ed={id:n.id,tipo:dest,d:JSON.parse(JSON.stringify(regGet(n.id).d))};G.rel=false;
+  if(dest==="aet")G.aetPasso[n.id]=0;
+  irPara(dest==="aet"?"aet":"avaliar");
+}
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-imp]");
+  if(!b)return;const k=b.dataset.imp;
+  if(k==="x"){const m=$("#modalImp");if(m)m.remove();return}
+  if(k==="ler"){
+    const st=$("#impEst"),f=$("#impFile").files[0],txt=nl2($("#impTxt").value),dest=$("#impDest").value;
+    if(!f&&!txt)return aviso("Escolha um arquivo ou cole o texto.");
+    b.disabled=true;
+    try{
+      let corpo={};
+      if(txt)corpo.texto=txt;
+      else if(/^image\//.test(f.type)){st.textContent="Preparando imagem…";corpo.imagem=await iaImagem(f)}
+      else if(f.type==="application/pdf"){st.textContent="Lendo o PDF…";corpo.texto=await textoDePDF(f)}
+      else{corpo.texto=(await lerComoTexto(f)).slice(0,14000)}
+      st.textContent="A IA está lendo o documento…";
+      const j=await chamarIA("/api/ergo/importar",corpo);
+      const m=$("#modalImp");if(m)m.remove();
+      aplicarImportacao(dest,j,f?f.name:"texto colado");
+    }catch(err){st.textContent=(err.message&&err.message!=="falha"?err.message:"Não foi possível ler agora.");b.disabled=false}
+  }
+});
+// botões de importação nas listas de AEP e AET
+function btnImportar(dest){return `<button type="button" class="btn sec" data-imp-abrir="${dest}">Importar documento antigo</button>`}
+const _renderAET38=renderAET;
+renderAET=function(){_renderAET38();if(G.ed&&G.ed.tipo==="aet")return;const el=$("#v-aet");const h=el&&el.querySelector("h2");if(h&&!el.querySelector("[data-imp-abrir]"))h.parentNode.insertAdjacentHTML("afterend",`<div class="linha no-print" style="margin:8px 0">${btnImportar("aet")}</div>`)};
+const _renderAEP38=renderAEP;
+renderAEP=function(){_renderAEP38();if(G.triagemOn||(G.ed&&G.ed.tipo==="aep"))return;const el=$("#aepRoot");const h=el&&el.querySelector("h2");if(h&&!el.querySelector("[data-imp-abrir]"))h.parentNode.insertAdjacentHTML("afterend",`<div class="linha no-print" style="margin:8px 0">${btnImportar("aep")}</div>`)};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-imp-abrir]");if(b)modalImportar(b.dataset.impAbrir)});
+
+// ---------- 4. Memória de eficácia (por palavras, sem IA) ----------
+const STOP38=new Set("de da do das dos a o e as os um uma para por com em no na nos nas que se ao aos ser foi tem sem mais como sobre entre ou quando muito pouco ainda ja ate nao sim".split(" "));
+const tok38=s=>normB(s).replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(w=>w.length>2&&!STOP38.has(w)).map(w=>w.replace(/(s|es|ao|oes)$/,""));
+function textoAcao(d){return [d.problema,d.causa,d.acao,d.definitiva,d.etapa].join(" ")}
+function similares(id,d){
+  const base=tok38(textoAcao(d));if(base.length<3)return [];
+  const outras=regOf("acao").filter(r=>!r.excluido&&r.id!==id&&["eficaz","parcial","naoeficaz"].includes(r.d.status));
+  if(!outras.length)return [];
+  const docs=outras.map(r=>({r,t:tok38(textoAcao(r.d))})),N=docs.length+1,df={};
+  docs.concat([{t:base}]).forEach(x=>new Set(x.t).forEach(w=>df[w]=(df[w]||0)+1));
+  const vec=t=>{const m={};t.forEach(w=>m[w]=(m[w]||0)+1);Object.keys(m).forEach(w=>m[w]*=Math.log(1+N/df[w]));return m};
+  const cos=(a,b)=>{let s=0,na=0,nb=0;for(const w in a){na+=a[w]*a[w];if(b[w])s+=a[w]*b[w]}for(const w in b)nb+=b[w]*b[w];return na&&nb?s/Math.sqrt(na*nb):0};
+  const vb=vec(base);
+  return docs.map(x=>{let s=cos(vb,vec(x.t));if(d.postoId&&x.r.d.postoId===d.postoId)s+=.08;if(d.hier!==""&&x.r.d.hier===d.hier)s+=.05;return {r:x.r,s}}).filter(x=>x.s>=.18).sort((a,b)=>b.s-a.s).slice(0,3);
+}
+const _htmlAcaoEd38=htmlAcaoEd;
+htmlAcaoEd=function(){
+  const h=_htmlAcaoEd38(),{d,id}=G.ed;
+  if(["eficaz","parcial","naoeficaz","cancelada"].includes(d.status))return h;
+  const S=similares(id,d);if(!S.length)return h;
+  const rot={eficaz:["Funcionou","n0"],parcial:["Funcionou em parte","n2"],naoeficaz:["Não funcionou","n3"]};
+  const cx=`<details class="bloco" open><summary>Ações parecidas já verificadas (${S.length})</summary><div class="bloco-c"><p class="mut" style="font-size:.86rem">Busca por palavras nas suas próprias ações com eficácia verificada. Não é leitura de sentido: confira se a situação é mesmo parecida.</p>
+   ${S.map(({r,s})=>{const a=r.d,x=rot[a.status],ef=a.ef||{};return `<div class="sug"><span><span class="bd ${x[1]}">${x[0]}</span> <b>${esc(a.numero||"")}</b> · ${esc(String(a.acao||a.problema||"").slice(0,120))}<br><small>${a.hier!==""&&HIER[Number(a.hier)]?esc(HIER[Number(a.hier)])+" · ":""}${a.postoId?esc(caminho(a.postoId))+" · ":""}${ef.residual?"risco residual: "+esc(ef.residual)+" · ":""}${ef.trabalhadores?"trabalhadores: "+esc(ef.trabalhadores):""}${ef.comparacao?"<br>"+esc(String(ef.comparacao).slice(0,180)):""}${ef.efeitos&&!/^nenhum/i.test(ef.efeitos)?"<br>Efeitos indesejados: "+esc(String(ef.efeitos).slice(0,140)):""}</small></span><button type="button" class="btn sec peq" data-g-acao="ac-abrir" data-id="${r.id}">Ver</button></div>`}).join("")}</div></details>`;
+  return h.replace(/<details class="bloco" ?(open)?><summary>Plano e tarefas/,m=>cx+m);
+};
+/* FASE 25: 3D mais realista. Proporções de Winter (2009, a partir de Drillis e Contini), membros com volume e sombreamento,
+   luz fixa no mundo, sombra no chão, equipamento de proteção, animação entre níveis, comparação com a postura adequada. */
+const MAT3={skin:"#E2B48E",shirt:"#2F5D8A",pants:"#3A4150",glove:"#9AA0A6",boot:"#262626",hat:"#F4F4F4"};
+const LUZ3=(()=>{const v=[-.4,.8,.45],n=Math.hypot(...v);return v.map(x=>x/n)})();
+const hexRGB=h=>{h=String(h).replace("#","");if(h.length===3)h=h.split("").map(c=>c+c).join("");return [parseInt(h.slice(0,2),16)||0,parseInt(h.slice(2,4),16)||0,parseInt(h.slice(4,6),16)||0]};
+const shade3=(h,k,a)=>{const [r,g,b]=hexRGB(h),f=c=>Math.max(0,Math.min(255,Math.round(c*k)));return a===undefined?`rgb(${f(r)},${f(g)},${f(b)})`:`rgba(${f(r)},${f(g)},${f(b)},${a})`};
+function corpo3d(pp,hot){
+  const p={...POSE0,...pp},e=p.esc,R=[],H=hot||{};
+  // comprimentos (m) a partir de estatura 1,75 m: braço .186H, antebraço .146H, coxa .245H, perna .246H, ombro biacromial .259H, quadril .191H
+  const L={trunk:.5*e,neck:.06*e,ua:.326*e,fa:.256*e,hd:.1*e,th:.43*e,sh:.43*e,ft:.24*e,sw:.225*e,hw:.1675*e};
+  const legY=(h,k)=>L.th*Math.cos(h*D2R)+L.sh*Math.cos((h-k)*D2R)+.07*e;
+  const py=p.stance==="sit"?p.seatH:Math.max(legY(p.hipL,p.kneeL),legY(p.hipR,p.kneeR));
+  const P=[p.x,py,0],t=p.trunk*D2R;
+  const u=rotX([Math.sin(t),Math.cos(t),0],p.lat*D2R),S=v3.add(P,v3.mul(u,L.trunk));
+  const w=rotAx([0,0,1],u,p.tw*D2R);
+  const cap=(a,b,r1,r2,m,n)=>R.push({k:"cap",a,b,r1:r1*e,r2:r2*e,m,hot:!!(n&&H[n]),d:0});
+  const sph=(c,r,m,n,bias)=>R.push({k:"sph",p:c,r:r*e,m,hot:!!(n&&H[n]),d:0,bias:bias||0});
+  const hipL=[P[0],P[1],L.hw],hipR=[P[0],P[1],-L.hw];
+  cap(hipR,hipL,.085,.085,"pants","leg");
+  cap(P,S,.125,.145,"shirt","trunk");
+  cap(v3.add(S,v3.mul(w,-L.sw)),v3.add(S,v3.mul(w,L.sw)),.05,.05,"shirt","trunk");
+  const nt=(p.trunk+p.neck)*D2R,nd=rotX([Math.sin(nt),Math.cos(nt),0],p.lat*D2R),Nt=v3.add(S,v3.mul(nd,L.neck)),Hc=v3.add(S,v3.mul(nd,L.neck+.1*e));
+  cap(S,Nt,.05,.042,"skin","neck");sph(Hc,.098,"skin","neck");
+  const fd=rotAx([Math.cos(nt),-Math.sin(nt),0],nd,(p.tw+p.ntw)*D2R);
+  sph(v3.add(Hc,v3.mul(fd,.098*e)),.017,"skin","neck",.02);
+  // capacete: calota e aba
+  cap(v3.add(Hc,v3.mul(nd,.045*e)),v3.add(Hc,v3.mul(nd,.085*e)),.108,.085,"hat","neck");
+  cap(v3.add(Hc,v3.add(v3.mul(nd,.05*e),v3.mul(fd,.07*e))),v3.add(Hc,v3.add(v3.mul(nd,.05*e),v3.mul(fd,.14*e))),.03,.03,"hat","neck");
+  R.slice(-2).forEach(q=>q.bias=.12);
+  [[1,"L"],[-1,"R"]].forEach(([s,n])=>{
+    const a=p["sh"+n]*D2R,b=p["ab"+n]*D2R,el=p["el"+n]*D2R,wr=p["wr"+n]*D2R,dv=p["dev"+n]*D2R,nm="arm"+n;
+    const dir=(ang,bb)=>{const y=-Math.cos(ang);return [Math.sin(ang),y*Math.cos(bb),s*(-y)*Math.sin(bb)]};
+    const Sj=v3.add(S,v3.mul(w,s*L.sw)),E=v3.add(Sj,v3.mul(dir(a,b),L.ua)),W=v3.add(E,v3.mul(dir(a+el,b*.6),L.fa)),hd=dir(a+el+wr,b*.5);hd[2]+=s*Math.sin(dv);
+    const Hd=v3.add(W,v3.mul(hd,L.hd));
+    sph(Sj,.062,"shirt",nm);cap(Sj,E,.052,.042,"shirt",nm);sph(E,.043,"shirt",nm);cap(E,W,.04,.031,"shirt",nm);cap(W,Hd,.036,.03,"glove","hand"+n);sph(Hd,.03,"glove","hand"+n);
+    const hp=p["hip"+n],kn=p["knee"+n],Hs=[P[0],P[1],s*L.hw],K=v3.add(Hs,[L.th*Math.sin(hp*D2R),-L.th*Math.cos(hp*D2R),0]),A=v3.add(K,[L.sh*Math.sin((hp-kn)*D2R),-L.sh*Math.cos((hp-kn)*D2R),0]);
+    cap(Hs,K,.082,.06,"pants","leg");sph(K,.06,"pants","leg");cap(K,A,.058,.043,"pants","leg");cap(A,v3.add(A,[L.ft,-.045*e,0]),.046,.04,"boot","leg");
+    p["_E"+n]=E;p["_W"+n]=W;p["_H"+n]=Hd;p["_K"+n]=K;
+  });
+  return {prims:R,joint:{S,P,Hc,EL:p._EL,ER:p._ER,WL:p._WL,WR:p._WR,HL:p._HL,HR:p._HR,KL:p._KL,KR:p._KR},L};
+}
+// ---------- desenho ----------
+function capsula(cx,a,b,ra,rb,cor,luz,glow){
+  const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy);
+  if(L<.5){cx.beginPath();cx.arc(a.x,a.y,Math.max(ra,rb),0,7);cx.fillStyle=shade3(cor,.9);cx.fill();return}
+  const ux=dx/L,uy=dy/L,nx=-uy,ny=ux,ang=Math.atan2(ny,nx);
+  cx.beginPath();cx.arc(a.x,a.y,ra,ang,ang+Math.PI);cx.lineTo(b.x-nx*rb,b.y-ny*rb);cx.arc(b.x,b.y,rb,ang+Math.PI,ang+2*Math.PI);cx.closePath();
+  const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,r=Math.max(ra,rb),ld=luz[0]*nx+luz[1]*ny,pos=Math.max(.2,Math.min(.8,.5+.3*ld));
+  const g=cx.createLinearGradient(mx-nx*r,my-ny*r,mx+nx*r,my+ny*r);
+  g.addColorStop(0,shade3(cor,.6));g.addColorStop(pos,shade3(cor,1.14));g.addColorStop(1,shade3(cor,.55));
+  if(glow){cx.save();cx.shadowColor="rgba(255,51,0,.9)";cx.shadowBlur=16;cx.fillStyle="rgba(255,51,0,.55)";cx.fill();cx.restore()}
+  cx.fillStyle=g;cx.fill();
+  cx.strokeStyle="rgba(0,0,0,.28)";cx.lineWidth=.8;cx.stroke();
+  if(glow){cx.save();cx.globalAlpha=.32;cx.fillStyle="#FF3300";cx.fill();cx.restore()}
+}
+function esfera(cx,o,r,cor,luz,glow){
+  const g=cx.createRadialGradient(o.x+luz[0]*r*.4,o.y+luz[1]*r*.4,r*.1,o.x,o.y,r);
+  g.addColorStop(0,shade3(cor,1.25));g.addColorStop(.6,shade3(cor,.95));g.addColorStop(1,shade3(cor,.55));
+  cx.beginPath();cx.arc(o.x,o.y,r,0,7);
+  if(glow){cx.save();cx.shadowColor="rgba(255,51,0,.9)";cx.shadowBlur=16;cx.fillStyle="rgba(255,51,0,.55)";cx.fill();cx.restore()}
+  cx.fillStyle=g;cx.fill();cx.strokeStyle="rgba(0,0,0,.25)";cx.lineWidth=.8;cx.stroke();
+  if(glow){cx.save();cx.globalAlpha=.3;cx.fillStyle="#FF3300";cx.fill();cx.restore()}
+}
+function normalPoly(pts){
+  const a=pts[0],b=pts[1],c=pts[2],u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]],n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],l=Math.hypot(...n)||1;return n.map(x=>x/l);
+}
+function cenaMix(a,b,k){
+  if(!a||k>=1)return b;
+  const mix=(x,y)=>typeof x==="number"&&typeof y==="number"?x+(y-x)*k:y;
+  const pose={};Object.keys({...a.pose,...b.pose}).forEach(n=>{pose[n]=(typeof a.pose[n]==="number"&&typeof b.pose[n]==="number")?mix(a.pose[n],b.pose[n]):(b.pose[n]!==undefined?b.pose[n]:a.pose[n])});
+  let props=b.props;
+  if(a.props.length===b.props.length&&a.props.every((q,i)=>q.k===b.props[i].k)){
+    props=b.props.map((q,i)=>{const o=a.props[i],r={...q},m=pt=>pt.map((v,j)=>mix(o===undefined?v:v,v));
+      if(q.k==="poly")r.pts=q.pts.map((pt,j)=>pt.map((v,c)=>mix(o.pts[j][c],v)));
+      else if(q.k==="seg"){r.a=q.a.map((v,c)=>mix(o.a[c],v));r.b=q.b.map((v,c)=>mix(o.b[c],v))}
+      else if(q.k==="sph"){r.p=q.p.map((v,c)=>mix(o.p[c],v))}
+      return r});
+  }
+  return {...b,pose,props};
+}
+function desenhar3d(cv,cena,cam,nivel){
+  const dpr=Math.min(2,window.devicePixelRatio||1),W=680,H=440;
+  if(cv.width!==W*dpr){cv.width=W*dpr;cv.height=H*dpr}
+  cv._cam=cam;
+  if(cv._alvo&&cv._nv!==nivel){cv._de=cv._atual||cv._alvo;cv._t0=performance.now()}
+  cv._alvo=cena;cv._nv=nivel;
+  const quadro=()=>{
+    const k=cv._de?Math.min(1,(performance.now()-cv._t0)/320):1,ease=k<1?1-Math.pow(1-k,3):1;
+    cv._atual=cenaMix(cv._de,cv._alvo,ease);cena3dQuadro(cv,cv._atual,cv._cam,dpr);
+    if(k<1)cv._raf=requestAnimationFrame(quadro);else{cv._de=null;cv._raf=0}
+  };
+  if(cv._raf){return}
+  quadro();
+}
+function cena3dQuadro(cv,cena,cam,dpr){
+  const W=680,H=440,cx=cv.getContext("2d");
+  cx.setTransform(dpr,0,0,dpr,0,0);cx.clearRect(0,0,W,H);
+  cam.cx=W/2;cam.cy=H*.58;cam.sc=H*.42;
+  // fundo e piso
+  const bg=cx.createLinearGradient(0,0,0,H);bg.addColorStop(0,"#EEF1F5");bg.addColorStop(.55,"#F9FAFB");bg.addColorStop(1,"#FFFFFF");cx.fillStyle=bg;cx.fillRect(0,0,W,H);
+  const fc=[[-1.8,0,-1.6],[2.6,0,-1.6],[2.6,0,1.6],[-1.8,0,1.6]].map(v=>projetar(v,cam)),ys=fc.map(o=>o.y),y0=Math.min(...ys),y1=Math.max(...ys);
+  const fg=cx.createLinearGradient(0,y0,0,y1);fg.addColorStop(0,"#F1F3F5");fg.addColorStop(1,"#DFE3E8");
+  cx.beginPath();fc.forEach((o,i)=>i?cx.lineTo(o.x,o.y):cx.moveTo(o.x,o.y));cx.closePath();cx.fillStyle=fg;cx.fill();
+  for(let i=-7;i<=10;i++){const a=projetar([i*.25-.5,0,-1.6],cam),b=projetar([i*.25-.5,0,1.6],cam);cx.strokeStyle=`rgba(120,130,145,${Math.max(.05,.22-(a.d+b.d)/2*.03)})`;cx.lineWidth=1;cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke()}
+  for(let j=-6;j<=6;j++){const a=projetar([-1.8,0,j*.25],cam),b=projetar([2.6,0,j*.25],cam);cx.strokeStyle=`rgba(120,130,145,${Math.max(.05,.22-(a.d+b.d)/2*.03)})`;cx.lineWidth=1;cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke()}
+  // luz em coordenadas de tela
+  const cyw=Math.cos(cam.yaw),syw=Math.sin(cam.yaw),cp=Math.cos(cam.pitch),sp=Math.sin(cam.pitch);
+  const lx=LUZ3[0]*cyw+LUZ3[2]*syw,lz=-LUZ3[0]*syw+LUZ3[2]*cyw,ly=LUZ3[1]*cp-lz*sp,ln=Math.hypot(lx,ly)||1,luz=[lx/ln,-ly/ln];
+  const bd=corpo3d(cena.pose,cena.hot),props=cena.props.map(q=>({...q}));
+  const ghost=V3D&&V3D.ghost&&V3D.nivel>0?corpo3d(cenaPara(V3D.id,0).pose,{}):null;
+  const proj=q=>q.k==="cap"?{a:projetar(q.a,cam),b:projetar(q.b,cam)}:null;
+  const todos=[...props,...bd.prims];
+  // sombra suave no chão
+  const sh=cv._sh||(cv._sh=document.createElement("canvas"));if(sh.width!==cv.width){sh.width=cv.width;sh.height=cv.height}
+  const sx=sh.getContext("2d");sx.setTransform(dpr,0,0,dpr,0,0);sx.clearRect(0,0,W,H);sx.fillStyle="#000";sx.strokeStyle="#000";sx.lineCap="round";
+  const fl=pt=>projetar([pt[0]+pt[1]*.32,0,pt[2]-pt[1]*.2],cam);
+  todos.forEach(q=>{
+    if(q.k==="cap"){const a=fl(q.a),b=fl(q.b);sx.lineWidth=Math.max(2,(q.r1+q.r2)*cam.sc*(a.f+b.f)/2*.9);sx.beginPath();sx.moveTo(a.x,a.y);sx.lineTo(b.x,b.y);sx.stroke()}
+    else if(q.k==="seg"){const a=fl(q.a),b=fl(q.b);sx.lineWidth=Math.max(1.5,q.r*2*cam.sc*(a.f+b.f)/2);sx.beginPath();sx.moveTo(a.x,a.y);sx.lineTo(b.x,b.y);sx.stroke()}
+    else if(q.k==="poly"){const P=q.pts.map(fl);sx.beginPath();P.forEach((o,i)=>i?sx.lineTo(o.x,o.y):sx.moveTo(o.x,o.y));sx.closePath();sx.fill()}
+  });
+  cx.save();cx.setTransform(1,0,0,1,0,0);cx.globalAlpha=.1;[[0,0],[3,0],[-3,0],[0,3],[0,-3],[2,2],[-2,-2]].forEach(([dx,dy])=>cx.drawImage(sh,dx*dpr,dy*dpr));cx.restore();
+  const pe=projetar([bd.joint.P[0]+.12,0,0],cam),rg=cx.createRadialGradient(pe.x,pe.y,2,pe.x,pe.y,70);rg.addColorStop(0,"rgba(0,0,0,.18)");rg.addColorStop(1,"rgba(0,0,0,0)");cx.fillStyle=rg;cx.beginPath();cx.ellipse(pe.x,pe.y,70,22,0,0,7);cx.fill();
+  // fantasma da postura adequada
+  if(ghost){cx.save();cx.globalAlpha=.22;ghost.prims.forEach(q=>{if(q.k==="cap"){const a=projetar(q.a,cam),b=projetar(q.b,cam);capsula(cx,a,b,q.r1*cam.sc*a.f,q.r2*cam.sc*b.f,"#3B82F6",luz,false)}else if(q.k==="sph"){const a=projetar(q.p,cam);esfera(cx,a,Math.max(2,q.r*cam.sc*a.f),"#3B82F6",luz,false)}});cx.restore()}
+  // primitivas ordenadas por profundidade
+  const L=todos.map(q=>{
+    if(q.k==="cap"){const a=projetar(q.a,cam),b=projetar(q.b,cam);return {q,a,b,d:(a.d+b.d)/2-(q.bias||0)}}
+    if(q.k==="seg"){const a=projetar(q.a,cam),b=projetar(q.b,cam);return {q,a,b,d:(a.d+b.d)/2}}
+    if(q.k==="sph"){const a=projetar(q.p,cam);return {q,a,d:a.d-(q.bias||0)}}
+    const P=q.pts.map(v=>projetar(v,cam));return {q,P,d:P.reduce((s,o)=>s+o.d,0)/P.length}
+  }).sort((u,v)=>v.d-u.d);
+  L.forEach(o=>{
+    const q=o.q;
+    if(q.k==="poly"){
+      const n=normalPoly(q.pts),df=Math.abs(n[0]*LUZ3[0]+n[1]*LUZ3[1]+n[2]*LUZ3[2]),cor=q.c||"#C9C9C9";
+      cx.beginPath();o.P.forEach((p,i)=>i?cx.lineTo(p.x,p.y):cx.moveTo(p.x,p.y));cx.closePath();cx.fillStyle=shade3(cor,.66+.5*df,.96);cx.fill();cx.strokeStyle="rgba(0,0,0,.2)";cx.lineWidth=1;cx.stroke();
+    }else if(q.k==="seg"){
+      const r=Math.max(1.4,q.r*cam.sc*(o.a.f+o.b.f)/2);capsula(cx,o.a,o.b,r,r,q.c||"#8C8C8C",luz,false)
+    }else if(q.k==="cap"){
+      const m=MAT3[q.m]||"#999",ra=Math.max(1.5,q.r1*cam.sc*o.a.f),rb=Math.max(1.5,q.r2*cam.sc*o.b.f);capsula(cx,o.a,o.b,ra,rb,m,luz,q.hot)
+    }else{
+      const m=q.m?(MAT3[q.m]||"#999"):(q.c||"#999");esfera(cx,o.a,Math.max(2,q.r*cam.sc*o.a.f),m,luz,q.hot)
+    }
+  });
+  // faixa laranja do capacete
+  // ondas de vibração
+  if(cena.ondas){cx.strokeStyle="#FF9900";cx.lineWidth=2.4;const o=projetar([.0,.1,0],cam);for(let i=0;i<cena.ondas*3;i++){cx.globalAlpha=.8-i*.05;cx.beginPath();for(let s=0;s<=20;s++){const xx=o.x-60+s*6,yy=o.y+14+i*8+Math.sin(s*1.2+i)*4;s?cx.lineTo(xx,yy):cx.moveTo(xx,yy)}cx.stroke()}cx.globalAlpha=1}
+  // arcos de ângulo (tronco, pescoço, braço)
+  const arco=(c3,v0,v1,rad,txt)=>{
+    const pts=[];for(let i=0;i<=16;i++){const t=i/16,v=[v0[0]*(1-t)+v1[0]*t,v0[1]*(1-t)+v1[1]*t,0],l=Math.hypot(v[0],v[1])||1;pts.push(projetar([c3[0]+v[0]/l*rad,c3[1]+v[1]/l*rad,c3[2]],cam))}
+    cx.save();cx.strokeStyle="#FF9900";cx.lineWidth=2.4;cx.setLineDash([]);cx.beginPath();pts.forEach((o,i)=>i?cx.lineTo(o.x,o.y):cx.moveTo(o.x,o.y));cx.stroke();cx.restore();
+    const s=projetar([c3[0]+(v0[0]+v1[0])/2*rad*.7,c3[1]+(v0[1]+v1[1])/2*rad*.7,c3[2]],cam);return s};
+  const ps=cena.pose,Pj=bd.joint;
+  (cena.lab||[]).forEach(([j,t])=>{
+    const pt=Pj[j];if(!pt)return;const o=projetar(pt,cam);
+    // arco quando houver ângulo representável no plano sagital
+    if(j==="S"&&Math.abs(ps.trunk||0)>3){const a=ps.trunk*D2R;arco(Pj.P,[0,1],[Math.sin(a),Math.cos(a)],.22,"")}
+    if(j==="Hc"&&Math.abs(ps.neck||0)>3){const a0=(ps.trunk||0)*D2R,a1=((ps.trunk||0)+ps.neck)*D2R;arco(Pj.S,[Math.sin(a0),Math.cos(a0)],[Math.sin(a1),Math.cos(a1)],.2,"")}
+    if(j==="EL"){const a=(ps.shL||0)*D2R;if(Math.abs(a)>.05){const Sj=v3.add(Pj.S,[0,0,0]);arco([Pj.S[0],Pj.S[1],Pj.S[2]+.2],[0,-1],[Math.sin(a),-Math.cos(a)],.2,"")}}
+    cx.beginPath();cx.arc(o.x,o.y,5,0,7);cx.fillStyle="#FF9900";cx.fill();cx.strokeStyle="#fff";cx.lineWidth=2;cx.stroke();
+    cx.font="bold 13px Inter,Arial,sans-serif";const w=cx.measureText(t).width+16,bx=Math.min(W-w-6,o.x+22),by=Math.max(8,o.y-34);
+    cx.strokeStyle="#FF9900";cx.lineWidth=1.5;cx.beginPath();cx.moveTo(o.x,o.y);cx.lineTo(bx,by+12);cx.stroke();
+    cx.save();cx.shadowColor="rgba(0,0,0,.18)";cx.shadowBlur=8;cx.fillStyle="rgba(255,255,255,.96)";cx.beginPath();if(cx.roundRect)cx.roundRect(bx,by,w,24,12);else cx.rect(bx,by,w,24);cx.fill();cx.restore();
+    cx.strokeStyle="#FF9900";cx.lineWidth=1.5;cx.beginPath();if(cx.roundRect)cx.roundRect(bx,by,w,24,12);else cx.rect(bx,by,w,24);cx.stroke();
+    cx.fillStyle="#111827";cx.fillText(t,bx+8,by+17);
+  });
+  // selo do nível
+  if(V3D){const nv=V3D.nivel,cor=["#9CA3AF","#FFD699","#FF9900","#FF3300"][nv];cx.font="bold 13px Inter,Arial,sans-serif";const t="Nível: "+nivelTxt(nv),w=cx.measureText(t).width+30;cx.fillStyle="rgba(255,255,255,.95)";cx.beginPath();if(cx.roundRect)cx.roundRect(12,12,w,28,14);else cx.rect(12,12,w,28);cx.fill();cx.fillStyle=cor;cx.beginPath();cx.arc(27,26,6,0,7);cx.fill();cx.fillStyle="#111827";cx.fillText(t,40,31)}
+}
+// comparação com a postura adequada
+const _abrir3d39=abrir3d;
+abrir3d=function(idx,titulo,chave,nivelIni){
+  _abrir3d39(idx,titulo,chave,nivelIni);
+  if(!V3D)return;
+  const sl=$("#v3Sl");if(sl&&!$("#v3Gh")){sl.closest(".linha").insertAdjacentHTML("beforeend",`<label class="chk" style="margin:0"><input type="checkbox" id="v3Gh"> Sobrepor a postura adequada (azul)</label>`);
+    $("#v3Gh").addEventListener("change",e=>{V3D.ghost=e.target.checked;V3D.redes()})}
+  V3D.redes();
+};
 /* =====================================================================
    INÍCIO
    ===================================================================== */
