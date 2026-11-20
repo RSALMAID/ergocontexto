@@ -270,6 +270,25 @@ details.nota summary{cursor:pointer;color:var(--verde2);font-size:.85rem;font-we
 .item{padding:20px 22px}
 .card{padding:22px 24px}
 @media (max-width:759px){.item{padding:16px}.card{padding:18px}}
+
+body.com-login #navConta{display:inline-block!important}
+#chip{display:flex;align-items:center}
+.chip-user{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:999px;padding:4px 12px 4px 4px;font-weight:600;font-size:.85rem}
+.chip-user .av{width:28px;height:28px;border-radius:50%;background:var(--laranja);display:grid;place-items:center;font-weight:800}
+@media (max-width:759px){#chip{position:absolute;right:12px;top:calc(8px + env(safe-area-inset-top))}.chip-user .nm{display:none}.chip-user{padding:4px}}
+.topo-in{position:relative}
+#auth{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:16px;overflow:auto;background:radial-gradient(1200px 600px at 20% -10%,#00a67e 0,transparent 60%),linear-gradient(160deg,#003b2e,#004F3D 55%,#00352a)}
+.auth-card{width:100%;max-width:420px;background:var(--card);border-radius:22px;padding:28px 26px;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+.auth-logo{text-align:center;margin-bottom:16px}
+.auth-logo h1{font-size:1.5rem;margin:8px 0 0}
+.auth-logo span{font-size:.85rem;color:var(--mut)}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--soft);border-radius:12px;padding:4px;margin:0 0 14px}
+.auth-tabs button{border:0;background:transparent;border-radius:9px;padding:9px;font-weight:700;color:var(--mut)}
+.auth-tabs button.on{background:var(--card);color:var(--verde);box-shadow:var(--sh)}
+.auth-ok{background:var(--n0b);color:var(--n0t);padding:10px 12px;border-radius:10px;font-size:.88rem;margin:0 0 10px}
+.auth-card a{color:var(--verde2);font-weight:600}
+body.sem-acesso .topo,body.sem-acesso .wrap{display:none}
+.codigo{display:inline-block;font:800 1.3rem ui-monospace,monospace;letter-spacing:.2em;background:var(--soft);border:1px dashed var(--verde2);border-radius:10px;padding:4px 14px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media print{
   :root{--bg:#fff;--card:#fff;--tx:#000;--mut:#444;--bd:#bbb;--soft:#f3f3f3;--fig:#222;
@@ -300,7 +319,9 @@ details.nota summary{cursor:pointer;color:var(--verde2);font-size:.85rem;font-we
       <button data-v="historico">Histórico</button>
       <button data-v="painel">Painel</button>
       <button data-v="sobre">Sobre o método</button>
+      <button data-v="conta" id="navConta" style="display:none">Conta</button>
     </nav>
+    <div id="chip"></div>
   </div>
 </header>
 
@@ -312,9 +333,11 @@ details.nota summary{cursor:pointer;color:var(--verde2);font-size:.85rem;font-we
   <section id="v-historico" class="view"></section>
   <section id="v-painel" class="view"></section>
   <section id="v-sobre" class="view sobre"></section>
+  <section id="v-conta" class="view"></section>
 </main>
 <noscript><p style="padding:20px">Este aplicativo precisa de JavaScript.</p></noscript>
 
+<script src="config.js"></script>
 <script>
 "use strict";
 /* =====================================================================
@@ -658,12 +681,13 @@ function gaugeSvg(ind,grande){
    ===================================================================== */
 const CH_LISTA="ergocontexto_v2_avaliacoes", CH_RASC="ergocontexto_v2_rascunho";
 let lista=lerJSON(CH_LISTA,[]);
+let perfil=lerJSON("ergocontexto_perfil",null);
 let estado=novoEstado();
 let sugFoto=null, sugDesc={}; // sugestões da IA (temporárias, não são gravadas)
 
 function novoEstado(base){
   return {id:gerarId(),criadoEm:null,passo:0,fase:"wizard",
-    ctx:Object.assign({unidade:"",area:"",local:"",atividade:"",funcao:"",avaliador:"",data:hojeISO(),gravidade:"",exposicao:"",obs:""},base||{}),
+    ctx:Object.assign({unidade:"",area:"",local:"",atividade:"",funcao:"",avaliador:(perfil&&perfil.nome)||"",data:hojeISO(),gravidade:"",exposicao:"",obs:""},base||{}),
     resp:{},dom:{},acoes:[],ia:"",iaj:null,foto:""};
 }
 function salvarLista(){
@@ -672,6 +696,7 @@ function salvarLista(){
     if(gravarJSON(CH_LISTA,copia)){lista=copia;aviso("Armazenamento quase cheio: fotos de avaliações antigas foram removidas. Faça um backup em Histórico.")}
     else aviso("Não foi possível salvar. Exporte um backup em Histórico e libere espaço.");
   }
+  if(typeof agendarSync==="function")agendarSync();
 }
 let tmrSalvar=null;
 function agendarSalvar(){clearTimeout(tmrSalvar);tmrSalvar=setTimeout(salvarRascunho,500)}
@@ -700,6 +725,7 @@ function irPara(v){
   if(v==="historico")renderHistorico();
   if(v==="painel")renderPainel();
   if(v==="sobre")renderSobre();
+  if(v==="conta")renderConta();
   if(v==="avaliar")render();
   window.scrollTo(0,0);
 }
@@ -1184,8 +1210,10 @@ function finalizar(){
   estado.acoes=estado.acoes.filter(a=>a.acao.trim());
   const agora=Date.now();
   if(!estado.criadoEm)estado.criadoEm=agora;
+  if(!estado.ctx.avaliador&&perfil)estado.ctx.avaliador=perfil.nome;
   const pr=prioridadeSugerida(calc,estado.ctx);
-  const av={id:estado.id,versao:VERSAO_MODELO,criadoEm:estado.criadoEm,atualizadoEm:agora,
+  const aut=(typeof autorAtual==='function'&&autorAtual());
+  const av={autor:aut||(lista.find(x=>x.id===estado.id)||{}).autor||null,id:estado.id,versao:VERSAO_MODELO,criadoEm:estado.criadoEm,atualizadoEm:agora,
     ctx:{...estado.ctx},resp:JSON.parse(JSON.stringify(estado.resp)),dom:JSON.parse(JSON.stringify(estado.dom)),
     acoes:JSON.parse(JSON.stringify(estado.acoes)),ia:estado.ia||"",iaj:estado.iaj||null,foto:estado.foto||"",
     resultado:{doms:calc.doms,pior:calc.pior,prio:pr.prio,porGravidade:pr.porGravidade,respondidos:calc.respondidos,total:calc.total}};
@@ -1363,7 +1391,9 @@ function payloadIA(av){
   return p;
 }
 async function chamarIA(rota,corpo){
-  const r=await fetch(URL_BASE+rota,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(corpo)});
+  const h={"Content-Type":"application/json"};
+  if(SB_ON){const t=await tokenValido();if(!t)throw new Error("Entre na sua conta para usar a IA.");h.Authorization="Bearer "+t}
+  const r=await fetch(URL_BASE+rota,{method:"POST",headers:h,body:JSON.stringify(corpo)});
   const j=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(j.erro||"falha");
   return j;
@@ -1555,11 +1585,12 @@ function cartaoHist(a){
   return `<div class="hist"><div class="linha" style="justify-content:space-between;flex-wrap:nowrap;align-items:flex-start"><div>${titulo}</div>${ind?`<span class="bd n${ind.n}" title="Índice geral de adequação" style="flex:none">Índice ${ind.v}</span>`:""}</div>
     <div class="dots" title="Perfil por domínio">${a.resultado.doms.map((r,i)=>`<i class="${r.nivel===null?"":"n"+r.nivel}" title="${esc(DOMINIOS[i].curto)}: ${r.nivel===null?"insuficiente":NIVEIS[r.nivel].curto}"></i>`).join("")}</div>
     <div class="linha">${badge(a.resultado.pior)}<small>Prioridade: <b>${a.resultado.prio===null?"—":PRIOS[a.resultado.prio]}</b> · ${esc(fmtData(a.ctx.data))} · ${abertas} ação(ões) em aberto</small></div>
+    ${a.autor&&a.autor.nome?`<small class="mut">Avaliador: ${esc(a.autor.nome)}</small>`:""}
     <div class="linha no-print" style="margin-top:8px">
       <button class="btn sec peq" data-acao="abrir" data-id="${esc(a.id)}">Abrir relatório</button>
-      <button class="btn sec peq" data-acao="editar-h" data-id="${esc(a.id)}">Editar</button>
+      ${podeEditar(a)?`<button class="btn sec peq" data-acao="editar-h" data-id="${esc(a.id)}">Editar</button>`:""}
       <button class="btn sec peq" data-acao="reavaliar" data-id="${esc(a.id)}">Reavaliar</button>
-      <button class="btn perigo peq" data-acao="del" data-id="${esc(a.id)}">Excluir</button>
+      ${podeEditar(a)?`<button class="btn perigo peq" data-acao="del" data-id="${esc(a.id)}">Excluir</button>`:""}
     </div></div>`;
 }
 function carregarParaEstado(a,fase){
@@ -1730,8 +1761,13 @@ document.addEventListener("click",e=>{
     case "abrir":{const a=lista.find(x=>x.id===id);if(a)carregarParaEstado(a,"resultado");break}
     case "editar-h":{const a=lista.find(x=>x.id===id);if(a)carregarParaEstado(a,"wizard");break}
     case "reavaliar":{const a=lista.find(x=>x.id===id);if(a){const c={...a.ctx,data:hojeISO()};estado=novoEstado(c);estado.foto="";sugFoto=null;sugDesc={};irPara("avaliar")}break}
-    case "del":if(confirm("Excluir esta avaliação?")){lista=lista.filter(x=>x.id!==id);salvarLista();renderHistorico()}break;
-    case "limpar":if(confirm("Apagar TODAS as avaliações deste aparelho? Faça backup antes.")){lista=[];salvarLista();renderHistorico()}break;
+    case "del":if(confirm("Excluir esta avaliação?")){registrarExclusao(id);lista=lista.filter(x=>x.id!==id);salvarLista();renderHistorico()}break;
+    case "limpar":if(confirm("Apagar TODAS as suas avaliações? Faça backup antes.")){lista.filter(podeEditar).forEach(x=>registrarExclusao(x.id));lista=lista.filter(x=>!podeEditar(x));salvarLista();renderHistorico()}break;
+    case "auth-tab":e.preventDefault();mostrarAuth(b.dataset.m);break;
+    case "ir-conta":irPara("conta");break;
+    case "sair":if(confirm("Sair da conta? Avaliações já sincronizadas continuam na nuvem; as ainda não sincronizadas serão perdidas deste aparelho.")){sair()}break;
+    case "sync-agora":sincronizar(true);break;
+    case "equipe-sair":if(confirm("Sair da equipe? Suas avaliações deixam de ser vistas pelos colegas.")){sbA("/rest/v1/rpc/sair_equipe",{method:"POST",body:{}}).then(()=>carregarPerfil()).then(()=>{renderConta();sincronizar()}).catch(er=>aviso(er.message))}break;
     case "exp-json":exportar("json");break;
     case "exp-csv-av":exportar("av");break;
     case "exp-csv-ac":exportar("ac");break;
@@ -1749,11 +1785,254 @@ $("#palco").addEventListener("change",e=>{
 });
 window.addEventListener("beforeunload",salvarRascunho);
 
+
+/* =====================================================================
+   LOGIN, EQUIPE E NUVEM (Supabase, sem biblioteca externa)
+   Só liga quando config.js tem URL e chave. Sem isso o app funciona local.
+   ===================================================================== */
+const CFG=window.ERGO_CONFIG||{};
+const SB_URL=(CFG.supabaseUrl||"").replace(/\/+$/,""),SB_KEY=CFG.anonKey||"";
+const SB_ON=!!(SB_URL&&SB_KEY);
+const CH_SESSAO="ergocontexto_sessao",CH_SYNC="ergocontexto_sync",CH_TOMB="ergocontexto_tomb";
+let sessao=SB_ON?lerJSON(CH_SESSAO,null):null;
+let equipeInfo=null,membros=[],statusNuvem="",sincronizando=false,tmrSync=null;
+
+function msgErro(j,status){
+  const t=String((j&&(j.msg||j.error_description||j.message||j.error))||"");
+  if(/invalid login credentials/i.test(t))return "E-mail ou senha incorretos.";
+  if(/email not confirmed/i.test(t))return "Confirme seu e-mail antes de entrar. Veja a caixa de entrada (e o spam).";
+  if(/already registered|already been registered/i.test(t))return "Este e-mail já tem conta. Use Entrar ou Esqueci a senha.";
+  if(/password should be at least|weak password/i.test(t))return "A senha precisa ter pelo menos 8 caracteres.";
+  if(/rate limit|too many|security purposes/i.test(t)||status===429)return "Muitas tentativas. Aguarde um minuto e tente de novo.";
+  if(/same password/i.test(t))return "A nova senha precisa ser diferente da atual.";
+  if(/valid email|invalid format/i.test(t))return "E-mail inválido.";
+  if(/signups not allowed/i.test(t))return "Criação de contas desativada neste projeto.";
+  return t||"Não foi possível concluir. Tente novamente.";
+}
+async function sbReq(caminho,{method="GET",body,token,headers}={}){
+  const r=await fetch(SB_URL+caminho,{method,headers:{apikey:SB_KEY,"Content-Type":"application/json",...((token||!SB_KEY.startsWith("sb_"))?{Authorization:"Bearer "+(token||SB_KEY)}:{}),...(headers||{})},body:body===undefined?undefined:JSON.stringify(body)});
+  let j=null;const txt=await r.text();try{j=txt?JSON.parse(txt):null}catch(e){}
+  if(!r.ok){const e=new Error(msgErro(j,r.status));e.status=r.status;throw e}
+  return j;
+}
+function gravarSessao(s){sessao=s;if(s)gravarJSON(CH_SESSAO,s);else try{localStorage.removeItem(CH_SESSAO)}catch(e){}}
+function sessaoDe(j){
+  return {access_token:j.access_token,refresh_token:j.refresh_token,expires_at:j.expires_at||Math.floor(Date.now()/1000)+(j.expires_in||3600),user:{id:j.user&&j.user.id,email:j.user&&j.user.email,nome:j.user&&j.user.user_metadata&&j.user.user_metadata.nome}};
+}
+async function tokenValido(){
+  if(!sessao)return null;
+  if(sessao.expires_at-90>Date.now()/1000)return sessao.access_token;
+  try{
+    const j=await sbReq("/auth/v1/token?grant_type=refresh_token",{method:"POST",body:{refresh_token:sessao.refresh_token}});
+    gravarSessao(sessaoDe(j));return sessao.access_token;
+  }catch(e){
+    if(e.status===400||e.status===401||e.status===403){await sair(true);return null}
+    return sessao.access_token; // sem rede: segue com o que tem
+  }
+}
+async function sbA(caminho,op){
+  const t=await tokenValido();if(!t)throw new Error("Sessão expirada. Entre de novo.");
+  return sbReq(caminho,{...(op||{}),token:t});
+}
+const autorAtual=()=>sessao?{id:sessao.user.id,nome:(perfil&&perfil.nome)||sessao.user.nome||sessao.user.email}:null;
+function podeEditar(a){
+  if(!SB_ON||!sessao||!a.autor)return true;
+  return a.autor.id===sessao.user.id||(perfil&&perfil.papel==="admin");
+}
+
+/* ---------- perfil e equipe ---------- */
+async function carregarPerfil(){
+  try{
+    const r=await sbA(`/rest/v1/perfis?id=eq.${sessao.user.id}&select=nome,papel,equipe_id,equipes(nome,codigo)`);
+    const p=r&&r[0];
+    if(p){perfil={nome:p.nome||sessao.user.email,papel:p.papel,equipe_id:p.equipe_id};equipeInfo=p.equipes||null;gravarJSON("ergocontexto_perfil",perfil)}
+    if(perfil&&perfil.equipe_id){membros=await sbA(`/rest/v1/perfis?equipe_id=eq.${perfil.equipe_id}&select=nome,email,papel&order=nome`)||[]}else membros=[];
+  }catch(e){}
+  if(estado.fase==="wizard"&&!estado.ctx.avaliador&&perfil)estado.ctx.avaliador=perfil.nome;
+  atualizarChip();
+}
+
+/* ---------- sincronização ---------- */
+function agendarSync(){if(!SB_ON||!sessao)return;clearTimeout(tmrSync);tmrSync=setTimeout(()=>sincronizar(),2500)}
+function marcarStatus(t){statusNuvem=t;atualizarChip();const el=$("#statusNuvem");if(el)el.textContent=t}
+async function sincronizar(manual){
+  if(!SB_ON||!sessao||sincronizando)return;
+  if(!navigator.onLine){marcarStatus("Sem internet. Sincroniza quando voltar.");return}
+  sincronizando=true;marcarStatus("Sincronizando…");
+  try{
+    const sy=lerJSON(CH_SYNC,{}),uid=sessao.user.id,admin=perfil&&perfil.papel==="admin";
+    const rows=await sbA("/rest/v1/avaliacoes?select=id,dados,atualizado_em,excluido&order=atualizado_em.desc&limit=1000")||[];
+    let mudou=false;
+    rows.forEach(r=>{
+      const i=lista.findIndex(a=>a.id===r.id);
+      if(r.excluido){if(i>=0){lista.splice(i,1);mudou=true}sy[r.id]=r.atualizado_em;return}
+      const loc=i>=0?lista[i]:null;
+      if(!loc){lista.push({...r.dados,foto:""});sy[r.id]=r.atualizado_em;mudou=true}
+      else if((r.atualizado_em||0)>(loc.atualizadoEm||0)){lista[i]={...r.dados,foto:loc.foto||""};sy[r.id]=r.atualizado_em;mudou=true}
+      else if((r.atualizado_em||0)===(loc.atualizadoEm||0))sy[r.id]=r.atualizado_em;
+    });
+    const eq=perfil&&perfil.equipe_id?perfil.equipe_id:null;
+    const sobe=lista.filter(a=>!a.legado&&(a.atualizadoEm||0)>(sy[a.id]||0)&&(!a.autor||a.autor.id===uid||admin));
+    for(let i=0;i<sobe.length;i+=15){
+      const lote=sobe.slice(i,i+15).map(a=>{const {foto,...resto}=a;return {id:a.id,equipe_id:eq,dados:resto,atualizado_em:a.atualizadoEm||0,excluido:false}});
+      await sbA("/rest/v1/avaliacoes?on_conflict=id",{method:"POST",body:lote,headers:{Prefer:"resolution=merge-duplicates,return=minimal"}});
+      sobe.slice(i,i+15).forEach(a=>{sy[a.id]=a.atualizadoEm||0});
+    }
+    const tomb=lerJSON(CH_TOMB,[]);
+    if(tomb.length){
+      await sbA("/rest/v1/avaliacoes?on_conflict=id",{method:"POST",body:tomb.map(id=>({id,equipe_id:eq,dados:{},atualizado_em:Date.now(),excluido:true})),headers:{Prefer:"resolution=merge-duplicates,return=minimal"}});
+      gravarJSON(CH_TOMB,[]);
+    }
+    gravarJSON(CH_SYNC,sy);
+    lista.sort((x,y)=>(y.criadoEm||0)-(x.criadoEm||0));
+    gravarJSON(CH_LISTA,lista);
+    marcarStatus("Sincronizado às "+new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}));
+    if(mudou){const v=$(".view.on");if(v&&v.id==="v-historico")renderHistorico();if(v&&v.id==="v-painel")renderPainel()}
+  }catch(e){marcarStatus("Falha ao sincronizar: "+e.message);if(manual)aviso("Falha ao sincronizar: "+e.message)}
+  finally{sincronizando=false}
+}
+function registrarExclusao(id){
+  if(!SB_ON||!sessao)return;
+  const t=lerJSON(CH_TOMB,[]);if(!t.includes(id)){t.push(id);gravarJSON(CH_TOMB,t)}
+}
+
+/* ---------- tela de acesso ---------- */
+let authModo="entrar";
+function htmlAuth(msg,tipo){
+  const tabs=[["entrar","Entrar"],["criar","Criar conta"]].map(([k,r])=>`<button type="button" data-acao="auth-tab" data-m="${k}" class="${authModo===k?"on":""}">${r}</button>`).join("");
+  const aviso_=msg?`<div class="${tipo==="ok"?"auth-ok":"alerta"}" role="alert">${esc(msg)}</div>`:"";
+  let form="";
+  if(authModo==="entrar")form=`<form data-auth="entrar"><label class="campo">E-mail<input type="email" name="email" autocomplete="username" required></label><label class="campo">Senha<input type="password" name="senha" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:16px">Entrar</button><p style="text-align:center;margin:12px 0 0"><a href="#" data-acao="auth-tab" data-m="esqueci">Esqueci a senha</a></p></form>`;
+  if(authModo==="criar")form=`<form data-auth="criar"><label class="campo">Nome completo<input name="nome" autocomplete="name" required></label><label class="campo">E-mail<input type="email" name="email" autocomplete="username" required></label><label class="campo">Senha (mín. 8 caracteres)<input type="password" name="senha" minlength="8" autocomplete="new-password" required></label><button class="btn" style="width:100%;margin-top:16px">Criar conta</button><p class="mut" style="font-size:.8rem">Você receberá um e-mail para confirmar a conta.</p></form>`;
+  if(authModo==="esqueci")form=`<form data-auth="esqueci"><p class="mut">Informe seu e-mail e enviaremos um link para criar uma nova senha.</p><label class="campo">E-mail<input type="email" name="email" autocomplete="username" required></label><button class="btn" style="width:100%;margin-top:16px">Enviar link</button><p style="text-align:center;margin:12px 0 0"><a href="#" data-acao="auth-tab" data-m="entrar">Voltar para Entrar</a></p></form>`;
+  if(authModo==="nova")form=`<form data-auth="nova"><p class="mut">Defina sua nova senha.</p><label class="campo">Nova senha (mín. 8 caracteres)<input type="password" name="senha" minlength="8" autocomplete="new-password" required></label><button class="btn" style="width:100%;margin-top:16px">Salvar nova senha</button></form>`;
+  return `<div class="auth-card"><div class="auth-logo"><img src="icon.svg" width="64" height="64" alt="" style="border-radius:16px"><h1>ErgoContexto</h1><span>Triagem ergonômica e fatores humanos</span></div>${authModo==="entrar"||authModo==="criar"?`<div class="auth-tabs">${tabs}</div>`:""}${aviso_}${form}<p class="mut" style="font-size:.74rem;text-align:center;margin:16px 0 0">Seus dados de avaliação ficam na sua conta e, se você entrar numa equipe, são visíveis aos membros dela.</p></div>`;
+}
+function mostrarAuth(modo,msg,tipo){
+  authModo=modo||authModo;
+  let el=$("#auth");if(!el){el=document.createElement("div");el.id="auth";document.body.appendChild(el)}
+  el.innerHTML=htmlAuth(msg,tipo);document.body.classList.add("sem-acesso");
+  const f=$("input",el);if(f&&!/Android|iPhone/i.test(navigator.userAgent))f.focus();
+}
+function fecharAuth(){const el=$("#auth");if(el)el.remove();document.body.classList.remove("sem-acesso")}
+async function enviarAuth(form){
+  const tipo=form.dataset.auth,d=Object.fromEntries(new FormData(form).entries());
+  const btn=$("button.btn",form);btn.disabled=true;
+  try{
+    if(tipo==="entrar"){
+      const j=await sbReq("/auth/v1/token?grant_type=password",{method:"POST",body:{email:d.email.trim(),password:d.senha}});
+      gravarSessao(sessaoDe(j));fecharAuth();await aposLogin();
+    }else if(tipo==="criar"){
+      const j=await sbReq("/auth/v1/signup",{method:"POST",body:{email:d.email.trim(),password:d.senha,data:{nome:d.nome.trim()},...{}}});
+      if(j&&j.access_token){gravarSessao(sessaoDe(j));fecharAuth();await aposLogin()}
+      else mostrarAuth("entrar","Conta criada! Enviamos um e-mail de confirmação. Clique no link e depois entre aqui.","ok");
+    }else if(tipo==="esqueci"){
+      await sbReq("/auth/v1/recover?redirect_to="+encodeURIComponent(location.origin+location.pathname),{method:"POST",body:{email:d.email.trim()}});
+      mostrarAuth("entrar","Se o e-mail estiver cadastrado, você receberá um link para criar uma nova senha.","ok");
+    }else if(tipo==="nova"){
+      await sbReq("/auth/v1/user",{method:"PUT",token:authTokenTemp,body:{password:d.senha}});
+      history.replaceState(null,"",location.pathname);
+      if(authSessaoApos){gravarSessao(authSessaoApos);authSessaoApos=null;fecharAuth();await aposLogin();aviso("Senha alterada.")}
+      else mostrarAuth("entrar","Senha alterada! Entre com a nova senha.","ok");
+    }
+  }catch(e){mostrarAuth(authModo,e.message);}
+}
+let authTokenTemp=null;
+async function sair(silencioso){
+  const t=sessao&&sessao.access_token;
+  try{if(t&&!silencioso)await sbReq("/auth/v1/logout",{method:"POST",token:t})}catch(e){}
+  gravarSessao(null);equipeInfo=null;membros=[];
+  if(!silencioso){
+    // saída manual: limpa os dados deste aparelho (a cópia está na nuvem)
+    try{["ergocontexto_perfil","ergocontexto_dono",CH_SYNC,CH_TOMB,CH_LISTA,CH_RASC].forEach(k=>localStorage.removeItem(k))}catch(e){}
+    perfil=null;lista=[];estado=novoEstado();
+  }
+  atualizarChip();
+  if(SB_ON){mostrarAuth("entrar",silencioso?"Sua sessão expirou. Entre novamente.":"")}
+}
+async function aposLogin(){
+  // se outra pessoa entrou neste aparelho, não mistura os dados locais
+  const dono=lerJSON("ergocontexto_dono",null);
+  if(dono&&dono!==sessao.user.id){try{[CH_SYNC,CH_TOMB,CH_LISTA,CH_RASC,"ergocontexto_perfil"].forEach(k=>localStorage.removeItem(k))}catch(e){}lista=[];perfil=null;estado=novoEstado()}
+  gravarJSON("ergocontexto_dono",sessao.user.id);
+  await carregarPerfil();
+  if(rascunhoSujo()===false&&perfil)estado.ctx.avaliador=estado.ctx.avaliador||perfil.nome;
+  atualizarChip();render();
+  sincronizar();
+}
+function atualizarChip(){
+  const el=$("#chip");if(!el)return;
+  if(!SB_ON||!sessao){el.innerHTML="";return}
+  const n=(perfil&&perfil.nome)||sessao.user.email||"";
+  el.innerHTML=`<button type="button" data-acao="ir-conta" class="chip-user" title="${esc(statusNuvem)}"><span class="av">${esc((n[0]||"?").toUpperCase())}</span><span class="nm">${esc(n.split(" ")[0])}</span></button>`;
+}
+
+/* ---------- aba Conta ---------- */
+function renderConta(){
+  const v=$("#v-conta");if(!v)return;
+  if(!SB_ON||!sessao){v.innerHTML=`<div class="card"><h2>Conta</h2><p class="mut">O login ainda não foi configurado neste site.</p></div>`;return}
+  const admin=perfil&&perfil.papel==="admin";
+  const eq=equipeInfo&&perfil&&perfil.equipe_id
+    ?`<p><b>${esc(equipeInfo.nome)}</b> · você é <b>${admin?"administrador":"avaliador"}</b></p>
+      <p>Código para convidar colegas: <span class="codigo">${esc(equipeInfo.codigo)}</span></p>
+      <h4 style="margin-top:14px">Membros (${membros.length})</h4>${membros.map(m=>`<div class="sug"><span>${esc(m.nome||"")}<br><small>${esc(m.email||"")}</small></span><span class="bd ${m.papel==="admin"?"n2":"nd"}">${m.papel==="admin"?"admin":"avaliador"}</span></div>`).join("")}
+      <p class="mut" style="font-size:.84rem">Todos da equipe veem as avaliações uns dos outros. Só o autor (ou um administrador) edita cada avaliação.</p>
+      <button class="btn sec peq" data-acao="equipe-sair">Sair da equipe</button>`
+    :`<p class="mut">Você ainda não está em uma equipe. Crie uma, ou entre com o código que um colega passou.</p>
+      <div class="grid2"><form data-conta="equipe-criar"><label class="campo">Nome da nova equipe<input name="nome" placeholder="Ex.: SESMT Laminação" required></label><button class="btn peq verde" style="margin-top:10px">Criar equipe</button></form>
+      <form data-conta="equipe-entrar"><label class="campo">Código da equipe<input name="codigo" placeholder="6 caracteres" maxlength="12" style="text-transform:uppercase" required></label><button class="btn peq verde" style="margin-top:10px">Entrar na equipe</button></form></div>`;
+  v.innerHTML=`<div class="painel-grid">
+  <div class="card"><h2>Minha conta</h2>
+    <form data-conta="nome"><label class="campo">Nome (aparece nos relatórios)<input name="nome" value="${esc((perfil&&perfil.nome)||"")}" required></label><button class="btn peq sec" style="margin-top:10px">Salvar nome</button></form>
+    <p class="mut" style="margin-top:12px">E-mail: ${esc(sessao.user.email||"")}</p>
+    <p class="mut">Nuvem: <span id="statusNuvem">${esc(statusNuvem||"—")}</span></p>
+    <div class="linha"><button class="btn peq sec" data-acao="sync-agora">Sincronizar agora</button><button class="btn peq perigo" data-acao="sair">Sair</button></div></div>
+  <div class="card"><h2>Equipe</h2>${eq}</div>
+  <div class="card"><h3>Trocar senha</h3>
+    <form data-conta="senha"><label class="campo">Nova senha (mín. 8 caracteres)<input type="password" name="senha" minlength="8" autocomplete="new-password" required></label><button class="btn peq sec" style="margin-top:10px">Alterar senha</button></form></div>
+  <div class="card"><h3>Privacidade</h3><p class="mut" style="font-size:.88rem">As avaliações ficam no seu aparelho e na nuvem da sua conta (a foto fica só no aparelho). Se entrar em uma equipe, os membros veem as avaliações. Para dados reais de trabalhadores, confirme com TI e jurídico o uso conforme a LGPD e a política da empresa.</p></div></div>`;
+}
+async function enviarConta(form){
+  const t=form.dataset.conta,d=Object.fromEntries(new FormData(form).entries());
+  try{
+    if(t==="nome"){await sbA(`/rest/v1/perfis?id=eq.${sessao.user.id}`,{method:"PATCH",body:{nome:d.nome.trim()},headers:{Prefer:"return=minimal"}});perfil.nome=d.nome.trim();gravarJSON("ergocontexto_perfil",perfil);atualizarChip();aviso("Nome salvo.")}
+    if(t==="senha"){await sbA("/auth/v1/user",{method:"PUT",body:{password:d.senha}});form.reset();aviso("Senha alterada.")}
+    if(t==="equipe-criar"){await sbA("/rest/v1/rpc/criar_equipe",{method:"POST",body:{p_nome:d.nome}});await carregarPerfil();renderConta();sincronizar();aviso("Equipe criada. Passe o código para seus colegas.")}
+    if(t==="equipe-entrar"){await sbA("/rest/v1/rpc/entrar_equipe",{method:"POST",body:{p_codigo:d.codigo}});await carregarPerfil();renderConta();sincronizar();aviso("Você entrou na equipe.")}
+  }catch(e){aviso(e.message)}
+}
+
+/* ---------- início do acesso ---------- */
+async function iniciarAuth(){
+  if(!SB_ON)return;
+  document.body.classList.add("com-login");
+  // link vindo do e-mail (confirmação ou recuperação): tokens no # da URL
+  const h=new URLSearchParams(location.hash.replace(/^#/,""));
+  if(h.get("error_description")){mostrarAuth("entrar",msgErro({error_description:h.get("error_description").replace(/\+/g," ")}));history.replaceState(null,"",location.pathname);return}
+  if(h.get("access_token")){
+    const tk=h.get("access_token"),tipo=h.get("type");
+    try{
+      const u=await sbReq("/auth/v1/user",{token:tk});
+      const s={access_token:tk,refresh_token:h.get("refresh_token"),expires_at:Math.floor(Date.now()/1000)+Number(h.get("expires_in")||3600),user:{id:u.id,email:u.email,nome:u.user_metadata&&u.user_metadata.nome}};
+      if(tipo==="recovery"){authTokenTemp=tk;authSessaoApos=s;mostrarAuth("nova");history.replaceState(null,"",location.pathname);return}
+      gravarSessao(s);history.replaceState(null,"",location.pathname);
+    }catch(e){mostrarAuth("entrar","Link inválido ou expirado. Entre ou peça um novo.");history.replaceState(null,"",location.pathname);return}
+  }
+  if(!sessao){mostrarAuth("entrar");return}
+  atualizarChip();
+  await aposLogin();
+}
+let authSessaoApos=null;
+window.addEventListener("online",()=>sincronizar());
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)sincronizar()});
+setInterval(()=>sincronizar(),180000);
 /* =====================================================================
    INÍCIO
    ===================================================================== */
 migrarLegado();
 render();
+document.addEventListener("submit",e=>{const f=e.target;if(f.dataset&&f.dataset.auth){e.preventDefault();enviarAuth(f)}else if(f.dataset&&f.dataset.conta){e.preventDefault();enviarConta(f)}});
+iniciarAuth();
 if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
   window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }
