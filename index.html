@@ -9177,6 +9177,374 @@ renderInicio=function(){
 .kb-d{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #eef0f2}.kb-n{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.86rem}.kb-d small{color:#6B7280;white-space:nowrap}
 @media(max-width:820px){.as-grid{grid-template-columns:1fr}.as-log{max-height:300px}}
 `;document.head.appendChild(s)})();
+/* FASE 27b: formulários de campo para todas as análises (Triagem, AEP, AET e os 5 métodos de determinantes).
+   Cada análise tem (1) formulário para imprimir e preencher em campo, com figuras das cenas 3D como opções nos itens de postura,
+   e (2) anexo da folha preenchida (foto ou PDF) para a IA transcrever. A IA só lê marcações e texto; o avaliador revisa e aplica. */
+const CP_NIV=["Adequado","Atenção","Alto","Crítico"];
+const CP_EVID=["Hipótese","Relatado","Observado","Medido"];
+const TRI_FIG={f1:"tronco",f2:"bracos",f3:"punhos",f4:"pernas",f5:"repet",f6:"ferramenta",f7:"levanta",f8:"estatica",a1:"luz",a4:"vcorpo",a5:"espaco"};
+const CP_COD={triagem:"ERGO-TRI-1",aep:"ERGO-AEP-1",aet:"ERGO-AET-1",ishikawa:"ERGO-DET-1",arvore:"ERGO-ARV-1",bowtie:"ERGO-BOW-1",fram:"ERGO-FRAM-1",hfacs:"ERGO-HFACS-1"};
+
+/* ---------- figuras (cenas 3D desenhadas de lado, em imagem) ---------- */
+const CP_FIG={};
+function cpFig(id,n){
+  const k=id+"/"+n;if(k in CP_FIG)return CP_FIG[k];
+  let u="";
+  try{
+    const c=cenaPara(id,n);
+    if(c){
+      const cv=document.createElement("canvas");cv.width=680;cv.height=440;
+      desenhar3d(cv,c,{yaw:0,pitch:.05,dist:3.6,tx:.25,ty:.9,tz:0},n);
+      const o=document.createElement("canvas");o.width=340;o.height=220;const x=o.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,340,220);x.drawImage(cv,0,0,340,220);u=o.toDataURL("image/jpeg",.78);
+    }
+  }catch(e){u=""}
+  return CP_FIG[k]=u;
+}
+
+/* ---------- gabaritos: os mesmos campos servem para imprimir e para a IA ler ---------- */
+const cpTx=(id,rot,linhas)=>({id,rot,tipo:"texto",linhas:linhas||1});
+function cpSpecTriagem(){
+  let n=0;
+  return {tipo:"triagem",titulo:"Triagem rápida de risco ergonômico",
+    cab:[cpTx("ctx.unidade","Unidade"),cpTx("ctx.area","Área"),cpTx("ctx.local","Posto ou local"),cpTx("ctx.atividade","Atividade"),cpTx("ctx.funcao","Função"),
+      {id:"ctx.gravidade",rot:"Gravidade potencial",tipo:"opcao",opcoes:GRAVIDADES},{id:"ctx.exposicao",rot:"Exposição diária",tipo:"opcao",opcoes:EXPOSICOES}],
+    secoes:DOMINIOS.map(d=>({t:d.nome,dica:d.pergunta,itens:d.itens.map(q=>({id:q.id,rot:(++n)+". "+q.t,tipo:"nivel",desc:q.c,fig:TRI_FIG[q.id]||""}))})),
+    fim:[cpTx("ctx.obs","Observações",3)]};
+}
+function cpSpecAEP(){
+  let n=0;
+  return {tipo:"aep",titulo:"AEP: avaliação ergonômica preliminar",
+    cab:[{id:"turno",rot:"Turno ou jornada",tipo:"texto",linhas:1},{id:"funcoes",rot:"Funções ou GSTS envolvidos",tipo:"texto",linhas:1},{id:"nExpostos",rot:"Nº de trabalhadores expostos",tipo:"texto",linhas:1},
+      cpTx("obs.prescrita","Atividade prescrita (o que o procedimento diz)",3),cpTx("obs.realizada","Atividade efetivamente realizada",3),cpTx("obs.estrategias","Estratégias dos trabalhadores e variações",2)],
+    secoes:CATS.map(c=>({t:c.nome,dica:"0 Adequado · 1 Atenção · 2 Alto · 3 Crítico · NA não se aplica",itens:c.itens.map(i=>({id:i.k,rot:(++n)+". "+i.t,tipo:"nivel",na:true,m:i.m||"",fig:cena3dDe(i.t)||""}))})),
+    fim:[]};
+}
+function cpSpecAET(){
+  const grande={prescrita:12,real:12,campo:14,entrevistas:12,variabilidade:8,estrategias:8,determinantes:8};
+  return {tipo:"aet",titulo:"AET: análise ergonômica do trabalho (anotações de campo)",cab:[],
+    secoes:AET_SEC.map(([t,cs])=>({t,dica:"",itens:cs.map(([k,r])=>({id:"sec."+k,rot:r,tipo:"texto",linhas:grande[k]||6}))})),fim:[]};
+}
+const CP_LIN=(pref,rotulo,n,extras)=>Array.from({length:n},(_,i)=>({id:pref+"."+(i+1),rot:rotulo+" "+(i+1),tipo:"linha",extras:extras||[]}));
+const CP_EX_EV={k:"ev",tipo:"opcao",opcoes:CP_EVID,r:"evidência"};
+function cpSpecCausa(metodo){
+  const ev=cpTx("evento","Evento ou problema analisado",3);
+  if(metodo==="ishikawa")return {tipo:"ishikawa",titulo:"Análise de determinantes ergonômicos",cab:[ev],
+    secoes:ISH_CATS.map((c,ci)=>({t:(ci+1)+". "+c.n,dica:c.dica,itens:Array.from({length:6},(_,i)=>({id:c.k+"."+(i+1),rot:"Determinante "+(ci+1)+"."+(i+1),tipo:"linha",num:(ci+1)+"."+(i+1),extras:[CP_EX_EV,{k:"p",tipo:"sn",r:"★ principal"}]}))})),
+    fim:[{t:"5 Porquês (opcional): aprofunde até 2 determinantes principais",dica:"Escreva no alto o número do determinante (ex.: 2.1) e depois as respostas, uma por linha.",itens:[{id:"pq1",rot:"5 Porquês, bloco 1",tipo:"porques",linhas:5},{id:"pq2",rot:"5 Porquês, bloco 2",tipo:"porques",linhas:5}]}]};
+  if(metodo==="arvore")return {tipo:"arvore",titulo:"Árvore de causas",cab:[ev],
+    secoes:[{t:"Antecedentes do evento",dica:"Escreva o que aconteceu antes. Em 'vem de', ponha o nº da linha que ele antecede (vazio ou E = o evento).",itens:Array.from({length:12},(_,i)=>({id:"n."+(i+1),rot:"Antecedente "+(i+1),tipo:"linha",num:String(i+1),extras:[{k:"tipo",tipo:"opcao",opcoes:["Fato","Variação","Condição habitual"],curtas:["Fato","Variação","Habitual"],r:"tipo"},{k:"pai",tipo:"texto",r:"vem de nº"},{k:"p",tipo:"sn",r:"⚑ ponto de ação"}]}))}],fim:[]};
+  if(metodo==="bowtie"){
+    const bt=[{k:"tipo",tipo:"opcao",opcoes:BW_TIPO.map(x=>x[1]),curtas:["Elimin.","Engenh.","Organiz.","Admin.","EPI"],r:"tipo"}];
+    const am=[],co=[];
+    for(let i=1;i<=5;i++){am.push({id:"am."+i,rot:"Ameaça "+i,tipo:"linha",num:"A"+i,extras:[]},...Array.from({length:2},(_,j)=>({id:"am."+i+".b."+(j+1),rot:"Barreira que impede a ameaça "+i,tipo:"linha",sub:true,num:"↳ barr.",extras:bt})))}
+    for(let i=1;i<=5;i++){co.push({id:"co."+i,rot:"Consequência "+i,tipo:"linha",num:"C"+i,extras:[{k:"sev",tipo:"opcao",opcoes:BW_SEV.map(x=>x[1]),curtas:["Leve","Moder.","Grave","Crítica"],r:"gravidade"}]},...Array.from({length:2},(_,j)=>({id:"co."+i+".b."+(j+1),rot:"Barreira que reduz a consequência "+i,tipo:"linha",sub:true,num:"↳ barr.",extras:bt})))}
+    return {tipo:"bowtie",titulo:"Bowtie: ameaças e barreiras",cab:[cpTx("perigo","Perigo (fonte do risco)"),cpTx("central","Evento central (o que dá errado)")],secoes:[{t:"Ameaças e barreiras preventivas",dica:"",itens:am},{t:"Consequências e barreiras de mitigação",dica:"",itens:co}],fim:[]};
+  }
+  if(metodo==="fram")return {tipo:"fram",titulo:"FRAM: funções e aspectos",cab:[ev],
+    secoes:[{t:"Funções do trabalho",dica:"Uma função por bloco. Em cada aspecto, escreva o que a função recebe, produz, exige ou usa (separe itens com ponto e vírgula).",itens:Array.from({length:6},(_,i)=>({id:"f."+(i+1),rot:"Função "+(i+1),tipo:"linha",num:String(i+1),extras:[...FR_ASP.map(a=>({k:a.k,tipo:"texto",r:a.n})),{k:"a",tipo:"sn",r:"⚑ amortecer"}],bloco:true}))}],fim:[]};
+  if(metodo==="hfacs"){
+    return {tipo:"hfacs",titulo:"HFACS adaptado: fatores humanos e condições latentes",cab:[ev],
+      secoes:HF_NIV.map(nv=>({t:nv.n,dica:nv.dica,itens:HF_CAT.filter(c=>c.nv===nv.k).flatMap(c=>Array.from({length:2},(_,i)=>({id:c.k+"."+(i+1),rot:c.n+" "+(i+1),tipo:"linha",cat:c.n,catDica:i===0?c.dica:"",extras:[CP_EX_EV]})))})),fim:[]};
+  }
+  return null;
+}
+function cpSpec(tipo){
+  if(tipo==="triagem")return cpSpecTriagem();
+  if(tipo==="aep")return cpSpecAEP();
+  if(tipo==="aet")return cpSpecAET();
+  return cpSpecCausa(tipo);
+}
+const cpCampos=sp=>[].concat(sp.cab||[],...sp.secoes.map(s=>s.itens),...(sp.fim||[]).map(f=>f.itens?f.itens:f));
+function cpSecoesFim(sp){return (sp.fim||[]).map(f=>f.itens?f:{t:"Observações",dica:"",itens:[f]})}
+
+/* ---------- impressão ---------- */
+const cpBx=()=>'<i class="bx"></i>';
+function cpCampoHtml(c){
+  const rl=n=>Array.from({length:n},()=>'<div class="rl"></div>').join("");
+  if(c.tipo==="nivel"){
+    const cab=`<div class="tt">${esc(c.rot)}${c.m?` <small>(${esc(c.m)})</small>`:""}</div>`;
+    if(c.fig){
+      const cel=[0,1,2,3].map(n=>{const im=cpFig(c.fig,n),cap=c.desc?(c.desc[n]||""):((cenaPara(c.fig,n)||{}).cap||"");return `<div class="fg">${im?`<img src="${im}" alt="">`:""}<div class="fc">${cpBx()}<b>${n}</b> ${CP_NIV[n]}</div><small>${esc(cap)}</small></div>`}).join("");
+      return `<div class="it">${cab}<div class="figs">${cel}</div>${c.na?`<div class="na">${cpBx()} NA (não se aplica)</div>`:""}</div>`;
+    }
+    const op=[0,1,2,3].map(n=>`<div class="o">${cpBx()}<b>${n}</b> ${CP_NIV[n]}${c.desc?`<small>${esc(c.desc[n]||"")}</small>`:""}</div>`).join("");
+    return `<div class="it">${cab}<div class="ops ${c.desc?"d":"c"}">${op}${c.na?`<div class="o">${cpBx()} NA</div>`:""}</div></div>`;
+  }
+  if(c.tipo==="opcao")return `<div class="it"><div class="tt">${esc(c.rot)}</div><div class="ops c">${c.opcoes.map((o,i)=>`<div class="o">${cpBx()}<b>${i+1}</b> ${esc(o)}</div>`).join("")}</div></div>`;
+  if(c.tipo==="sn")return `<div class="it"><div class="tt">${esc(c.rot)}</div><div class="ops c"><div class="o">${cpBx()} Sim</div><div class="o">${cpBx()} Não</div></div></div>`;
+  if(c.tipo==="texto")return `<div class="it"><div class="tt">${esc(c.rot)}</div>${rl(c.linhas||1)}</div>`;
+  if(c.tipo==="porques")return `<div class="it"><div class="tt">${esc(c.rot)}: determinante nº <span class="ln0"></span></div>${[1,2,3,4,5].map(i=>`<div class="ln"><b>${i}º</b><span class="rl2"></span></div>`).join("")}</div>`;
+  if(c.tipo==="linha"){
+    const ex=c.extras||[];
+    if(c.bloco){
+      return `<div class="it blk"><div class="ln"><b>${esc(c.num)}</b><span class="rl2"></span>${ex.filter(e=>e.tipo==="sn").map(e=>`<span class="ex">${cpBx()}<small>${esc(e.r||"")}</small></span>`).join("")}</div><div class="asp">${ex.filter(e=>e.tipo==="texto").map(e=>`<div><small>${esc(e.r||e.k)}</small><div class="rl"></div></div>`).join("")}</div></div>`;
+    }
+    const x=ex.map(e=>e.tipo==="sn"?`<span class="ex">${cpBx()}<small>${esc(e.r||"")}</small></span>`:e.tipo==="opcao"?`<span class="ex">${e.opcoes.map((o,i)=>`${cpBx()}<small>${i+1} ${esc((e.curtas||[])[i]||String(o).replace(/ \(.*$/,"").slice(0,16))}</small>`).join(" ")}</span>`:`<span class="ex"><small>${esc(e.r||"")}</small><span class="ln0"></span></span>`).join("");
+    return `<div class="ln ${c.sub?"sub":""}"><b>${esc(c.num||"")}</b><span class="rl2"></span>${x}</div>`;
+  }
+  return "";
+}
+function cpHtml(sp){
+  const sec=(s)=>`<div class="sec">${esc(s.t)}</div>${s.dica?`<div class="dica">${esc(s.dica)}</div>`:""}`+(()=>{let cat="";return s.itens.map(c=>{let pre="";if(c.cat&&c.cat!==cat){cat=c.cat;pre=`<div class="cat">${esc(c.cat)}${c.catDica?` <small>${esc(c.catDica)}</small>`:""}</div>`}return pre+cpCampoHtml(c)}).join("")})();
+  const cab=sp.cab.length?`<div class="cab">${sp.cab.map(c=>`<div class="${(c.linhas||1)>1||c.tipo!=="texto"?"full":""}">${c.tipo==="texto"?`<small>${esc(c.rot)}</small>${Array.from({length:c.linhas||1},()=>'<div class="rl"></div>').join("")}`:cpCampoHtml(c).replace('class="it"','class="it0"')}</div>`).join("")}</div>`:"";
+  const css=`@page{size:A4;margin:11mm}*{box-sizing:border-box}body{font:9.5pt/1.25 Arial,Helvetica,sans-serif;color:#000;margin:0}
+h1{font-size:15pt;margin:0 0 2px}.sub0{color:#333;font-size:8.5pt}.id{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 4px}.id div{flex:1 1 150px;border-bottom:1px solid #000;min-height:19px;font-size:8pt;color:#333}
+.how{border:1px solid #000;padding:4px 7px;font-size:8.5pt;margin:6px 0}.cab{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin:6px 0}.cab .full{grid-column:1/-1}.cab small{font-size:8pt;color:#333}
+.bx{display:inline-block;width:4.4mm;height:4.4mm;border:1.5px solid #000;margin-right:1.6mm;vertical-align:middle;background:#fff}
+.sec{background:#222;color:#fff;padding:3px 8px;font-weight:700;margin:9px 0 3px;break-after:avoid}.dica{font-size:8pt;color:#333;margin:0 0 3px;break-after:avoid}.cat{font-weight:700;font-size:9pt;margin:5px 0 1px;border-bottom:1px solid #999;break-after:avoid}.cat small{font-weight:400;color:#444}
+.it,.it0{border:1px solid #888;border-radius:3px;padding:3px 6px;margin:0 0 3px;break-inside:avoid}.it0{border:0;padding:0}.tt{font-weight:700;margin-bottom:2px}.tt small{font-weight:400;color:#444}
+.figs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}.fg img{width:100%;display:block;border:1px solid #bbb}.fc{margin-top:1px;font-size:8.5pt}.fg small{display:block;font-size:7pt;color:#333;line-height:1.1}
+.na{margin-top:2px;font-size:8.5pt}.ops{display:grid;gap:3px 8px}.ops.c{grid-template-columns:repeat(auto-fit,minmax(70px,1fr))}.ops.d{grid-template-columns:repeat(4,1fr)}.o{font-size:8.5pt}.o small{display:block;font-size:7.2pt;color:#333;line-height:1.12;margin-top:1px}
+.rl{border-bottom:1px solid #777;height:6.2mm}.ln{display:flex;align-items:flex-end;gap:5px;margin:0 0 2px;min-height:7mm;break-inside:avoid}.ln>b{width:11mm;font-size:8.5pt;flex:none}.ln.sub{margin-left:9mm}.rl2{flex:1 1 auto;border-bottom:1px solid #777;height:5.4mm;min-width:30mm}.ln0{display:inline-block;width:18mm;border-bottom:1px solid #000}
+.ex{display:inline-flex;align-items:center;gap:2px;flex:none;font-size:7.5pt;padding-bottom:1px}.ex small{font-size:7.3pt;margin-right:3mm}.blk .asp{display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px 8px;margin-top:2px}.blk .asp small{font-size:7.3pt}
+.pe{margin-top:8px;font-size:7.5pt;color:#444;border-top:1px solid #aaa;padding-top:3px}
+@media screen{body{max-width:190mm;margin:10px auto;padding:0 10px}}`;
+  const fimS=cpSecoesFim(sp);
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(sp.titulo)} · ${CP_COD[sp.tipo]}</title><style>${css}</style></head><body>
+  <h1>${esc(sp.titulo)}</h1><div class="sub0">ErgoContexto · Formulário de campo ${CP_COD[sp.tipo]}</div>
+  <div class="id"><div>Nº do registro (se já existir)</div><div>Posto / atividade avaliado</div><div>Data</div><div>Avaliador</div></div>
+  <div class="how"><b>Como preencher:</b> marque com X dentro da caixa (uma por pergunta) e escreva em letra de forma. <b>Para a IA ler:</b> fotografe cada folha inteira, reta, com boa luz e sem sombra, ou escaneie em PDF, e anexe no app. A IA só transcreve; você confere antes de aplicar.</div>
+  ${cab}${sp.secoes.map(sec).join("")}${fimS.map(sec).join("")}
+  <div class="pe">ErgoContexto · ${CP_COD[sp.tipo]} · impresso em ${esc(dataBR(hojeISO()))}. Documento de apoio ao registro de campo; a decisão técnica é do avaliador.</div></body></html>`;
+}
+function cpImprimir(tipo){
+  let sp;try{sp=cpSpec(tipo)}catch(e){return aviso("Não consegui montar o formulário: "+(e.message||e))}
+  if(!sp)return aviso("Formulário indisponível para este método.");
+  aviso("Preparando o formulário…");
+  setTimeout(()=>{
+    let h;try{h=cpHtml(sp)}catch(e){return aviso("Não consegui montar o formulário: "+(e.message||e))}
+    const w=window.open("");if(!w)return aviso("Libere pop-ups para imprimir.");
+    w.document.open();w.document.write(h);w.document.close();setTimeout(()=>{try{w.focus();w.print()}catch(e){}},700);
+  },30);
+}
+
+/* ---------- leitura por IA ---------- */
+const cpPeso=c=>c.tipo==="lista"||c.tipo==="porques"?3:c.tipo==="texto"||c.tipo==="linha"?(c.extras&&c.extras.length>3?4:2):1;
+function cpChunks(campos){
+  const out=[];let cur=[],w=0;
+  campos.forEach(c=>{const p=cpPeso(c);if(cur.length&&(w+p>22||cur.length>=24)){out.push(cur);cur=[];w=0}cur.push(c);w+=p});
+  if(cur.length)out.push(cur);return out;
+}
+const cpGab=c=>({id:c.id,rot:c.rot,tipo:c.tipo,opcoes:c.opcoes||[],na:!!c.na,linhas:c.linhas||1,extras:(c.extras||[]).map(e=>({k:e.k,tipo:e.tipo,opcoes:e.opcoes||[]}))});
+function cpVazio(v){
+  if(v===null||v===undefined||v==="")return true;
+  if(Array.isArray(v))return !v.some(x=>String(x||"").trim());
+  if(typeof v==="object"){if("w" in v)return !String(v.n||"").trim()&&!(v.w||[]).length;return !Object.values(v).some(x=>x!==null&&x!==undefined&&String(x).trim()!==""&&x!==false)}
+  return false;
+}
+async function cpImagens(files){
+  const out=[];
+  for(const f of files){
+    const pdf=f.type==="application/pdf"||/\.pdf$/i.test(f.name);
+    const L=pdf?await ptPdfParaImagens(f,2000):[f];
+    for(const g of L){
+      let u=await ptImg(g,2000,.82,0);
+      if(u.length>2600000)u=await ptImg(g,1700,.74,0);
+      if(u.length>2600000)u=await ptImg(g,1400,.66,0);
+      out.push(u);
+    }
+  }
+  return out;
+}
+async function cpLer(sp,files,prog){
+  const campos=cpCampos(sp),chunks=cpChunks(campos),imgs=await cpImagens(files);
+  if(!imgs.length)throw new Error("Nenhuma página encontrada no arquivo.");
+  const tarefas=[];imgs.forEach((u,pi)=>chunks.forEach((ch,ci)=>tarefas.push({u,pi,ci,ch})));
+  const res=[];let feitas=0,falhas=0,ultimoErro="";
+  const exec=async t=>{
+    try{const j=await chamarIA("/api/ergo/formulario-campo",{titulo:sp.titulo,imagem:t.u,campos:t.ch.map(cpGab)});res.push({pi:t.pi,j})}
+    catch(e){falhas++;ultimoErro=e.message||"falha"}
+    feitas++;prog(`Lendo… ${feitas} de ${tarefas.length} (página ${t.pi+1} de ${imgs.length})`);
+  };
+  const fila=tarefas.slice();
+  await Promise.all([0,1,2].map(async()=>{while(fila.length)await exec(fila.shift())}));
+  if(falhas===tarefas.length)throw new Error(ultimoErro&&ultimoErro!=="falha"?ultimoErro:"Não consegui ler agora. Tente de novo.");
+  const valores={};let leg="boa";const ord=["boa","regular","ruim"];
+  res.sort((a,b)=>a.pi-b.pi).forEach(r=>{
+    const v=r.j.valores||{};Object.keys(v).forEach(k=>{if(cpVazio(valores[k])&&!cpVazio(v[k]))valores[k]=v[k]});
+    if(ord.indexOf(r.j.legibilidade)>ord.indexOf(leg))leg=r.j.legibilidade;
+  });
+  return {valores,legibilidade:leg,paginas:imgs.length,falhas,total:tarefas.length};
+}
+function cpMostra(c,v){
+  if(cpVazio(v))return "";
+  if(c.tipo==="nivel")return v==="na"?"NA":v+" · "+CP_NIV[v];
+  if(c.tipo==="opcao")return c.opcoes[v-1]||"";
+  if(c.tipo==="sn")return v?"Sim":"Não";
+  if(c.tipo==="texto")return String(v).slice(0,120);
+  if(c.tipo==="lista")return v.filter(Boolean).length+" linha(s): "+v.filter(Boolean).join(" / ").slice(0,100);
+  if(c.tipo==="porques")return "nº "+(v.n||"?")+": "+(v.w||[]).join(" → ").slice(0,110);
+  const ex=(c.extras||[]).map(e=>{const x=v[e.k];if(x===null||x===undefined||x==="")return "";return e.tipo==="sn"?(x?"✔ "+(e.r||e.k):""):e.tipo==="opcao"?(e.opcoes[x-1]||""):String(x).slice(0,40)}).filter(Boolean).join(", ");
+  return String(v.t||"").slice(0,120)+(ex?" ["+ex+"]":"");
+}
+function cpRevisao(sp,r,aplicar){
+  const campos=cpCampos(sp),lidos=campos.filter(c=>!cpVazio(r.valores[c.id]));
+  let m=document.getElementById("cpModal");if(m)m.remove();
+  m=document.createElement("div");m.id="cpModal";
+  const linhas=lidos.map(c=>`<tr><td>${esc(c.rot)}</td><td>${esc(cpMostra(c,r.valores[c.id]))}</td></tr>`).join("");
+  m.innerHTML=`<div class="modal-fundo" data-cp="fechar"></div><div class="modal-caixa" role="dialog" aria-modal="true" style="max-width:760px"><button type="button" class="modal-x" data-cp="fechar" aria-label="Fechar">×</button>
+  <h2 style="margin-top:0">Conferir a leitura</h2>
+  <p class="mut" style="margin-top:0">${lidos.length} de ${campos.length} campos lidos em ${r.paginas} página(s). Legibilidade: <b>${esc(r.legibilidade)}</b>.${r.falhas?` <b style="color:#c62828">${r.falhas} parte(s) não puderam ser lidas.</b>`:""} Campos não lidos ficam como estão no registro.</p>
+  ${r.legibilidade==="ruim"?`<div class="alerta">A foto está difícil de ler. Confira com muito cuidado ou fotografe de novo, reta e com boa luz.</div>`:""}
+  <div style="max-height:46vh;overflow:auto;border:1px solid #e5e7eb;border-radius:10px"><table class="tab" style="width:100%;font-size:.84rem"><tr><th>Campo</th><th>Lido</th></tr>${linhas||`<tr><td colspan="2">Nada foi reconhecido.</td></tr>`}</table></div>
+  <div class="linha" style="margin-top:12px"><button type="button" class="btn" data-cp="aplicar" ${lidos.length?"":"disabled"}>Aplicar ao registro</button><button type="button" class="btn sec" data-cp="fechar">Cancelar</button></div>
+  <p class="mut" style="font-size:.8rem;margin-bottom:0">${esc(IA_AVISO)}</p></div>`;
+  document.body.appendChild(m);
+  m._aplicar=()=>{try{const n=aplicar(r.valores);m.remove();aviso(n===false?"Não foi possível aplicar.":"Leitura aplicada. Revise o registro antes de seguir.")}catch(e){aviso("Não consegui aplicar: "+(e.message||e))}};
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-cp]");if(!b)return;const k=b.dataset.cp,m=document.getElementById("cpModal");
+  if(k==="fechar"&&m)m.remove();
+  else if(k==="aplicar"&&m&&m._aplicar)m._aplicar();
+  else if(k==="imprimir")cpImprimir(b.dataset.t);
+  else if(k==="anexar"){const f=document.getElementById("cpFile");if(f){f.dataset.t=b.dataset.t;f.click()}}
+});
+document.addEventListener("change",async e=>{
+  if(e.target.id!=="cpFile")return;
+  const t=e.target.dataset.t,fs=[...e.target.files];e.target.value="";if(!fs.length)return;
+  const st=document.getElementById("cpProg");const prog=x=>{if(st){st.textContent=x;st.style.display=x?"":"none"}};
+  try{
+    const sp=cpSpec(t);prog("Preparando as páginas…");
+    const r=await cpLer(sp,fs,prog);prog("");
+    cpRevisao(sp,r,v=>CP_APLICAR[t](v));
+  }catch(er){prog("");aviso(er.message||"Não consegui ler o formulário.")}
+});
+
+/* ---------- aplicar o que foi lido ---------- */
+const cpIdx=(v,n)=>typeof v==="number"&&v>=1&&v<=n?v:null;
+const cpT=v=>String(v||"").trim();
+const CP_APLICAR={};
+CP_APLICAR.triagem=v=>{
+  const c=estado.ctx;
+  ["unidade","area","local","atividade","funcao","obs"].forEach(k=>{const t=cpT(v["ctx."+k]);if(t)c[k]=t});
+  const g=cpIdx(v["ctx.gravidade"],GRAVIDADES.length);if(g)c.gravidade=String(g-1);
+  const x=cpIdx(v["ctx.exposicao"],EXPOSICOES.length);if(x)c.exposicao=String(x-1);
+  let n=0;DOMINIOS.forEach(d=>d.itens.forEach(q=>{const a=v[q.id];if(typeof a==="number"){estado.resp[q.id]=estado.resp[q.id]||{};estado.resp[q.id].n=a;n++}}));
+  try{salvarRascunho()}catch(e){}
+  render();return n;
+};
+function cpAlvoReg(tipo){
+  if(!(G.ed&&G.ed.tipo===tipo))criarReg(tipo,"");
+  if(travado(G.ed.d))throw new Error("Este registro está travado (aprovado ou emitido).");
+  return G.ed.d;
+}
+CP_APLICAR.aep=v=>{
+  const d=cpAlvoReg("aep");let n=0;
+  d.f=d.f||{};CATS.forEach(c=>c.itens.forEach(i=>{const a=v[i.k];if(a==="na"){d.f[i.k]="na";n++}else if(typeof a==="number"){d.f[i.k]=String(a);n++}}));
+  ["turno","funcoes"].forEach(k=>{const t=cpT(v[k]);if(t)d[k]=t});
+  const ne=parseInt(cpT(v.nExpostos).replace(/\D/g,""),10);if(ne>0)d.nExpostos=ne;
+  d.obs=d.obs||{};["prescrita","realizada","estrategias"].forEach(k=>{const t=cpT(v["obs."+k]);if(t)d.obs[k]=d.obs[k]?d.obs[k]+"\n"+t:t});
+  gravarEd();irPara("avaliar");return n;
+};
+CP_APLICAR.aet=v=>{
+  const d=cpAlvoReg("aet");let n=0;d.sec=d.sec||{};
+  AET_SEC.forEach(([t,cs])=>cs.forEach(([k])=>{const x=cpT(v["sec."+k]);if(x){d.sec[k]=cpT(d.sec[k])?d.sec[k]+"\n— Anotações de campo —\n"+x:x;n++}}));
+  gravarEd();irPara("aet");return n;
+};
+function cpCausaFim(r){czFlush();renderCausas()}
+const cpDup=(arr,t,key)=>arr.some(x=>normB(x[key||"t"]||"")===normB(t));
+function cpEvento(r,v){const t=cpT(v.evento);if(t&&!cpT(r.d.evento))r.d.evento=t}
+CP_APLICAR.ishikawa=v=>{
+  const r=G.cz.ed,D=r.d.dados;cpEvento(r,v);let n=0;const cod={};
+  ISH_CATS.forEach((c,ci)=>{D.cats[c.k]=D.cats[c.k]||[];for(let i=1;i<=6;i++){
+    const a=v[c.k+"."+i];if(!a||!cpT(a.t))continue;const t=cpT(a.t).slice(0,200);
+    let it=D.cats[c.k].find(x=>normB(x.t)===normB(t));
+    if(!it){it={id:czid(),t,ev:"relatado",raiz:false,why:[]};D.cats[c.k].push(it);n++}
+    const ev=cpIdx(a.ev,4);if(ev)it.ev=["hipotese","relatado","observado","medido"][ev-1];
+    if(a.p===true)it.raiz=true;
+    cod[(ci+1)+"."+i]=it;
+  }});
+  ["pq1","pq2"].forEach(k=>{const p=v[k];if(!p||!(p.w||[]).length)return;const it=cod[cpT(p.n).replace(/[^\d.]/g,"")];if(!it)return;it.why=it.why||[];p.w.forEach(w=>{if(!cpDup(it.why,w))it.why.push({id:czid(),t:cpT(w).slice(0,200),ev:"relatado"})});if(!it.raiz)it.raiz=true});
+  cpCausaFim(r);return n;
+};
+CP_APLICAR.arvore=v=>{
+  const r=G.cz.ed,D=r.d.dados;cpEvento(r,v);let n=0;const mapa={},novos=[];
+  for(let i=1;i<=12;i++){
+    const a=v["n."+i];if(!a||!cpT(a.t))continue;
+    const t=cpT(a.t).slice(0,220);let no=D.nos.find(x=>normB(x.t)===normB(t));
+    if(!no){no={id:czid(),pai:"r",t,tipo:"fato",ev:"relatado",pi:false,fim:false};D.nos.push(no);n++}
+    const tp=cpIdx(a.tipo,3);if(tp)no.tipo=["fato","variacao","habitual"][tp-1];
+    if(a.p===true)no.pi=true;mapa[i]=no;novos.push([i,no,cpT(a.pai)]);
+  }
+  novos.forEach(([i,no,pai])=>{const p=pai.replace(/\D/g,"");if(p&&mapa[p]&&mapa[p]!==no&&mapa[p].pai!==no.id)no.pai=mapa[p].id;else if(!p||/^e/i.test(pai))no.pai=no.pai||"r"});
+  cpCausaFim(r);return n;
+};
+CP_APLICAR.bowtie=v=>{
+  const r=G.cz.ed,D=r.d.dados;let n=0;
+  const per=cpT(v.perigo),cen=cpT(v.central);if(per&&!cpT(D.perigo))D.perigo=per;if(cen&&!cpT(D.central))D.central=cen;
+  const bar=(alvo,pref,i)=>{for(let j=1;j<=2;j++){const b=v[pref+"."+i+".b."+j];if(!b||!cpT(b.t))continue;const t=cpT(b.t).slice(0,200);if(cpDup(alvo.barreiras,t))continue;const tp=cpIdx(b.tipo,BW_TIPO.length);alvo.barreiras.push({id:czid(),t,tipo:tp?BW_TIPO[tp-1][0]:"eng",estado:"verificar",esc:""});n++}};
+  for(let i=1;i<=5;i++){
+    const a=v["am."+i];if(a&&cpT(a.t)){const t=cpT(a.t).slice(0,200);let x=D.ameacas.find(z=>normB(z.t)===normB(t));if(!x){x={id:czid(),t,ev:"relatado",barreiras:[]};D.ameacas.push(x);n++}bar(x,"am",i)}
+    const c=v["co."+i];if(c&&cpT(c.t)){const t=cpT(c.t).slice(0,200);let x=D.consequencias.find(z=>normB(z.t)===normB(t));if(!x){x={id:czid(),t,sev:"2",barreiras:[]};D.consequencias.push(x);n++}const sv=cpIdx(c.sev,4);if(sv)x.sev=String(sv);bar(x,"co",i)}
+  }
+  cpCausaFim(r);return n;
+};
+CP_APLICAR.fram=v=>{
+  const r=G.cz.ed,F=r.d.dados.funcoes;cpEvento(r,v);let n=0;
+  for(let i=1;i<=6;i++){
+    const a=v["f."+i];if(!a||!cpT(a.t))continue;const t=cpT(a.t).slice(0,120);
+    let f=F.find(z=>normB(z.n)===normB(t));
+    if(!f){f={id:czid(),n:t,desc:"",I:[],O:[],P:[],R:[],T:[],C:[],var:"",varTxt:"",acao:false};F.push(f);n++}
+    FR_ASP.forEach(s=>{const lst=cpT(a[s.k]).split(/;|\n/).map(x=>cpT(x).slice(0,140)).filter(Boolean);lst.forEach(x=>{if(!(f[s.k]||[]).some(y=>normB(y)===normB(x)))f[s.k]=(f[s.k]||[]).concat([x]).slice(0,6)})});
+    if(a.a===true)f.acao=true;
+  }
+  cpCausaFim(r);return n;
+};
+CP_APLICAR.hfacs=v=>{
+  const r=G.cz.ed,A=r.d.dados.ach;cpEvento(r,v);let n=0;
+  HF_CAT.forEach(c=>{for(let i=1;i<=2;i++){
+    const a=v[c.k+"."+i];if(!a||!cpT(a.t))continue;const t=cpT(a.t).slice(0,220);
+    let x=A.find(z=>z.cat===c.k&&normB(z.t)===normB(t));
+    if(!x){x={id:czid(),cat:c.k,t,ev:"relatado",de:"",raiz:false};A.push(x);n++}
+    const ev=cpIdx(a.ev,4);if(ev)x.ev=["hipotese","relatado","observado","medido"][ev-1];
+  }});
+  cpCausaFim(r);return n;
+};
+
+/* ---------- botões nas telas ---------- */
+function cpBarra(tipo,titulo,extra){
+  return `<div class="card no-print cp-bar"><div class="linha" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><div><b>${esc(titulo||"Formulário de campo")}</b><br><small class="mut">Imprima, preencha no posto e anexe a foto ou o PDF. A IA transcreve e você confere antes de aplicar.</small></div>
+  <div class="linha" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn sec peq" data-cp="imprimir" data-t="${tipo}">Imprimir formulário</button><button type="button" class="btn peq" data-cp="anexar" data-t="${tipo}">Anexar preenchido (IA)</button></div></div>
+  <div id="cpProg" class="kb-prog" style="display:none;margin-top:8px" role="status"></div>${extra||""}</div>`;
+}
+(function(){
+  if(!document.getElementById("cpFile")){const i=document.createElement("input");i.type="file";i.id="cpFile";i.hidden=true;i.multiple=true;i.accept="image/*,application/pdf";document.body.appendChild(i)}
+  const s=document.createElement("style");s.textContent=`.cp-bar{border-left:4px solid #FF9900}#cpModal{position:fixed;inset:0;z-index:9000}`;document.head.appendChild(s);
+})();
+// AEP e AET: no editor e nas listas
+const _htmlRegEd53=htmlRegEd;
+htmlRegEd=function(){
+  const h=_htmlRegEd53();
+  if(!G.ed||G.rel||(G.ed.tipo!=="aep"&&G.ed.tipo!=="aet"))return h;
+  return cpBarra(G.ed.tipo,G.ed.tipo==="aep"?"Formulário de campo da AEP":"Anotações de campo da AET")+h;
+};
+const _renderAEP53=renderAEP;
+renderAEP=function(){
+  _renderAEP53();
+  if(G.triagemOn){
+    const b=$("#triBar");if(b&&!b.querySelector(".cp-bar")){b.insertAdjacentHTML("beforeend",cpBarra("triagem","Formulário de campo da Triagem"))}
+    return;
+  }
+  if(G.ed&&G.ed.tipo==="aep")return;
+  const r=$("#aepRoot");if(r&&!r.querySelector(".cp-bar"))r.insertAdjacentHTML("afterbegin",cpBarra("aep","Formulário de campo da AEP","<small class=\"mut\" style=\"display:block;margin-top:6px\">Ao anexar sem abrir uma AEP, o app cria uma nova AEP com as respostas lidas.</small>"));
+};
+const _renderAET53=renderAET;
+renderAET=function(){
+  _renderAET53();
+  if(G.ed&&G.ed.tipo==="aet")return;
+  const el=$("#v-aet");if(el&&!el.querySelector(".cp-bar"))el.insertAdjacentHTML("afterbegin",cpBarra("aet","Anotações de campo da AET","<small class=\"mut\" style=\"display:block;margin-top:6px\">Ao anexar sem abrir uma AET, o app cria uma nova AET com o texto lido.</small>"));
+};
+// Determinantes: tela do método e editor
+const _renderCausas53=renderCausas;
+renderCausas=function(){
+  _renderCausas53();
+  const el=$("#v-causas"),z=G.cz;if(!el||!z)return;
+  const k=z.ed?z.ed.d.metodo:z.novo?z.novo.metodo:null;if(!k||!cpSpecCausa(k))return;
+  if(el.querySelector(".cp-bar"))return;
+  const bar=cpBarra(k,"Formulário de campo: "+CM[k].meta.curto,z.ed?"":"<small class=\"mut\" style=\"display:block;margin-top:6px\">Para anexar um formulário preenchido, crie a análise e use este botão dentro dela.</small>");
+  const prim=el.firstElementChild;if(prim)prim.insertAdjacentHTML("afterend",bar);else el.insertAdjacentHTML("afterbegin",bar);
+  if(!z.ed){const b=el.querySelector('.cp-bar [data-cp="anexar"]');if(b)b.style.display="none"}
+};
 /* =====================================================================
    INÍCIO
    ===================================================================== */
