@@ -1682,7 +1682,7 @@ function carregarParaEstado(a,fase){
   estado={id:a.id,criadoEm:a.criadoEm,passo:0,fase,ctx:{...a.ctx},resp:JSON.parse(JSON.stringify(a.resp)),dom:JSON.parse(JSON.stringify(a.dom||{})),
     acoes:JSON.parse(JSON.stringify(a.acoes||[])),ia:a.ia||"",iaj:a.iaj?JSON.parse(JSON.stringify(a.iaj)):null,foto:a.foto||""};
   sugFoto=null;sugDesc={};
-  irPara("avaliar");
+  irTriagem();
 }
 function csv(rows){
   const cel=c=>{c=String(c??"");if(/^[=+\-@\t\r]/.test(c))c="'"+c;return /[;"\n\r]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c};
@@ -1845,7 +1845,7 @@ document.addEventListener("click",e=>{
     case "ia-para-plano":iaParaPlano();break;
     case "abrir":{const a=lista.find(x=>x.id===id);if(a)carregarParaEstado(a,"resultado");break}
     case "editar-h":{const a=lista.find(x=>x.id===id);if(a)carregarParaEstado(a,"wizard");break}
-    case "reavaliar":{const a=lista.find(x=>x.id===id);if(a){const c={...a.ctx,data:hojeISO()};estado=novoEstado(c);estado.foto="";sugFoto=null;sugDesc={};irPara("avaliar")}break}
+    case "reavaliar":{const a=lista.find(x=>x.id===id);if(a){const c={...a.ctx,data:hojeISO()};estado=novoEstado(c);estado.foto="";sugFoto=null;sugDesc={};irTriagem()}break}
     case "del":if(confirm("Excluir esta avaliação?")){registrarExclusao(id);lista=lista.filter(x=>x.id!==id);salvarLista();renderHistorico()}break;
     case "limpar":if(confirm("Apagar TODAS as suas avaliações? Faça backup antes.")){lista.filter(podeEditar).forEach(x=>registrarExclusao(x.id));lista=lista.filter(x=>!podeEditar(x));salvarLista();renderHistorico()}break;
     case "auth-tab":e.preventDefault();mostrarAuth(b.dataset.m);break;
@@ -2355,10 +2355,10 @@ function htmlDemFluxo(id){
   aeps.forEach(r=>{const c=aepClasse(r.d);if(c.gat.length)rec.push("AEP "+(r.d.numero||"")+": gatilhos para AET ("+c.gat.map(g=>g.rot.toLowerCase()).join("; ")+").")});
   return `<div class="card no-print"><h3>Fluxo da demanda</h3>
   ${rec.length?rec.map(t=>`<div class="alerta">${esc(t)}</div>`).join(""):""}
-  <div class="linha"><button class="btn sec" data-g-acao="dem-triagem" data-id="${id}">1. Triagem rápida</button><button class="btn sec" data-g-acao="reg-novo" data-t="aep" data-id="${id}">2. Nova AEP</button><button class="btn sec" data-g-acao="reg-novo" data-t="aet" data-id="${id}">3. Nova AET</button></div>
+  <div class="linha"><button class="btn sec" data-g-acao="dem-triagem" data-id="${id}">1. Triagem rápida</button><button class="btn sec" data-g-acao="dem-aep" data-id="${id}">2. AEP (abre em Avaliar)</button><button class="btn sec" data-g-acao="reg-novo" data-t="aet" data-id="${id}">3. Nova AET</button></div>
   <h4 style="margin-top:14px">Registros desta demanda</h4>
   ${tri.map(a=>{const i=indice(a.resultado);return `<div class="sug"><span><b>Triagem</b> ${esc(a.id)}<br><small>${dataBR(a.ctx.data)} · ${esc(a.ctx.atividade||"")}${i?" · índice "+i.v+" ("+i.rot+")":""}</small></span></div>`}).join("")}
-  ${aeps.map(r=>`<div class="sug"><span><b>AEP</b> ${esc(r.d.numero||"(pendente)")}<br><small>v${r.d.versao||1} · ${esc(r.d.status)}</small></span><button class="btn sec peq" data-g-acao="abrir-reg" data-id="${r.id}">Abrir</button></div>`).join("")}
+  ${aeps.length?`<p class="mut">${aeps.length} AEP vinculada(s) a esta demanda. Abra em <a href="#" data-ir="avaliar">Avaliar</a>.</p>`:""}
   ${aets.map(r=>`<div class="sug"><span><b>AET</b> ${esc(r.d.numero||"(pendente)")}<br><small>v${r.d.versao||1} · ${esc(r.d.status)}</small></span><button class="btn sec peq" data-g-acao="abrir-reg" data-id="${r.id}">Abrir</button></div>`).join("")}
   ${!tri.length&&!aeps.length&&!aets.length?`<p class="mut">Nenhum registro ainda.</p>`:""}
   <div class="linha" style="margin-top:12px"><button class="btn sec peq" data-g-acao="dem-del" data-id="${id}">Excluir demanda</button></div></div>`;
@@ -2375,7 +2375,7 @@ function triagemDaDemanda(id){
   if(p&&p.d.pai){const ar=regGet(p.d.pai);if(ar){c.area=ar.d.nome;let u=ar.d.pai&&regGet(ar.d.pai);while(u&&u.d.tc!=="planta")u=u.d.pai&&regGet(u.d.pai);if(u)c.unidade=u.d.nome}}
   estado=novoEstado(c);sugFoto=null;sugDesc={};G.ed=null;
   if(d.status==="aberta"){r.d.status="triagem";regGravar(r)}
-  irPara("avaliar");
+  irTriagem();
 }
 
 /* =====================================================================
@@ -2456,9 +2456,9 @@ function novoReg(tipo,demId){
 function criarReg(tipo,demId){
   const r=novoReg(tipo,demId);delete r.novo;regGravar(r);
   const dm=demId&&regGet(demId);if(dm&&(dm.d.status==="aberta"||dm.d.status==="triagem")){dm.d.status=tipo;regGravar(dm)}
-  G.ed={id:r.id,tipo,d:JSON.parse(JSON.stringify(r.d))};G.rel=false;irPara("demandas");
+  G.ed={id:r.id,tipo,d:JSON.parse(JSON.stringify(r.d))};G.rel=false;irEd();
 }
-function abrirReg(id){const r=regGet(id);if(!r)return;G.ed={id,tipo:r.tipo,d:JSON.parse(JSON.stringify(r.d))};G.rel=false;irPara("demandas")}
+function abrirReg(id){const r=regGet(id);if(!r)return;G.ed={id,tipo:r.tipo,d:JSON.parse(JSON.stringify(r.d))};G.rel=false;irEd()}
 function gravarEd(){
   if(!G.ed||G.ed.tipo==="dem")return;
   const r=regGet(G.ed.id);if(!r)return;
@@ -2513,20 +2513,20 @@ function htmlRegEd(){
     corpo+=bloco("2. Observação da atividade real",
       T("obs.prescrita","Atividade prescrita (o que o procedimento diz)",dis,3)+T("obs.realizada","Atividade efetivamente realizada",dis,3)+
       `<h4>Etapas, duração e frequência</h4>${etapas}${lock?"":`<button type="button" class="btn sec peq" data-g-acao="etapa-add">+ Etapa</button>`}`+
-      T("obs.variacoes","Variações normais",dis,2)+T("obs.pior","Pior condição razoavelmente previsível",dis,2)+T("obs.emergencia","Situações de emergência",dis,2)+T("obs.turnos","Diferenças entre turnos",dis,2)+T("obs.interferencias","Interferências operacionais",dis,2)+T("obs.recursos","Recursos utilizados",dis,2)+T("obs.improvisacoes","Improvisações",dis,2)+T("obs.dificuldades","Dificuldades",dis,2)+T("obs.estrategias","Estratégias adotadas pelo trabalhador",dis,2)+T("obs.procReal","Diferença entre o procedimento e o trabalho real",dis,2),true);
+      T("obs.variacoes","Variações normais",dis,2)+T("obs.pior","Pior condição razoavelmente previsível",dis,2)+T("obs.emergencia","Situações de emergência",dis,2)+T("obs.turnos","Diferenças entre turnos",dis,2)+T("obs.interferencias","Interferências operacionais",dis,2)+T("obs.recursos","Recursos utilizados",dis,2)+T("obs.improvisacoes","Improvisações",dis,2)+T("obs.dificuldades","Dificuldades",dis,2)+T("obs.estrategias","Estratégias adotadas pelo trabalhador",dis,2)+T("obs.procReal","Diferença entre o procedimento e o trabalho real",dis,2)+T("obs.ciclos","Número de ciclos observados",dis,1),true);
     const c=aepClasse(d);
     corpo+=bloco(`3. Fatores avaliados <span class="bd nd">${c.totResp}/${c.tot}</span>`,CATS.map((cat,ci)=>`<details class="sub" ${ci===0?"open":""}><summary>${cat.nome} <span class="bd ${c.cats[ci].pior<0?"nd":"n"+c.cats[ci].pior}">${c.cats[ci].pior<0?"sem dados":NIV_F[c.cats[ci].pior]}</span> <small>${c.cats[ci].resp}/${c.cats[ci].total}</small></summary>${cat.itens.map(i=>`<div class="frow"><span>${esc(i.t)}</span><select data-g="f.${i.k}" data-re="1" ${dis}><option value="">—</option>${NIV_F.map((n,v)=>`<option value="${v}" ${String(d.f[i.k])===String(v)?"selected":""}>${n}</option>`).join("")}<option value="na" ${d.f[i.k]==="na"?"selected":""}>Não se aplica</option></select></div>`).join("")}${T("fn."+cat.id,"Observações de "+cat.nome.toLowerCase(),dis,2)}</details>`).join(""),true);
-    corpo+=bloco("4. Participação do trabalhador",`<p class="mut">O foco é a situação de trabalho, não o desempenho, o comportamento ou a capacidade individual.</p>`+T("part.comoE","Como a atividade realmente é feita (relato dos executantes)",dis,3)+T("part.dificuldades","Principais dificuldades percebidas",dis,2)+T("part.regioes","Regiões do corpo com desconforto (consolidado, sem identificar pessoas)",dis,2)+T("part.momento","Momento da jornada em que o desconforto aparece",dis,2)+T("part.sugestoes","Sugestões dos executantes",dis,2)+`<label class="campo">Executantes validaram a descrição da atividade?<select data-g="part.validou" ${dis}><option value=""></option>${sel1(["Sim","Parcialmente","Não"],d.part.validou||"")}</select></label>`+T("part.divergencia","Divergências entre avaliador e trabalhadores",dis,2)+T("part.consulta","Consulta coletiva por equipe (quem participou)",dis,2)+T("part.devolutiva","Devolutiva da avaliação aos trabalhadores",dis,2),false);
+    corpo+=bloco("4. Participação do trabalhador",`<p class="mut">O foco é a situação de trabalho, não o desempenho, o comportamento ou a capacidade individual.</p>`+T("part.comoE","Como a atividade realmente é feita (relato dos executantes)",dis,3)+T("part.dificuldades","Principais dificuldades percebidas",dis,2)+T("part.regioes","Regiões do corpo com desconforto (consolidado, sem identificar pessoas)",dis,2)+T("part.momento","Momento da jornada em que o desconforto aparece",dis,2)+T("part.sugestoes","Sugestões dos executantes",dis,2)+`<label class="campo">Executantes validaram a descrição da atividade?<select data-g="part.validou" ${dis}><option value=""></option>${sel1(["Sim","Parcialmente","Não"],d.part.validou||"")}</select></label>`+T("part.divergencia","Divergências entre avaliador e trabalhadores",dis,2)+T("part.consulta","Consulta coletiva por equipe (quem participou)",dis,2)+T("part.devolutiva","Devolutiva da avaliação aos trabalhadores",dis,2)+T("part.confirmaMelhoria","Confirmação da melhoria implantada (preencher depois das ações)",dis,2),false);
     corpo+=bloco("5. Evidências",htmlEvid(lock),false);
     corpo+=bloco("6. Condições que se sobrepõem à média",`<p class="mut">Se qualquer uma estiver marcada, o resultado nunca fica abaixo de <b>Alto</b>, mesmo com média boa.</p>${CRIT.map((t,i)=>`<label class="chk"><input type="checkbox" data-g="crit.c${i}" data-re="1" ${d.crit["c"+i]?"checked":""} ${dis}> ${t}</label>`).join("")}<h4>Fatores de priorização (0 baixo · 1 médio · 2 alto)</h4><div class="grid3">${PRIOF.map(([k,r])=>`<label class="campo">${r}<select data-g="prio.${k}" data-re="1" ${dis}><option value="0">0</option><option value="1" ${d.prio[k]==="1"?"selected":""}>1</option><option value="2" ${d.prio[k]==="2"?"selected":""}>2</option></select></label>`).join("")}</div>`,false);
-    corpo+=bloco("7. Classificação, gatilhos e métodos",htmlClasse(c,dis),true);
+    corpo+=bloco("6b. Fatores adicionais de classificação",htmlPriox(dis),false);corpo+=bloco("7. Classificação, gatilhos e métodos",htmlClasse(c,dis),true);
   }else{
     corpo+=AET_SEC.map(([tit,cs],gi)=>bloco(`${gi+2}. ${tit}`,cs.map(([k,r])=>T("sec."+k,r,dis,k==="conclusao"||k==="diagnostico"||k==="recomendacoes"?5:3)).join(""),gi<2)).join("");
     if(d.aepId&&regGet(d.aepId))corpo+=bloco("Origem",`<p class="mut">Pré-preenchida a partir da AEP ${esc(regGet(d.aepId).d.numero||"")}. Revise e complemente com estudo de campo, entrevistas e medições.</p>`,false);
     corpo+=bloco("Evidências",htmlEvid(lock),false);
   }
   corpo+=bloco("Revisão e aprovação",htmlGovernanca(dis),true);
-  return `<div class="card no-print"><button class="btn sec peq" data-g-acao="ed-voltar">← Demandas</button><h2 style="margin-top:12px">${tipo==="aep"?"AEP":"AET"} ${esc(d.numero||"(número após sincronizar)")}${dem?` <small class="mut">· demanda ${esc(dem.d.numero||"")}</small>`:""}</h2>${lock?`<div class="alerta">Registro aprovado e bloqueado para edição.</div>`:`<small class="mut">Salvamento automático neste aparelho.</small>`}</div>${corpo}`;
+  return `<div class="card no-print"><button class="btn sec peq" data-g-acao="ed-voltar">← ${tipo==="aep"?"Lista de AEP":"Demandas"}</button><h2 style="margin-top:12px">${tipo==="aep"?"AEP":"AET"} ${esc(d.numero||"(número após sincronizar)")}${dem?` <small class="mut">· demanda ${esc(dem.d.numero||"")}</small>`:""}</h2>${lock?`<div class="alerta">Registro aprovado e bloqueado para edição.</div>`:`<small class="mut">Salvamento automático neste aparelho.</small>`}</div>${corpo}`;
 }
 function htmlClasse(c,dis){
   const d=G.ed.d;
@@ -2646,10 +2646,10 @@ function lerCampo(t){
   return false;
 }
 function reRender(){
-  const y=window.scrollY,ab=[...document.querySelectorAll("#v-demandas details")].map(x=>x.open),foco=document.activeElement&&document.activeElement.dataset?document.activeElement.dataset.g:null;
+  const y=window.scrollY,ab=[...document.querySelectorAll(".view.on details")].map(x=>x.open),foco=document.activeElement&&document.activeElement.dataset?document.activeElement.dataset.g:null;
   renderDemandas();
-  document.querySelectorAll("#v-demandas details").forEach((x,i)=>{if(ab[i]!==undefined)x.open=ab[i]});
-  if(foco){const el=document.querySelector(`#v-demandas [data-g="${foco}"]`);if(el)el.focus({preventScroll:true})}
+  document.querySelectorAll(".view.on details").forEach((x,i)=>{if(ab[i]!==undefined)x.open=ab[i]});
+  if(foco){const el=document.querySelector(`.view.on [data-g="${foco}"]`);if(el)el.focus({preventScroll:true})}
   window.scrollTo(0,y);
 }
 ["input","change"].forEach(ev=>document.addEventListener(ev,async e=>{
@@ -3863,7 +3863,7 @@ document.addEventListener("click",e=>{
 });
 function criarRegNoPosto(postoId){
   const r=novoReg("aep","");delete r.novo;r.d.postoId=postoId;regGravar(r);
-  G.ed={id:r.id,tipo:"aep",d:JSON.parse(JSON.stringify(r.d))};G.rel=false;irPara("demandas");
+  G.ed={id:r.id,tipo:"aep",d:JSON.parse(JSON.stringify(r.d))};G.rel=false;irEd();
 }
 
 /* abertura pelo QR: #posto=ID */
@@ -5287,6 +5287,472 @@ const _regGravar23=regGravar;
 regGravar=function(r,agora){
   if(r&&r.tipo==="aet"&&r.d&&r.d.sec&&RX_CLINICO.test(r.d.sec.saude||"")){aviso("A seção de saúde coletiva não aceita diagnóstico, CID, medicamento ou dado individual. Use apenas números e tendências do grupo.");return}
   return _regGravar23(r,agora);
+};
+/* =====================================================================
+   FASE 15: a AEP passa a ser a tela inicial (Avaliar). A triagem rápida
+   antiga continua disponível por um botão, e a AEP deixa de aparecer em Demandas.
+   ===================================================================== */
+G.triagemOn=false;G.aepFiltro="todas";G.aepBusca="";
+function irEd(){irPara(G.ed&&G.ed.tipo==="aep"?"avaliar":"demandas")}
+function irTriagem(){G.triagemOn=true;irPara("avaliar")}
+const vistaAvaliar=()=>{const s=$("#v-avaliar");return !!(s&&s.classList.contains("on"))};
+// itens do anexo que faltavam: destinos de encaminhamento e fatores adicionais de classificação
+if(!ENC.some(x=>x[0]==="obsc"))ENC.unshift(["obsc","Observação complementar"]);
+if(!ENC.some(x=>x[0]==="aet"))ENC.splice(ENC.findIndex(x=>x[0]==="aepdet")+1,0,["aet","AET"]);
+const PRIOX=[["afast","Afastamento relacionado à atividade"],["falha","Falha de controle (barreira ou controle existente não funciona)"],["comb","Exposição combinada (vários fatores ao mesmo tempo)"],["var","Variabilidade elevada da tarefa ou das condições"],["cogx","Exigência cognitiva elevada"],["interv","Possibilidade de intervenção imediata"]];
+function htmlPriox(dis){
+  const d=G.ed.d;d.priox=d.priox||{};
+  return `<p class="mut">Somados à intensidade, frequência, duração, recuperação, consequência, número de expostos, queixa recorrente e condição crítica já registrados acima. Dois ou mais dos cinco primeiros marcados elevam a prioridade em um nível.</p>${PRIOX.map(([k,r])=>`<label class="chk"><input type="checkbox" data-g="priox.${k}" data-re="1" ${d.priox[k]?"checked":""} ${dis}> ${r}</label>`).join("")}`;
+}
+const _aepClasse24=aepClasse;
+aepClasse=function(d){
+  const c=_aepClasse24(d),x=d.priox||{};
+  const n=["afast","falha","comb","var","cogx"].filter(k=>x[k]).length;
+  if(c.p>=0&&n>=2&&c.p<3){c.p+=1;c.motivos.push("Prioridade elevada por fatores adicionais ("+n+" marcados)")}
+  if(x.afast&&c.nivel>=0&&c.nivel<2){c.motivos.push("Afastamento relacionado: reavalie o nível com a saúde ocupacional")}
+  if(x.interv&&c.nivel>=2)c.motivos.push("Há possibilidade de intervenção imediata: registre a medida provisória agora");
+  return c;
+};
+// medições vinculadas na AEP
+const _htmlEvid24=htmlEvid;
+htmlEvid=function(b){
+  let h=_htmlEvid24(b);
+  if(G.ed&&G.ed.tipo==="aep"){
+    const ms=regOf("med").filter(r=>!G.ed.d.postoId||r.d.postoId===G.ed.d.postoId||(G.ed.d.medIds||[]).includes(r.id));
+    h+=`<h4 style="margin-top:12px">Medições vinculadas</h4>${ms.length?ms.map(r=>`<label class="chk"><input type="checkbox" data-aepmed="${r.id}" ${(G.ed.d.medIds||[]).includes(r.id)?"checked":""} ${b?"disabled":""}> ${esc(r.d.numero||"(sem número)")} · ${esc((AG[r.d.agente]||AG.outro).rot)} · ${dataBR(r.d.data)}</label>`).join(""):`<p class="mut" style="font-size:.84rem">Nenhuma medição para este posto. Cadastre em Medições.</p>`}`;
+  }
+  return h;
+};
+document.addEventListener("change",e=>{const t=e.target;if(t.dataset&&t.dataset.aepmed&&G.ed){const s=new Set(G.ed.d.medIds||[]);t.checked?s.add(t.dataset.aepmed):s.delete(t.dataset.aepmed);G.ed.d.medIds=[...s];if(G.ed.tipo!=="dem")gravarEd()}});
+// ---------- tela ----------
+function garantirRaiz(){
+  const sec=$("#v-avaliar");if(!sec)return null;
+  let r=$("#aepRoot");
+  if(!r){sec.insertAdjacentHTML("afterbegin",`<div id="triBar" class="no-print" style="display:none"><button class="btn sec peq" data-aep="sair-tri">← Voltar para a AEP</button></div><div id="aepRoot"></div>`);r=$("#aepRoot")}
+  return r;
+}
+function renderAEP(){
+  const r=garantirRaiz();if(!r)return;
+  const tri=G.triagemOn;
+  $("#triBar").style.display=tri?"":"none";r.style.display=tri?"none":"";
+  const b=$("#banner"),pl=$("#palco");if(b)b.style.display=tri?"":"none";if(pl)pl.style.display=tri?"":"none";
+  if(tri)return;
+  if(G.ed&&G.ed.tipo==="aep"){r.innerHTML=G.rel?htmlRelatorio():htmlRegEd();return}
+  const f=G.aepFiltro,q=normB(G.aepBusca||"");
+  const todas=regOf("aep").filter(a=>!a.excluido);
+  const L=todas.filter(a=>(f==="todas"||a.d.status===f)&&(!q||normB((a.d.numero||"")+" "+(a.d.postoId?caminho(a.d.postoId):"")+" "+(a.d.avaliadores||"")).includes(q))).sort((a,b)=>(b.d.data||"").localeCompare(a.d.data||""));
+  const chips=[["todas","Todas"],["rascunho","Rascunho"],["revisao","Em revisão"],["aprovada","Aprovadas"]].map(([k,t])=>`<button type="button" class="${f===k?"on":""}" data-aep="filtro" data-f="${k}">${t} <small>${k==="todas"?todas.length:todas.filter(a=>a.d.status===k).length}</small></button>`).join("");
+  r.innerHTML=`<div class="card"><div class="linha" style="justify-content:space-between"><h2 style="margin:0">Avaliar: AEP</h2><button class="btn" data-aep="nova">+ Nova AEP</button></div>
+  <p class="mut">Avaliação Ergonômica Preliminar: identifica e classifica os perigos ergonômicos com observação da atividade real, fatores de biomecânica, organização, cognição, ambiente e mobiliário, participação dos trabalhadores, evidências, métodos e encaminhamentos. A pontuação nunca esconde uma condição isolada grave.</p>
+  <div class="linha"><label class="campo" style="flex:1;min-width:200px;margin:0">Demanda de origem (opcional)<select id="aepDem"><option value="">(sem demanda)</option>${sel1(regOf("dem").filter(x=>!FECHADA(x.d.status)).map(x=>[x.id,(x.d.numero||"(pendente)")+" · "+(x.d.origem||"")]),G.aepDem||"")}</select></label><button class="btn sec" data-aep="tri">Triagem rápida de campo</button></div></div>
+  <div class="card"><div class="chips" style="margin-bottom:8px">${chips}</div><input id="aepBusca" placeholder="Buscar por número, posto ou avaliador" value="${esc(G.aepBusca||"")}" style="width:100%;margin-bottom:8px">
+  ${L.map(a=>{const d=a.d,c=aepClasse(d),cor=c.nivel<0?"nd":"n"+c.nivel;return `<div class="sug"><span><b>${esc(d.numero||"(número após sincronizar)")}</b> · ${esc(d.postoId?caminho(d.postoId):"posto não vinculado")}<br><small>${dataBR(d.data)} · v${d.versao||1} · ${esc(STATUS_REG[d.status]||d.status)} · ${c.totResp}/${c.tot} fatores</small><br><span class="bd ${cor}">${c.nivel<0?"Dados insuficientes":NIV_F[c.nivel]}</span></span><span class="linha"><button class="btn sec peq" data-g-acao="abrir-reg" data-id="${a.id}">Abrir</button>${d.status==="aprovada"?"":`<button class="btn sec peq" data-aep="del" data-id="${a.id}">Excluir</button>`}</span></div>`}).join("")||`<p class="mut">Nenhuma AEP encontrada. Toque em "+ Nova AEP".</p>`}</div>`;
+}
+document.addEventListener("click",e=>{
+  const g=e.target.closest("[data-g-acao=dem-aep]");if(g){criarReg("aep",g.dataset.id);return}
+  const b=e.target.closest("[data-aep]");if(!b)return;const k=b.dataset.aep;
+  if(k==="nova"){const s=$("#aepDem");G.aepDem="";criarReg("aep",s?s.value:"")}
+  else if(k==="tri"){G.triagemOn=true;irPara("avaliar")}
+  else if(k==="sair-tri"){G.triagemOn=false;irPara("avaliar")}
+  else if(k==="filtro"){G.aepFiltro=b.dataset.f;renderAEP()}
+  else if(k==="del"){if(confirm("Excluir esta AEP?")){regExcluir(b.dataset.id);renderAEP()}}
+});
+document.addEventListener("input",e=>{if(e.target.id==="aepBusca"){G.aepBusca=e.target.value;const p=e.target.selectionStart;renderAEP();const n=$("#aepBusca");if(n){n.focus();n.setSelectionRange(p,p)}}});
+document.addEventListener("change",e=>{if(e.target.id==="aepDem")G.aepDem=e.target.value});
+// ---------- roteamento ----------
+const _renderDem24=renderDemandas;
+renderDemandas=function(){
+  if(vistaAvaliar()){renderAEP();return}
+  if(G.ed&&G.ed.tipo==="aep"){gravarEd();G.ed=null;G.rel=false}
+  _renderDem24();
+};
+const _irPara24=irPara;
+irPara=function(v){
+  if(v!=="avaliar"&&G.ed&&G.ed.tipo==="aep"){gravarEd();G.ed=null;G.rel=false}
+  if(v==="avaliar"){
+    if(!G.triagemOn){
+      $$(".view").forEach(s=>s.classList.toggle("on",s.id==="v-avaliar"));
+      $$("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.v==="avaliar"));
+      renderAEP();window.scrollTo(0,0);return;
+    }
+    _irPara24(v);renderAEP();return;
+  }
+  _irPara24(v);
+};
+// ao abrir o app, o painel inicial é a AEP
+document.addEventListener("DOMContentLoaded",()=>{setTimeout(()=>{if(vistaAvaliar()&&!G.triagemOn)renderAEP()},0)});
+setTimeout(()=>{if(vistaAvaliar()&&!G.triagemOn)renderAEP()},300);
+/* =====================================================================
+   FASE 15: EXEMPLOS 3D DE POSTURA E ESTAÇÃO DE TRABALHO
+   Boneco articulado em 3D (cinemática direta, projeção em perspectiva) que
+   gira com o dedo ou o mouse, sem imagens e sem rede. Cada item de ergonomia
+   física da AEP tem uma cena com quatro níveis (adequado, atenção, alto,
+   crítico). Os ângulos usam as faixas do RULA e do REBA conferidas
+   (McAtamney e Corlett, 1993; Hignett e McAtamney, 2000). Onde a cena é
+   ilustrativa, a legenda diz isso.
+   ===================================================================== */
+const D2R=Math.PI/180;
+const v3={add:(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],mul:(a,k)=>[a[0]*k,a[1]*k,a[2]*k],sub:(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]]};
+const rotX=(v,a)=>[v[0],v[1]*Math.cos(a)-v[2]*Math.sin(a),v[1]*Math.sin(a)+v[2]*Math.cos(a)];
+function rotAx(v,k,a){const c=Math.cos(a),s=Math.sin(a),d=v[0]*k[0]+v[1]*k[1]+v[2]*k[2],cr=[k[1]*v[2]-k[2]*v[1],k[2]*v[0]-k[0]*v[2],k[0]*v[1]-k[1]*v[0]];return [v[0]*c+cr[0]*s+k[0]*d*(1-c),v[1]*c+cr[1]*s+k[1]*d*(1-c),v[2]*c+cr[2]*s+k[2]*d*(1-c)]}
+const POSE0={stance:"stand",trunk:0,lat:0,tw:0,neck:0,ntw:0,shL:10,shR:10,abL:5,abR:5,elL:15,elR:15,wrL:0,wrR:0,devL:0,devR:0,hipL:0,hipR:0,kneeL:0,kneeR:0,seatH:.45,esc:1,x:0};
+function corpo3d(pp,hot){
+  const p={...POSE0,...pp},e=p.esc,R=[],H=hot||{};
+  const L={trunk:.5*e,neck:.1*e,ua:.3*e,fa:.27*e,hd:.1*e,th:.42*e,sh:.42*e,ft:.2*e,sw:.19*e,hw:.1*e};
+  const legY=(h,k)=>L.th*Math.cos(h*D2R)+L.sh*Math.cos((h-k)*D2R)+.07*e;
+  const py=p.stance==="sit"?p.seatH:Math.max(legY(p.hipL,p.kneeL),legY(p.hipR,p.kneeR));
+  const P=[p.x,py,0],t=p.trunk*D2R;
+  const u=rotX([Math.sin(t),Math.cos(t),0],p.lat*D2R),S=v3.add(P,v3.mul(u,L.trunk));
+  const w=rotAx([0,0,1],u,p.tw*D2R),col=n=>H[n]?"#FF3300":"#5B7C8D";
+  const seg=(a,b,r,n)=>R.push({k:"seg",a,b,r,c:col(n),d:0});
+  seg(P,S,.115*e,"trunk");seg(v3.add(S,v3.mul(w,-L.sw)),v3.add(S,v3.mul(w,L.sw)),.045*e,"trunk");
+  const nt=(p.trunk+p.neck)*D2R,nd=rotX([Math.sin(nt),Math.cos(nt),0],p.lat*D2R),Nt=v3.add(S,v3.mul(nd,L.neck)),Hc=v3.add(S,v3.mul(nd,L.neck+.1*e));
+  seg(S,Nt,.04*e,"neck");R.push({k:"sph",p:Hc,r:.1*e,c:col("neck"),d:0});
+  const fd=rotAx([Math.cos(nt),-Math.sin(nt),0],nd,(p.tw+p.ntw)*D2R);R.push({k:"seg",a:Hc,b:v3.add(Hc,v3.mul(fd,.13*e)),r:.018*e,c:"#2f4858",d:0});
+  [[1,"L"],[-1,"R"]].forEach(([s,n])=>{
+    const a=p["sh"+n]*D2R,b=p["ab"+n]*D2R,el=p["el"+n]*D2R,wr=p["wr"+n]*D2R,dv=p["dev"+n]*D2R,nm="arm"+n;
+    const dir=(ang,bb)=>{const y=-Math.cos(ang);return [Math.sin(ang),y*Math.cos(bb),s*(-y)*Math.sin(bb)]};
+    const Sj=v3.add(S,v3.mul(w,s*L.sw)),E=v3.add(Sj,v3.mul(dir(a,b),L.ua)),W=v3.add(E,v3.mul(dir(a+el,b*.6),L.fa)),hd=dir(a+el+wr,b*.5);hd[2]+=s*Math.sin(dv);
+    seg(Sj,E,.042*e,nm);seg(E,W,.036*e,nm);seg(W,v3.add(W,v3.mul(hd,L.hd)),.03*e,"hand"+n);R.push({k:"sph",p:Sj,r:.05*e,c:col(nm),d:0});
+    const hp=p["hip"+n],kn=p["knee"+n],Hs=[P[0],P[1],s*L.hw],K=v3.add(Hs,[L.th*Math.sin(hp*D2R),-L.th*Math.cos(hp*D2R),0]),A=v3.add(K,[L.sh*Math.sin((hp-kn)*D2R),-L.sh*Math.cos((hp-kn)*D2R),0]);
+    seg(Hs,K,.065*e,"leg");seg(K,A,.05*e,"leg");seg(A,v3.add(A,[L.ft,-.04*e,0]),.035*e,"leg");
+    p["_E"+n]=E;p["_W"+n]=W;p["_H"+n]=v3.add(W,v3.mul(hd,L.hd));p["_K"+n]=K;
+  });
+  return {prims:R,joint:{S,P,Hc,EL:p._EL,ER:p._ER,WL:p._WL,WR:p._WR,HL:p._HL,HR:p._HR,KL:p._KL,KR:p._KR}};
+}
+// ---------- adereços ----------
+function caixa(c,s,col,nome){
+  const [x,y,z]=c,[a,b,d]=[s[0]/2,s[1]/2,s[2]/2],V=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]].map(q=>[x+q[0]*a,y+q[1]*b,z+q[2]*d]);
+  return [[0,1,2,3],[4,5,6,7],[0,1,5,4],[3,2,6,7],[0,3,7,4],[1,2,6,5]].map(f=>({k:"poly",pts:f.map(i=>V[i]),c:col||"#C9C9C9",d:0,n:nome}));
+}
+const placa=(x0,x1,y,z0,z1,col)=>({k:"poly",pts:[[x0,y,z0],[x1,y,z0],[x1,y,z1],[x0,y,z1]],c:col||"#D6D6D6",d:0});
+const linha=(a,b,r,c)=>({k:"seg",a,b,r:r||.012,c:c||"#8C8C8C",d:0});
+const mesa=(x0,x1,h,z=.45)=>[placa(x0,x1,h,-z,z),linha([x0+.03,0,-z+.03],[x0+.03,h,-z+.03]),linha([x0+.03,0,z-.03],[x0+.03,h,z-.03]),linha([x1-.03,0,-z+.03],[x1-.03,h,-z+.03]),linha([x1-.03,0,z-.03],[x1-.03,h,z-.03])];
+const cadeira=(x,h)=>[placa(x-.22,x+.22,h,-.22,.22,"#B0BEC5"),{k:"poly",pts:[[x-.22,h,-.22],[x-.22,h,.22],[x-.22,h+.45,.22],[x-.22,h+.45,-.22]],c:"#B0BEC5",d:0},linha([x,0,0],[x,h,0],.025),linha([x-.25,0,0],[x+.25,0,0],.02),linha([x,0,-.25],[x,0,.25],.02)];
+const monitor=(x,y,tilt)=>[{k:"poly",pts:[[x,y,-.3],[x,y,.3],[x+tilt*.3,y+.34,.3],[x+tilt*.3,y+.34,-.3]],c:"#37474F",d:0},linha([x,y-.1,0],[x,y,0],.02)];
+function nivelTxt(n){return ["Adequado","Atenção","Alto","Crítico"][n]}
+// ---------- cenas (n = 0 a 3) ----------
+const FREQ=["menos de 10","10 a 20","20 a 30","mais de 30"];
+const SC={
+ tronco:n=>{const a=[0,15,40,70][n];return {pose:{trunk:a,shL:[15,25,40,60][n],shR:[15,25,40,60][n],elL:30,elR:30,hipL:0,hipR:0},props:mesa(.35,.85,.9),hot:{trunk:n>=2},lab:[["S","Tronco "+a+"°"]],cap:["Tronco ereto, 0°.","Flexão leve, de 0° a 20°.","Flexão de 20° a 60°.","Flexão acima de 60°."][n],fonte:"Faixas de tronco do REBA (Hignett e McAtamney, 2000)."}},
+ torcao:n=>{const a=[0,15,35,60][n];return {pose:{trunk:[5,20,30,40][n],tw:a,shL:50,shR:50,elL:50,elR:50},props:caixa([.45,.15,0],[.3,.3,.3]),hot:{trunk:n>=2},lab:[["S","Torção "+a+"°"]],cap:["Sem torção do tronco.","Torção leve.","Torção moderada com flexão.","Torção acentuada com flexão do tronco."][n],fonte:"Torção do tronco soma pontos no REBA e no RULA."}},
+ pescoco:n=>{const a=[5,15,30,50][n];return {pose:{neck:a,shL:20,shR:20,elL:80,elR:80,stance:"sit"},props:[...mesa(.3,.9,.72),...cadeira(-.28,.45)],hot:{neck:n>=2},lab:[["Hc","Pescoço "+a+"°"]],cap:["Pescoço neutro, até 10°.","Flexão de 10° a 20°.","Flexão acima de 20°.","Flexão acentuada sustentada."][n],fonte:"Faixas de pescoço do RULA (McAtamney e Corlett, 1993)."}},
+ ombros:n=>{const a=[10,30,60,90][n];return {pose:{shL:20,shR:20,abL:a,abR:a,elL:70,elR:70},props:[],hot:{armL:n>=2,armR:n>=2},lab:[["EL","Abdução "+a+"°"]],cap:["Braços junto ao corpo.","Abdução leve.","Abdução de 60°.","Abdução de 90°, ombro elevado."][n],fonte:"Ilustrativa. Braço elevado ou abduzido soma pontos no RULA e no REBA."}},
+ bracos:n=>{const a=[20,45,90,120][n];return {pose:{shL:a,shR:a,elL:30,elR:30},props:[],hot:{armL:n>=2,armR:n>=2},lab:[["EL","Braço "+a+"°"]],cap:["Braço até 20° à frente.","Elevação de 20° a 45°.","Elevação de 45° a 90°.","Elevação acima de 90°, sustentada."][n],fonte:"Faixas de braço do REBA (Hignett e McAtamney, 2000)."}},
+ punhos:n=>{const a=[0,12,30,50][n];return {pose:{shL:20,shR:20,elL:90,elR:90,wrL:a,wrR:a,devL:[0,8,20,30][n],devR:[0,8,20,30][n],stance:"sit"},props:[...mesa(.25,.75,.72),...cadeira(-.28,.45)],hot:{handL:n>=2,handR:n>=2,armL:n>=3,armR:n>=3},lab:[["HL","Punho "+a+"°"]],cap:["Punho neutro, cotovelo a cerca de 90°.","Desvio de até 15°.","Flexão ou extensão acima de 15°, com desvio.","Flexão acentuada com desvio."][n],fonte:"Faixas de punho do RULA e do REBA."}},
+ pernas:n=>{const k=[5,25,45,70][n];return {pose:{hipL:[0,15,30,45][n],hipR:0,kneeL:k,kneeR:5,trunk:[0,5,10,20][n]},props:[],hot:{leg:n>=2},lab:[["KL","Joelho "+k+"°"]],cap:["Pernas apoiadas, peso distribuído.","Flexão de joelho de 30°.","Flexão de joelho acima de 30°.","Flexão acima de 60°, apoio assimétrico."][n],fonte:"Faixas de joelho do REBA (Hignett e McAtamney, 2000)."}},
+ agacha:n=>[{pose:{trunk:5},cap:"Em pé, sem agachar.",hot:{}},{pose:{hipL:70,hipR:70,kneeL:90,kneeR:90,trunk:35,shL:50,shR:50},cap:"Meio agachamento, joelhos a 90°.",hot:{leg:true}},{pose:{hipL:115,hipR:115,kneeL:140,kneeR:140,trunk:30,shL:60,shR:60},cap:"Agachamento profundo.",hot:{leg:true,trunk:true}},{pose:{hipL:5,hipR:70,kneeL:100,kneeR:90,trunk:45,shL:70,shR:70},cap:"Ajoelhado, tronco inclinado.",hot:{leg:true,trunk:true}}].map(o=>({props:[],lab:[],fonte:"Ilustrativa. Joelho flexionado acima de 60° soma pontos no REBA.",...o}))[n],
+ acima:n=>{const h=[1.25,1.5,1.75,1.95][n],a=[60,95,130,165][n];return {pose:{shL:a,shR:a,elL:[40,30,20,10][n],elR:[40,30,20,10][n],trunk:[0,0,-5,-10][n]},props:[placa(.2,.7,h,-.4,.4),...caixa([.45,h+.12,0],[.3,.24,.4])],hot:{armL:n>=1,armR:n>=1},lab:[["EL","Braço "+a+"°"]],cap:["Prateleira abaixo da linha dos ombros.","Na altura dos ombros.","Acima da linha dos ombros.","Bem acima da cabeça, braços estendidos."][n],fonte:"Braço acima do ombro: acima de 90° no REBA."}},
+ alcance:n=>{const d=[.2,.4,.6,.78][n];return {pose:{shL:[40,65,85,100][n],shR:[40,65,85,100][n],elL:[60,35,15,5][n],elR:[60,35,15,5][n],trunk:[0,10,25,40][n]},props:[...mesa(.1,d+.35,.9),...caixa([d+.2,1,0],[.2,.2,.2])],hot:{trunk:n>=2,armL:n>=2,armR:n>=2},lab:[["HL","Alcance "+Math.round(d*100)+" cm"]],cap:["Objeto ao alcance, junto ao corpo.","Alcance moderado.","Alcance longo, com inclinação do tronco.","Alcance máximo, tronco inclinado e braços estendidos."][n],fonte:"Ilustrativa. Quanto mais longe, maior a carga postural."}},
+ estatica:n=>({pose:{trunk:[3,12,22,32][n],neck:[5,12,22,32][n],shL:[30,40,50,60][n],shR:[30,40,50,60][n],elL:70,elR:70},props:mesa(.35,.85,.95),hot:{trunk:n>=2,neck:n>=2,leg:n>=2},lab:[["S","Parado "+["< 1 min","1 a 5 min","5 a 30 min","> 30 min"][n]]],cap:["Posição mantida por menos de 1 minuto.","1 a 5 minutos.","5 a 30 minutos.","Mais de 30 minutos na mesma postura."][n],fonte:"Ilustrativa. Postura estática (mais de 1 minuto) soma pontos no REBA e no RULA."}),
+ sentada:n=>({pose:{stance:"sit",trunk:[0,10,25,40][n],neck:[5,15,25,40][n],shL:25,shR:25,elL:90,elR:90,seatH:[.45,.5,.38,.34][n]},props:[...mesa(.3,.9,[.72,.72,.76,.78][n]),...cadeira(-.28,[.45,.5,.38,.34][n])],hot:{trunk:n>=2,neck:n>=2},lab:[["S","Tronco "+[0,10,25,40][n]+"°"]],cap:["Sentado com apoio lombar, pés no chão.","Assento alto, leve inclinação.","Assento baixo, tronco curvado.","Assento muito baixo, tronco e pescoço projetados."][n],fonte:"Ilustrativa, com base nos critérios de cadeira e mesa do ROSA."}),
+ repet:n=>({pose:{shL:30,shR:30,elL:70,elR:70,stance:"sit",wrL:[0,10,15,25][n],wrR:[0,10,15,25][n]},props:[...mesa(.25,.75,.72),...cadeira(-.28,.45)],hot:{handL:n>=2,handR:n>=2},lab:[["HL",FREQ[n]+" mov/min"]],cap:["Poucos movimentos, com pausas.","Movimentos regulares.","Alta frequência.","Frequência muito alta, sem pausa."][n],fonte:"Ilustrativa. No RULA, mais de 4 repetições por minuto soma ponto de uso muscular."}),
+ duracao:n=>({pose:{trunk:[3,8,14,20][n],stance:"stand",shL:30,shR:30,elL:60,elR:60},props:mesa(.35,.85,.95),hot:{trunk:n>=2},lab:[["S",["< 1 h","1 a 2 h","2 a 4 h","> 4 h"][n]+" por dia"]],cap:["Exposição curta.","Exposição de 1 a 2 horas.","2 a 4 horas.","Mais de 4 horas por dia, sem recuperação."][n],fonte:"Ilustrativa. A duração multiplica o efeito da postura e da força (veja Strain Index)."}),
+ ferramenta:n=>({pose:{shL:[20,35,55,75][n],shR:[20,35,55,75][n],elL:[80,70,60,45][n],elR:[80,70,60,45][n],trunk:[0,5,12,20][n],wrL:[0,5,20,35][n],wrR:[0,5,20,35][n]},props:[linha([.38,.95,-.05],[.5,.95,.05],.05+n*.01,"#FFB74D"),caixa([.55,.95,0],[.14,.1,.1],"#9E9E9E")].flat(),hot:{handL:n>=2,handR:n>=2,armL:n>=3,armR:n>=3},lab:[["HL","Ferramenta "+["leve","média","pesada","muito pesada"][n]]],cap:["Ferramenta leve, cabo adequado, punho neutro.","Peso moderado.","Pesada, punho desviado.","Muito pesada, braço elevado e punho desviado."][n],fonte:"Ilustrativa. Peso, cabo e posição do punho alteram o esforço (veja Strain Index e Medições para vibração)."}),
+ vcorpo:n=>({pose:{stance:"sit",trunk:[0,5,10,15][n],shL:20,shR:20,elL:90,elR:90,seatH:.5},props:[...cadeira(-.28,.5),...caixa([.5,.6,0],[.7,.2,.6],"#B0BEC5")],ondas:n+1,hot:{trunk:n>=2},lab:[["P","Vibração "+nivelTxt(n).toLowerCase()]],cap:["Assento com amortecimento, vibração baixa.","Vibração moderada.","Vibração alta.","Vibração intensa e contínua."][n],fonte:"Ilustrativa. O risco depende da aceleração e do tempo: meça em Medições (NHO 09, ISO 2631-1)."}),
+ empurra:n=>({pose:{trunk:[5,15,30,45][n],shL:[35,45,60,70][n],shR:[35,45,60,70][n],elL:[40,25,10,5][n],elR:[40,25,10,5][n],hipL:[0,8,15,25][n],hipR:[-10,-15,-20,-25][n],kneeL:[0,10,20,30][n],x:-.1},props:[...caixa([.75,.5,0],[.7,.5,.6],"#BDBDBD"),linha([.45,[.9,1,.95,.85][n],-.25],[.45,[.9,1,.95,.85][n],.25],.02,"#616161")],hot:{trunk:n>=2,armL:n>=2,armR:n>=2},lab:[["S","Inclinação "+[5,15,30,45][n]+"°"]],cap:["Esforço baixo, carrinho em bom estado.","Esforço moderado.","Esforço alto, tronco inclinado.","Esforço máximo, rodas travando."][n],fonte:"Ilustrativa. Compare a força medida com o limite da tabela adotada em Medições (Snook e Ciriello; ISO 11228-2)."}),
+ levanta:n=>{const hh=[.8,.5,.2,.1][n],tr=[10,35,60,70][n];return {pose:{trunk:tr,tw:[0,0,0,35][n],hipL:[10,40,70,70][n],hipR:[10,40,70,70][n],kneeL:[10,40,80,80][n],kneeR:[10,40,80,80][n],shL:[30,45,70,85][n],shR:[30,45,70,85][n],elL:20,elR:20},props:caixa([.42,hh,0],[.3,.3,.3]),hot:{trunk:n>=2,armL:n>=3,armR:n>=3},lab:[["S","Tronco "+tr+"°"]],cap:["Carga na altura da cintura, junto ao corpo.","Carga na altura do joelho.","Carga perto do chão.","Carga no chão, com torção do tronco."][n],fonte:"Ilustrativa. Calcule o limite de peso na equação NIOSH (botão Calcular NIOSH)."}},
+ pessoas:n=>({pose:{trunk:[15,35,55,75][n],shL:[45,60,75,85][n],shR:[45,60,75,85][n],elL:[30,15,8,0][n],elR:[30,15,8,0][n],hipL:[5,20,35,45][n],hipR:[5,20,35,45][n],kneeL:[5,20,35,45][n],kneeR:[5,20,35,45][n]},props:[...mesa(.2,1.5,.7,.4),linha([.35,.78,0],[1.3,.78,0],.1,"#E57373"),{k:"sph",p:[1.4,.8,0],r:.09,c:"#E57373",d:0}],hot:{trunk:n>=2,armL:n>=2,armR:n>=2},lab:[["S","Tronco "+[15,35,55,75][n]+"°"]],cap:["Paciente próximo, cama na altura certa.","Inclinação moderada.","Inclinação alta, braços estendidos.","Inclinação extrema com carga de pessoa."][n],fonte:"Ilustrativa. Movimentação de pessoas exige recursos auxiliares (elevador, lençol deslizante) e equipe."}),
+ bancada:n=>{const h=[.95,1.05,1.15,1.3][n]-.0,hh=[.95,1.05,1.15,1.3][n];return {pose:{shL:[30,45,70,95][n],shR:[30,45,70,95][n],elL:[85,70,50,35][n],elR:[85,70,50,35][n],trunk:[2,3,5,8][n],abL:[5,15,25,35][n],abR:[5,15,25,35][n]},props:mesa(.3,.9,hh),hot:{armL:n>=2,armR:n>=2},lab:[["EL","Bancada "+Math.round(hh*100)+" cm"]],cap:["Altura da bancada na altura dos cotovelos.","Bancada um pouco alta.","Alta: ombros elevados.","Muito alta: braços elevados e abduzidos."][n],fonte:"Ilustrativa. A altura ideal depende da tarefa e do trabalhador: prefira bancada regulável."}},
+ monitor:n=>{const y=[1.12,1.0,.88,.75][n];return {pose:{stance:"sit",neck:[3,12,25,40][n],trunk:[0,5,10,12][n],shL:25,shR:25,elL:90,elR:90},props:[...mesa(.35,.95,.72),...cadeira(-.28,.45),...monitor(.75,y-.05,0)],hot:{neck:n>=2},lab:[["Hc","Pescoço "+[3,12,25,40][n]+"°"]],cap:["Borda superior do monitor na altura dos olhos.","Monitor um pouco baixo.","Monitor baixo: pescoço flexionado.","Monitor muito baixo ou muito longe."][n],fonte:"Ilustrativa, com base nos critérios de monitor do ROSA."}},
+ pedal:n=>({pose:{stance:"sit",seatH:.45,hipL:[85,85,100,110][n],kneeL:[90,85,75,60][n],hipR:[85,70,60,50][n],kneeR:[90,100,110,125][n],trunk:[0,5,10,15][n],shL:30,shR:30,elL:90,elR:90},props:[...cadeira(-.28,.45),...mesa(.35,.9,.72),caixa([.7,.04,.1],[.2,.05,.3],"#9E9E9E")].flat(),hot:{leg:n>=2},lab:[["KR","Pedal "+nivelTxt(n).toLowerCase()]],cap:["Pedal ao alcance, joelho a 90°.","Pedal um pouco distante.","Perna estendida de forma sustentada.","Pedal exige esforço assimétrico constante."][n],fonte:"Ilustrativa. Evite acionamento contínuo por um só pé."}),
+ comando:n=>{const h=[1.15,1.35,1.6,1.85][n];return {pose:{shL:[50,75,110,140][n],shR:[50,75,110,140][n],elL:[50,30,15,5][n],elR:[50,30,15,5][n],trunk:[0,3,5,0][n]},props:[...caixa([.7,h,0],[.1,.35,.7],"#CFD8DC"),...[0,1].map(i=>({k:"sph",p:[.64,h+.08-i*.12,0],r:.03,c:"#FF9900",d:0}))],hot:{armL:n>=2,armR:n>=2},lab:[["HL","Comando a "+Math.round(h*100)+" cm"]],cap:["Comandos na altura do cotovelo e do tórax.","Comandos um pouco altos.","Comandos acima do ombro.","Comandos muito altos, uso frequente."][n],fonte:"Ilustrativa. Comandos de uso frequente devem ficar entre o cotovelo e o ombro."}},
+ acesso:n=>({pose:n===0?{trunk:10,shL:30,shR:30}:n===1?{trunk:35,hipL:30,hipR:30,kneeL:40,kneeR:40,shL:60,shR:60}:n===2?{trunk:55,hipL:60,hipR:60,kneeL:80,kneeR:80,shL:80,shR:80}:{trunk:50,hipL:5,hipR:70,kneeL:100,kneeR:90,shL:85,shR:85,neck:25},props:[...caixa([.6,.55,0],[.8,.5,.9],"#B0BEC5")],hot:{trunk:n>=2,leg:n>=3,armL:n>=2,armR:n>=2},lab:[],cap:["Ponto de operação acessível em pé.","Acesso exige inclinação.","Acesso agachado.","Acesso ajoelhado, sob a máquina, com braços elevados."][n],fonte:"Ilustrativa. O acesso para manutenção deve ser previsto no projeto da máquina."}),
+ antropo:n=>({pose:{esc:[1,.92,.85,1.12][n],shL:[40,50,65,35][n],shR:[40,50,65,35][n],elL:[70,60,45,80][n],elR:[70,60,45,80][n],trunk:[3,6,12,18][n],stance:"stand"},props:mesa(.35,.85,.95),hot:{armL:n===2,armR:n===2,trunk:n===3},lab:[["S",["Mediano","Pessoa menor","Pessoa bem menor","Pessoa maior"][n]]],cap:["Posto adequado a quem tem a estatura média.","Pessoa menor alcança com esforço.","Pessoa muito menor: ombros elevados.","Pessoa maior: tronco curvado sobre a bancada."][n],fonte:"Ilustrativa. Projete para a faixa de estaturas do grupo ou use postos reguláveis."}),
+ luz:n=>({pose:{stance:"sit",neck:[5,10,18,25][n],trunk:[0,5,10,15][n],shL:25,shR:25,elL:90,elR:90},props:[...mesa(.35,.95,.72),...cadeira(-.28,.45),...monitor(.78,1.0,.2),...[0,1,2].map(i=>linha([-.2+i*.15,1.9,0],[.78,1.2,0],.006,n>=2?"#FFB300":"#E0E0E0")),{k:"sph",p:[-.2,1.9,0],r:.07,c:"#FFC107",d:0}],hot:{neck:n>=2},lab:[["Hc",["Sem reflexo","Reflexo leve","Ofuscamento","Ofuscamento forte"][n]]],cap:["Luz sem reflexo no monitor.","Reflexo leve.","Reflexo na tela: pescoço se inclina para evitar.","Ofuscamento forte e postura forçada."][n],fonte:"Ilustrativa. Meça a iluminância em Medições (NHO 11, ISO 8995-1)."}),
+ espaco:n=>({pose:{trunk:[0,10,25,40][n],shL:[20,30,45,60][n],shR:[20,30,45,60][n],elL:40,elR:40,lat:[0,0,10,15][n]},props:[...caixa([.5+[.6,.3,.1,.02][n],.9,0],[.08,1.8,1.4],"#CFD8DC"),...caixa([-.4-[.6,.3,.1,.02][n],.9,0],[.08,1.8,1.4],"#CFD8DC")],hot:{trunk:n>=2},lab:[["S","Folga "+["60","30","10","2"][n]+" cm"]],cap:["Espaço livre suficiente.","Espaço justo.","Espaço apertado: postura adaptada.","Sem espaço: tronco e braços forçados."][n],fonte:"Ilustrativa. Defina folgas mínimas conforme o projeto e a tarefa."})
+};
+// associa os itens da AEP às cenas
+const MAPA3D=[[/postura do tronco/,"tronco"],[/torções/,"torcao"],[/cervical|ruído interferindo/,"pescoco"],[/posição dos ombros/,"ombros"],[/elevação e sustentação/,"bracos"],[/cotovelos, punhos/,"punhos"],[/membros inferiores/,"pernas"],[/ajoelhado|agachado/,"agacha"],[/acima da linha/,"acima"],[/alcance/,"alcance"],[/postura estática|permanência em pé/,"estatica"],[/permanência sentada|^cadeira|^mesa$/,"sentada"],[/repetitividade|frequência dos movimentos/,"repet"],[/duração da exposição|recuperação muscular/,"duracao"],[/força aplicada|tipo de pega|ferramentas de impacto|vibração de mãos|empunhadura|peso das ferramentas|^ferramentas$|compatibilidade com luvas/,"ferramenta"],[/vibração de corpo inteiro/,"vcorpo"],[/empurrar/,"empurra"],[/levantamento/,"levanta"],[/movimentação de pessoas/,"pessoas"],[/bancada|altura de trabalho|regulagens|apoios/,"bancada"],[/monitores/,"monitor"],[/pedais/,"pedal"],[/dispositivos de comando/,"comando"],[/acesso para operação/,"acesso"],[/adequação antropométrica/,"antropo"],[/iluminação|reflexos e ofuscamento|contraste/,"luz"],[/espaço disponível|circulação|acesso ao posto/,"espaco"]];
+function cena3dDe(titulo){const t=String(titulo||"").toLowerCase();const m=MAPA3D.find(x=>x[0].test(t));return m?m[1]:null}
+// ---------- renderização ----------
+function projetar(p,c){
+  const x=p[0]-c.tx,y=p[1]-c.ty,z=p[2]-c.tz,cy=Math.cos(c.yaw),sy=Math.sin(c.yaw),x1=x*cy+z*sy,z1=-x*sy+z*cy,cp=Math.cos(c.pitch),sp=Math.sin(c.pitch),y2=y*cp-z1*sp,z2=y*sp+z1*cp,f=c.dist/(c.dist+z2);
+  return {x:c.cx+x1*c.sc*f,y:c.cy-y2*c.sc*f,d:z2,f};
+}
+function desenhar3d(cv,cena,cam,nivel){
+  const cx=cv.getContext("2d"),W=cv.width,H=cv.height;cx.clearRect(0,0,W,H);cx.fillStyle="#fff";cx.fillRect(0,0,W,H);
+  cam.cx=W/2;cam.cy=H*.56;cam.sc=H*.36;
+  const bd=corpo3d(cena.pose,cena.hot),prims=[...cena.props.map(q=>({...q})),...bd.prims];
+  // chão
+  cx.strokeStyle="#E3E3E3";cx.lineWidth=1;
+  for(let i=-6;i<=8;i++){const a=projetar([i*.25,0,-1.2],cam),b=projetar([i*.25,0,1.2],cam);cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke()}
+  for(let j=-5;j<=5;j++){const a=projetar([-1.5,0,j*.24],cam),b=projetar([2,0,j*.24],cam);cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke()}
+  const L=prims.map(q=>{
+    if(q.k==="seg"){const a=projetar(q.a,cam),b=projetar(q.b,cam);return {q,a,b,d:(a.d+b.d)/2}}
+    if(q.k==="sph"){const a=projetar(q.p,cam);return {q,a,d:a.d}}
+    const P=q.pts.map(v=>projetar(v,cam));return {q,P,d:P.reduce((s,o)=>s+o.d,0)/P.length}
+  }).sort((u,v)=>v.d-u.d);
+  L.forEach(o=>{
+    const q=o.q;
+    if(q.k==="poly"){cx.beginPath();o.P.forEach((p,i)=>i?cx.lineTo(p.x,p.y):cx.moveTo(p.x,p.y));cx.closePath();cx.fillStyle=q.c;cx.globalAlpha=.85;cx.fill();cx.globalAlpha=1;cx.strokeStyle="#9E9E9E";cx.lineWidth=1;cx.stroke()}
+    else if(q.k==="seg"){cx.strokeStyle=q.c;cx.lineCap="round";cx.lineWidth=Math.max(1.5,q.r*2*cam.sc*(o.a.f+o.b.f)/2);cx.beginPath();cx.moveTo(o.a.x,o.a.y);cx.lineTo(o.b.x,o.b.y);cx.stroke()}
+    else{cx.fillStyle=q.c;cx.beginPath();cx.arc(o.a.x,o.a.y,Math.max(2,q.r*cam.sc*o.a.f),0,7);cx.fill()}
+  });
+  // ondas de vibração
+  if(cena.ondas){cx.strokeStyle="#FF9900";cx.lineWidth=2;const o=projetar([.0,.1,0],cam);for(let i=0;i<cena.ondas*3;i++){cx.beginPath();for(let s=0;s<=20;s++){const xx=o.x-60+s*6,yy=o.y+14+i*8+Math.sin(s*1.2+i)*4;s?cx.lineTo(xx,yy):cx.moveTo(xx,yy)}cx.stroke()}}
+  // rótulos
+  cx.font="bold 13px Arial";(cena.lab||[]).forEach(([j,t])=>{const pt=bd.joint[j];if(!pt)return;const o=projetar(pt,cam),w=cx.measureText(t).width;cx.fillStyle="rgba(255,255,255,.92)";cx.fillRect(o.x+12,o.y-22,w+10,20);cx.strokeStyle="#FF9900";cx.lineWidth=1;cx.strokeRect(o.x+12,o.y-22,w+10,20);cx.fillStyle="#000";cx.fillText(t,o.x+17,o.y-8);cx.fillStyle="#FF9900";cx.beginPath();cx.arc(o.x,o.y,3.5,0,7);cx.fill()});
+}
+const cenaPara=(id,n)=>{const f=SC[id];if(!f)return null;const c=f(n);return {pose:c.pose,props:c.props||[],hot:c.hot||{},lab:c.lab||[],cap:c.cap,fonte:c.fonte,ondas:c.ondas}};
+let V3D=null;
+function abrir3d(idx,titulo,chave,nivelIni){
+  const id=cena3dDe(titulo);if(!id)return;
+  let m=$("#modal3d");if(m)m.remove();m=document.createElement("div");m.id="modal3d";
+  const lock=G.ed&&travado(G.ed.d);
+  m.innerHTML=`<div class="modal-fundo" data-v3="fechar"></div><div class="modal-caixa" role="dialog" aria-modal="true" style="max-width:720px"><button type="button" class="modal-x" data-v3="fechar" aria-label="Fechar">×</button>
+  <h2>Exemplo 3D: ${esc(titulo)}</h2><canvas id="cv3d" width="680" height="440" style="width:100%;height:auto;border:1px solid var(--bd,#ddd);border-radius:10px;touch-action:none;background:#fff" role="img" aria-label="Boneco 3D ilustrando o item"></canvas>
+  <div class="linha" style="margin:8px 0"><label style="flex:1;font-size:.88rem">Nível: <b id="v3Nv"></b><input type="range" id="v3Sl" min="0" max="3" value="0" style="width:100%"></label></div>
+  <div class="linha"><button type="button" class="btn sec peq" data-v3="lat">Lateral</button><button type="button" class="btn sec peq" data-v3="fr">Frente</button><button type="button" class="btn sec peq" data-v3="cima">De cima</button><button type="button" class="btn sec peq" data-v3="gira">Girar</button>${lock||!chave?"":`<button type="button" class="btn verde peq" data-v3="usar">Marcar este nível no formulário</button>`}</div>
+  <p id="v3Cap" style="margin:8px 0 2px;font-weight:700"></p><p id="v3Fon" class="mut" style="font-size:.82rem;margin:0"></p><p class="mut" style="font-size:.8rem">Arraste para girar. Cores: laranja-avermelhado indica a região que pesa na classificação. Exemplo ilustrativo, não substitui a observação do posto real.</p></div>`;
+  document.body.appendChild(m);
+  V3D={id,chave,nivel:Number.isFinite(nivelIni)?nivelIni:0,cam:{yaw:-.35,pitch:.18,dist:3.2,tx:.25,ty:.9,tz:0},gira:false,anim:null};
+  const cv=$("#cv3d"),sl=$("#v3Sl");sl.value=V3D.nivel;
+  const redes=()=>{const c=cenaPara(id,V3D.nivel);desenhar3d(cv,c,V3D.cam,V3D.nivel);$("#v3Nv").textContent=nivelTxt(V3D.nivel);$("#v3Cap").textContent=c.cap;$("#v3Fon").textContent=c.fonte||""};
+  V3D.redes=redes;redes();
+  let arr=null;cv.addEventListener("pointerdown",e=>{arr=[e.clientX,e.clientY];cv.setPointerCapture(e.pointerId)});
+  cv.addEventListener("pointermove",e=>{if(!arr)return;V3D.cam.yaw+=(e.clientX-arr[0])*.012;V3D.cam.pitch=Math.max(-.2,Math.min(1.4,V3D.cam.pitch+(e.clientY-arr[1])*.008));arr=[e.clientX,e.clientY];redes()});
+  cv.addEventListener("pointerup",()=>{arr=null});cv.addEventListener("pointercancel",()=>{arr=null});
+  sl.addEventListener("input",()=>{V3D.nivel=Number(sl.value);redes()});
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-v3]");if(!b)return;const k=b.dataset.v3,m=$("#modal3d");
+  if(k==="fechar"){if(V3D&&V3D.anim)clearInterval(V3D.anim);V3D=null;if(m)m.remove();return}
+  if(!V3D)return;const c=V3D.cam;
+  if(k==="lat"){c.yaw=0;c.pitch=.05}else if(k==="fr"){c.yaw=-Math.PI/2;c.pitch=.05}else if(k==="cima"){c.yaw=-.35;c.pitch=1.35}
+  else if(k==="gira"){V3D.gira=!V3D.gira;if(V3D.anim){clearInterval(V3D.anim);V3D.anim=null}if(V3D.gira)V3D.anim=setInterval(()=>{if(!$("#cv3d")){clearInterval(V3D&&V3D.anim);return}c.yaw+=.03;V3D.redes()},40)}
+  else if(k==="usar"&&G.ed&&V3D.chave){G.ed.d.f=G.ed.d.f||{};G.ed.d.f[V3D.chave]=String(V3D.nivel);gravarEd();m.remove();V3D=null;reRender();aviso("Nível marcado no formulário.");return}
+  V3D&&V3D.redes();
+});
+// botão "Exemplo 3D" em cada item com cena
+const _htmlRegEd25=htmlRegEd;
+htmlRegEd=function(){
+  let h=_htmlRegEd25();
+  if(!G.ed||G.ed.tipo!=="aep")return h;
+  CATS.forEach(cat=>cat.itens.forEach(i=>{
+    if(!cena3dDe(i.t))return;
+    const alvo=`<span>${esc(i.t)}</span>`;
+    h=h.replace(alvo,`${alvo}<button type="button" class="btn sec peq" style="margin-left:6px;padding:2px 8px" data-v3-abrir="${i.k}" title="Exemplo 3D" aria-label="Exemplo 3D de ${esc(i.t)}">3D</button>`);
+  }));
+  return h;
+};
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-v3-abrir]");if(!b)return;const k=b.dataset.v3Abrir;
+  let item=null;CATS.forEach(c=>c.itens.forEach(i=>{if(i.k===k)item=i}));if(!item)return;
+  const cur=G.ed&&G.ed.d.f&&G.ed.d.f[k];abrir3d(0,item.t,k,cur!==undefined&&cur!==""&&cur!=="na"?Number(cur):0);
+});
+/* =====================================================================
+   FASE 15: MÉTODOS ADICIONAIS (modelos próprios do ErgoContexto)
+   As tabelas oficiais de OWAS, ROSA, OCRA, QEC, LEST, EWA e dos checklists
+   específicos não estão abertas para reprodução. Por isso cada método abaixo
+   é um MODELO ERGOCONTEXTO inspirado no método citado: usa os mesmos
+   domínios de análise, com pontuação própria e transparente (cada item vale
+   de 0 ao máximo; o índice é a média normalizada em %). Regra de
+   prevalência: qualquer item no valor máximo eleva o resultado para, no
+   mínimo, "Alto". O resultado NÃO é o escore do método original e o
+   registro traz esse aviso. Quem tiver a tabela oficial deve registrar o
+   escore oficial em Métodos aplicados.
+   ===================================================================== */
+const OP=(...l)=>l.map((t,i)=>[String(i),t]);
+const CK=OP("Conforme","Parcialmente conforme","Não conforme");
+const MD={
+ owas:{nome:"Posturas e cargas (modelo inspirado no OWAS)",orig:"OWAS, Karhu, Kansi e Kuorinka, 1977",intro:"Registre a postura mais frequente ou mais crítica observada na tarefa, no estilo do OWAS (costas, braços, pernas, carga e tempo).",it:[
+  ["costas","Costas",OP("Eretas","Inclinadas","Torcidas","Inclinadas e torcidas")],
+  ["bracos","Braços",OP("Ambos abaixo dos ombros","Um acima dos ombros","Ambos acima dos ombros")],
+  ["pernas","Pernas",OP("Sentado","Em pé, duas pernas apoiadas","Em pé, uma perna","Joelhos flexionados","Ajoelhado ou agachado","Caminhando")],
+  ["carga","Carga manuseada",OP("Até 10 kg","De 10 a 20 kg","Acima de 20 kg")],
+  ["tempo","Tempo na postura, no ciclo",OP("Menos de 20%","De 20% a 50%","Mais de 50%")]],
+  pesoMax:{pernas:4}},
+ rosa:{nome:"Escritório e computador (modelo inspirado no ROSA)",orig:"ROSA, Sonne, Villalta e Andrews, 2012",intro:"Avalie o posto de escritório: cadeira, monitor, telefone, mouse e teclado.",it:[
+  ["alt","Altura da cadeira (pés apoiados, joelho a 90°)",OP("Adequada","Um pouco alta ou baixa","Pés não apoiam ou joelhos acima do assento")],
+  ["prof","Profundidade do assento",OP("Cerca de 8 cm livres atrás do joelho","Um pouco curto ou longo","Muito longo ou muito curto")],
+  ["apb","Apoio de braços",OP("Altura do cotovelo, ombros relaxados","Um pouco alto, baixo ou largo","Ausente ou força ombros")],
+  ["enc","Encosto",OP("Apoia a lombar, inclinação entre 95° e 110°","Apoio parcial","Sem apoio, ou sem regulagem")],
+  ["tcad","Tempo sentado sem pausa",OP("Menos de 1 h","De 1 a 4 h","Mais de 4 h")],
+  ["mon","Altura do monitor",OP("Borda superior na altura dos olhos","Um pouco alto ou baixo","Muito baixo ou muito alto")],
+  ["dist","Distância do monitor (cerca de um braço)",OP("Adequada","Um pouco perto ou longe","Muito perto ou longe, ou o trabalhador se projeta")],
+  ["ref","Reflexo e ofuscamento no monitor",OP("Nenhum","Leve","Forte")],
+  ["tel","Telefone e documentos",OP("Ao alcance, uso de headset se frequente","Alcance com leve esforço","Telefone preso no ombro, ou documentos fora de alcance")],
+  ["mouse","Mouse",OP("Ao lado do teclado, punho neutro","Um pouco afastado","Afastado, punho desviado ou ombro elevado")],
+  ["tec","Teclado",OP("Punhos neutros, ombros relaxados","Leve desvio ou extensão","Punhos em extensão ou desvio, teclado alto")],
+  ["tuso","Tempo de uso do computador por dia",OP("Menos de 1 h","De 1 a 4 h","Mais de 4 h")]]},
+ ocra:{nome:"Repetitividade de membros superiores (modelo inspirado no OCRA)",orig:"OCRA, Occhipinti e Colombini, 1996 (norma ISO 11228-3)",intro:"Avalie a tarefa repetitiva: ações técnicas, força, postura, recuperação e duração.",it:[
+  ["freq","Ações técnicas por minuto",OP("Até 20","De 21 a 30","De 31 a 40","Mais de 40")],
+  ["forca","Força (escala de Borg CR-10, mãos)",OP("Até 1, muito leve","De 2 a 3","De 4 a 5","6 ou mais")],
+  ["ombro","Postura do ombro",OP("Braço junto ao corpo","Elevação até 45°","Elevação de 45° a 90°","Acima de 90°")],
+  ["cot","Cotovelo (giro do antebraço e extensão)",OP("Movimentos curtos","Giros ocasionais","Giros e extensões frequentes","Giros e extensões quase contínuos")],
+  ["pun","Punho",OP("Neutro","Desvio de até 15°","Desvio e flexão moderados","Desvio e flexão acentuados")],
+  ["mao","Tipo de pega",OP("Palmar, mão relaxada","Pinça ampla","Pinça fina ou gancho","Pinça fina com força")],
+  ["est","Movimentos estereotipados (mais de 50% do ciclo igual)",OP("Não","Parcialmente","Sim")],
+  ["rec","Recuperação (pausas e rodízio)",OP("Pausa a cada hora e rodízio","Pausas a cada 2 horas","Apenas almoço","Sem pausas")],
+  ["dur","Duração diária da tarefa repetitiva",OP("Menos de 2 h","De 2 a 4 h","De 4 a 6 h","Mais de 6 h")],
+  ["comp","Fatores complementares (vibração, frio, luvas, impacto, precisão)",OP("Nenhum","Um fator","Dois fatores","Três ou mais")]]},
+ qec:{nome:"Avaliação rápida de exposição (modelo inspirado no QEC)",orig:"QEC, Li e Buckle, 1999",intro:"Parte do avaliador (postura) e parte do trabalhador (percepção), no estilo do QEC.",it:[
+  ["costas","Costas, durante a tarefa",OP("Quase neutra","Inclinada ou torcida moderadamente","Muito inclinada, torcida ou fletida")],
+  ["costasF","Costas: movimentos",OP("Raros","Frequentes, até 10 por minuto","Muito frequentes")],
+  ["ombro","Ombro e braço",OP("Na altura da cintura","Na altura do peito","Na altura ou acima dos ombros")],
+  ["ombroF","Ombro e braço: movimentos",OP("Ocasionais","Frequentes","Quase contínuos")],
+  ["pun","Punho e mão",OP("Retos","Desvio ou flexão moderados","Desvio ou flexão acentuados")],
+  ["punF","Punho e mão: repetição",OP("Até 10 por minuto","De 11 a 20","Mais de 20")],
+  ["pesc","Pescoço",OP("Neutro","Inclinado ou torcido","Muito inclinado ou torcido")],
+  ["carga","Carga manuseada com uma mão",OP("Até 5 kg","De 6 a 10 kg","Mais de 10 kg")],
+  ["tempo","Tempo diário na tarefa",OP("Menos de 2 h","De 2 a 4 h","Mais de 4 h")],
+  ["visao","Exigência visual (trabalhador)",OP("Baixa","Média","Alta")],
+  ["vibr","Vibração (trabalhador)",OP("Nenhuma","Até 1 h por dia","Mais de 1 h por dia")],
+  ["ritmo","Ritmo imposto (trabalhador)",OP("Livre","Às vezes imposto","Sempre imposto")],
+  ["estr","Estresse com a tarefa (trabalhador)",OP("Nenhum","Moderado","Alto")]]},
+ lest:{nome:"Condições de trabalho (modelo inspirado no LEST)",orig:"LEST, Guélaud et al., 1975",intro:"Visão geral de ambiente, carga física, carga mental, aspectos psicossociais e tempo de trabalho.",it:[
+  ["ruido","Ruído",OP("Conversa normal possível","Voz elevada necessária","Difícil comunicar mesmo gritando")],
+  ["term","Ambiente térmico",OP("Confortável","Desconforto ocasional","Calor ou frio frequentes")],
+  ["luz","Iluminação",OP("Adequada à tarefa","Insuficiente em partes","Insuficiente ou ofuscante")],
+  ["vib","Vibração",OP("Nenhuma","Presente em parte da jornada","Presente na maior parte da jornada")],
+  ["est","Carga estática",OP("Posturas variadas","Postura mantida por períodos médios","Postura mantida por períodos longos")],
+  ["din","Carga dinâmica (esforço e deslocamento)",OP("Baixa","Moderada","Alta")],
+  ["tempo","Pressão de tempo",OP("Ritmo livre","Metas moderadas","Ritmo imposto, sem folga")],
+  ["atenc","Exigência de atenção",OP("Intermitente","Frequente","Contínua, com consequência grave se falhar")],
+  ["compl","Complexidade da tarefa",OP("Simples","Moderada","Alta")],
+  ["inic","Autonomia e iniciativa",OP("Alta","Média","Nenhuma")],
+  ["comun","Comunicação e apoio",OP("Livre e suficiente","Limitada","Quase impossível")],
+  ["jorn","Jornada e horários",OP("Diurno, estável","Turnos fixos","Turnos alternados, noite ou horas extras frequentes")]]},
+ ewa:{nome:"Análise de posto (modelo inspirado no EWA)",orig:"EWA, Ergonomic Workplace Analysis, Ahonen et al., 1989 (Instituto Finlandês de Saúde Ocupacional)",intro:"Panorama do posto em 14 dimensões, no estilo do EWA.",it:[
+  ["esp","Espaço de trabalho",OP("Livre","Justo","Insuficiente")],
+  ["ativ","Atividade física geral",OP("Leve","Moderada","Pesada")],
+  ["lev","Levantamento de cargas",OP("Raro ou leve","Ocasional","Frequente ou pesado")],
+  ["post","Posturas e movimentos",OP("Variados e confortáveis","Alguns desconfortos","Forçados ou mantidos")],
+  ["risc","Risco de acidente",OP("Baixo","Moderado","Alto")],
+  ["cont","Conteúdo do trabalho",OP("Variado","Parcialmente repetitivo","Monótono")],
+  ["rest","Restrições à autonomia",OP("Poucas","Algumas","Muitas")],
+  ["comu","Comunicação e contatos pessoais",OP("Adequada","Limitada","Inexistente")],
+  ["dec","Tomada de decisão",OP("Livre","Parcial","Nenhuma, com responsabilidade alta")],
+  ["rep","Repetitividade",OP("Baixa","Média","Alta")],
+  ["aten","Atenção exigida",OP("Baixa","Média","Alta e contínua")],
+  ["luz","Iluminação",OP("Adequada","Insuficiente em parte","Insuficiente ou ofuscante")],
+  ["ter","Ambiente térmico",OP("Confortável","Desconforto ocasional","Calor ou frio frequentes")],
+  ["rui","Ruído",OP("Baixo","Incômodo","Alto")]]},
+ sobane:{nome:"Triagem participativa (modelo inspirado no Déparis, SOBANE)",orig:"SOBANE e Déparis, Malchaire (Universidade Católica de Louvain), 2001",intro:"Nível 1 (Déparis) do SOBANE: o trabalhador e o responsável examinam cada área e dizem se está satisfatória, a melhorar ou exige análise mais detalhada (nível 2, Observação).",it:[
+  ["local","Local de trabalho e arrumação",OP("Satisfatório","A melhorar","Exige análise de nível 2")],
+  ["post","Posturas e esforços",OP("Satisfatório","A melhorar","Exige análise de nível 2")],
+  ["lev","Cargas e movimentação",OP("Satisfatório","A melhorar","Exige análise de nível 2")],
+  ["rep","Repetitividade e ritmo",OP("Satisfatório","A melhorar","Exige análise de nível 2")],
+  ["luz","Ambiente luminoso",OP("Satisfatório","A melhorar","Exige análise de nível 2")],
+  ["rui","Ambiente sonoro",OP("Satisfatório","A melhorar","Exige análise de nível 2")],
+  ["ter","Ambiente térmico",OP("Satisfatório","A melhorar","Exige análise de nível 2")],
+  ["sec","Riscos de acidente e segurança",OP("Satisfatório","A melhorar","Exige análise de nível 2")],
+  ["info","Informações e comandos",OP("Satisfatório","A melhorar","Exige análise de nível 2")],
+  ["aut","Autonomia e participação",OP("Satisfatório","A melhorar","Exige análise de nível 2")],
+  ["rel","Relações no trabalho",OP("Satisfatório","A melhorar","Exige análise de nível 2")],
+  ["cont","Conteúdo e carga mental",OP("Satisfatório","A melhorar","Exige análise de nível 2")],
+  ["hor","Horários e pausas",OP("Satisfatório","A melhorar","Exige análise de nível 2")]]},
+ corlett:{nome:"Mapa corporal de desconforto (estilo Corlett)",orig:"Corlett e Bishop, 1976 (Ergonomics 19(2): 175-182)",intro:"Pergunte ao trabalhador o desconforto em cada região no fim da jornada: 0 = nenhum, 5 = intolerável. É autorrelato, não diagnóstico.",it:[...["Pescoço","Ombro direito","Ombro esquerdo","Braço direito","Braço esquerdo","Cotovelo direito","Cotovelo esquerdo","Antebraço e punho direitos","Antebraço e punho esquerdos","Mão direita","Mão esquerda","Parte superior das costas","Parte inferior das costas (lombar)","Quadril e nádegas","Coxas","Joelhos","Pernas","Pés"].map((r,i)=>["r"+i,r,OP("0 nenhum","1 leve","2 moderado","3 forte","4 muito forte","5 intolerável")])],limiar:.8},
+ ck_sala:{nome:"Checklist de sala de controle",orig:"ErgoContexto, com base nos princípios de ISO 11064 (projeto ergonômico de centros de controle) e NR-17 (itens 17.5 e 17.6)",intro:"Checklist próprio para salas e postos de monitoramento.",it:[
+  ["a1","Disposição de telas e painéis permite ver todas as informações críticas sem girar o tronco",CK],
+  ["a2","Altura e distância das telas adequadas (sem flexão do pescoço)",CK],
+  ["a3","Alarmes distinguíveis por prioridade e sem excesso",CK],
+  ["a4","Cadeira regulável, com apoio lombar",CK],
+  ["a5","Mesa com espaço para pernas e antebraços apoiados",CK],
+  ["a6","Iluminação sem reflexos nas telas, com regulagem",CK],
+  ["a7","Ruído e conforto térmico adequados à atenção contínua",CK],
+  ["a8","Pausas e rodízio previstos para vigilância prolongada",CK],
+  ["a9","Procedimentos de emergência acessíveis e treinados",CK],
+  ["a10","Passagem de turno estruturada (registro e conversa)",CK]]},
+ ck_ferr:{nome:"Checklist de ferramentas manuais",orig:"ErgoContexto, com base em critérios gerais de projeto de ferramentas manuais (NR-17 item 17.4 e literatura de ergonomia)",intro:"Checklist próprio para ferramentas manuais e elétricas portáteis.",it:[
+  ["f1","Cabo com diâmetro e formato compatíveis com a mão (ver pega e punho neutro)",CK],
+  ["f2","Peso adequado à frequência de uso e à postura",CK],
+  ["f3","Equilíbrio da ferramenta (sem tendência a girar no punho)",CK],
+  ["f4","Superfície do cabo antiderrapante, sem bordas ou arestas",CK],
+  ["f5","Gatilho acionável por mais de um dedo, sem uso contínuo de um só dedo",CK],
+  ["f6","Compatível com uso de luvas",CK],
+  ["f7","Vibração e impacto controlados, com medição em Medições",CK],
+  ["f8","Ferramenta apropriada ao serviço, sem improvisos",CK],
+  ["f9","Manutenção preventiva e afiação em dia",CK],
+  ["f10","Suporte, balanceador ou guia para reduzir peso e esforço estático",CK]]},
+ ck_pac:{nome:"Checklist de movimentação de pacientes",orig:"ErgoContexto, com base em princípios de ergonomia hospitalar e NR-32 (item 32.2.4.9, movimentação de pacientes)",intro:"Checklist próprio para transferência e mobilização de pessoas.",it:[
+  ["p1","Avaliação prévia da condição e da colaboração do paciente",CK],
+  ["p2","Recursos auxiliares disponíveis e em uso (elevador, lençol deslizante, prancha)",CK],
+  ["p3","Camas e macas com altura regulável",CK],
+  ["p4","Espaço livre para a manobra",CK],
+  ["p5","Equipe em número suficiente para a tarefa",CK],
+  ["p6","Treinamento específico recente",CK],
+  ["p7","Piso seco e rodas das camas e cadeiras com freio",CK],
+  ["p8","Procedimentos escritos para cada tipo de transferência",CK],
+  ["p9","Registro de queixas osteomusculares da equipe",CK]]},
+ ck_alt:{nome:"Checklist de trabalho em altura (aspectos ergonômicos)",orig:"ErgoContexto, com base na NR-35 (capacitação, análise de risco, permissão, ancoragem, EPI e resgate) e em critérios gerais de ergonomia",intro:"Checklist próprio. Não substitui a análise de risco e a permissão de trabalho exigidas pela NR-35.",it:[
+  ["h1","Trabalhadores capacitados e aptos (NR-35)",CK],
+  ["h2","Análise de risco e permissão de trabalho emitidas",CK],
+  ["h3","Pontos de ancoragem adequados e inspecionados",CK],
+  ["h4","Cinto tipo paraquedista e talabarte em bom estado, com ajuste ao corpo",CK],
+  ["h5","Plano de resgate conhecido e viável",CK],
+  ["h6","Plataforma ou apoio de trabalho estável, com espaço para os pés",CK],
+  ["h7","Ferramentas presas ou com cordão de segurança, de peso compatível",CK],
+  ["h8","Altura de trabalho evita braços acima dos ombros por longos períodos",CK],
+  ["h9","Tempo suspenso no cinto limitado, com pausas",CK],
+  ["h10","Condições climáticas e iluminação adequadas",CK]]}
+};
+const MD_NOMES=[["owas","OWAS (posturas e cargas)"],["rosa","ROSA (escritório)"],["ocra","OCRA (repetitividade)"],["qec","QEC (exposição rápida)"],["lest","LEST (condições de trabalho)"],["ewa","EWA (análise de posto)"],["sobane","SOBANE / Déparis (triagem)"],["corlett","Mapa corporal de Corlett"],["snook","Snook e Ciriello (empurrar e puxar)"],["ck_sala","Checklist: sala de controle"],["ck_ferr","Checklist: ferramentas manuais"],["ck_pac","Checklist: movimentação de pacientes"],["ck_alt","Checklist: trabalho em altura"]];
+const NIV_PCT=p=>p>=75?["Crítico","n3"]:p>=50?["Alto","n2"]:p>=25?["Moderado","n1"]:["Baixo","n0"];
+function mdCalc(def,v){
+  const itens=def.it,comp=itens.filter(i=>v[i[0]]!==undefined&&v[i[0]]!=="");
+  if(comp.length<itens.length)return null;
+  let soma=0,max=0,pior=[];
+  const det=itens.map(([k,rot,ops])=>{const mx=Math.max(...ops.map(o=>Number(o[0]))),val=Number(v[k]);soma+=val;max+=mx;
+    const lim=def.limiar?Math.ceil(mx*def.limiar):mx;if(mx>=2&&val>=lim)pior.push(rot);return {rot,val,mx,txt:(ops.find(o=>o[0]===String(v[k]))||[0,""])[1]}});
+  const pct=Math.round(soma/max*100);let niv=NIV_PCT(pct);
+  let elev=false;if(pior.length&&pct<50){niv=NIV_PCT(50);elev=true}
+  return {pct,niv,det,pior,soma,max,elev};
+}
+function snookCalc(v){
+  const f=parseFloat(String(v.forca).replace(",",".")),l=parseFloat(String(v.lim).replace(",","."));
+  if(!isFinite(f)||!isFinite(l)||l<=0||!v.fonte||!String(v.fonte).trim()||!v.tipo)return null;
+  const r=f/l,niv=r<=.8?["Baixo","n0"]:r<=1?["Moderado","n1"]:r<=1.25?["Alto","n2"]:["Crítico","n3"];return {f,l,r,niv};
+}
+const _desenharMetodo26=desenharMetodo;
+desenharMetodo=function(){
+  const def=MD[M.tipo];
+  if(!def&&M.tipo!=="snook")return _desenharMetodo26();
+  const el=$("#metodoModal");if(!el)return;
+  const aviso0=`<p class="mut" style="font-size:.84rem;border-left:3px solid #FF9900;padding-left:8px"><b>Modelo ErgoContexto.</b> ${def?`Inspirado em ${esc(def.orig)}.`:"Inspirado em Snook e Ciriello (1991)."} Não é o método original e o índice não equivale ao escore oficial.</p>`;
+  let corpo;
+  if(M.tipo==="snook"){
+    corpo=`<h2>Empurrar e puxar (modelo inspirado em Snook e Ciriello)</h2>${aviso0}
+    <p class="mut" style="font-size:.86rem">Meça a força com dinamômetro (kgf) e compare com o limite da tabela de Snook e Ciriello (1991) ou da ISO 11228-2 que você adotar, para o sexo, a distância, a altura das mãos e a frequência da tarefa. Informe o limite e a fonte da tabela: o ErgoContexto não reproduz a tabela.</p>
+    <div class="grid2"><label class="campo">Tipo de força<select data-mt="tipo"><option value="">Selecione…</option>${sel1([["Empurrar, força inicial","Empurrar, força inicial"],["Empurrar, força sustentada","Empurrar, força sustentada"],["Puxar, força inicial","Puxar, força inicial"],["Puxar, força sustentada","Puxar, força sustentada"]],M.v.tipo??"")}</select></label>${mi("forca","Força medida","","kgf")}${mi("lim","Limite de referência da tabela adotada","","kgf")}<label class="campo">Fonte do limite (tabela, ano, percentil)<input data-mt="fonte" value="${esc(M.v.fonte??"")}" placeholder="Ex.: Snook e Ciriello 1991, 75% das mulheres, 15 m, 1 vez por min"></label></div>`;
+  }else{
+    corpo=`<h2>${esc(def.nome)}</h2>${aviso0}<p class="mut" style="font-size:.86rem">${esc(def.intro)}</p>${def.it.map(([k,r,o])=>`<label class="campo">${esc(r)}<select data-mt="${k}"><option value="">Selecione…</option>${sel1(o,M.v[k]??"")}</select></label>`).join("")}`;
+  }
+  el.innerHTML=`<div class="modal-fundo" data-mt-fechar="1"></div><div class="modal-caixa" role="dialog" aria-modal="true"><button type="button" class="modal-x" data-mt-fechar="1" aria-label="Fechar">×</button>${corpo}<div id="metodoRes"></div></div>`;
+  atualizarMetodo();
+};
+const _resultadoMetodo26=resultadoMetodo;
+resultadoMetodo=function(){
+  if(M.tipo==="snook"){
+    const r=snookCalc(M.v);if(!r)return null;
+    return {nome:"Empurrar e puxar (modelo ErgoContexto inspirado em Snook e Ciriello)",versao:"Modelo ErgoContexto; limite de referência informado pelo avaliador: "+M.v.fonte.trim(),
+      resultado:`Força ${nf(r.f,1)} kgf para limite ${nf(r.l,1)} kgf: razão ${nf(r.r)} · ${r.niv[0]}`,
+      parametros:`${M.v.tipo}. Força medida ${nf(r.f,1)} kgf. Limite adotado ${nf(r.l,1)} kgf (${M.v.fonte.trim()}). Razão = medida ÷ limite. Faixas do modelo: até 0,80 baixo; até 1,00 moderado; até 1,25 alto; acima crítico.`,
+      limites:"Modelo próprio, não reproduz as tabelas de Snook e Ciriello. A validade depende de o limite informado corresponder à tarefa (sexo, distância, altura das mãos, frequência, tipo de força). Meça com dinamômetro calibrado e repita a medição.",
+      html:`<div class="res-aep"><div><small>Razão força ÷ limite</small><br><span class="bd ${r.niv[1]}" style="font-size:1rem">${nf(r.r)} · ${r.niv[0]}</span></div></div><p>${esc(M.v.tipo)}: medida ${nf(r.f,1)} kgf, limite ${nf(r.l,1)} kgf.</p>`};
+  }
+  const def=MD[M.tipo];if(!def)return _resultadoMetodo26();
+  const r=mdCalc(def,M.v);if(!r)return null;
+  const det=r.det.map(d=>`${d.rot}: ${d.txt} (${d.val}/${d.mx})`).join("; ");
+  const interp=r.pior.length?`Itens no nível mais exigente: ${r.pior.join(", ")}. Pela regra de prevalência, o resultado não fica abaixo de Alto.`:"Sem itens no nível mais exigente.";
+  return {nome:def.nome+" (modelo ErgoContexto)",versao:`Modelo ErgoContexto inspirado em ${def.orig}. Não é o método original.`,
+    resultado:`Índice ${r.pct}% · ${r.niv[0]}${r.elev?" (elevado pela regra de prevalência)":""}`,
+    parametros:`${det}.\nSoma ${r.soma} de ${r.max} pontos = ${r.pct}%. Faixas: abaixo de 25% baixo; até 50% moderado; até 75% alto; acima crítico. ${interp}`,
+    limites:`Modelo próprio, com os mesmos domínios do método citado e pontuação simplificada e transparente. O índice serve para priorizar e documentar, não equivale ao escore oficial de ${def.orig.split(",")[0]}. Para o escore oficial, aplique o método original e registre-o em Métodos aplicados. Julgamento profissional prevalece.`,
+    html:`<table class="tab"><tr><th>Item</th><th>Resposta</th><th>Pontos</th></tr>${r.det.map(d=>`<tr><td>${esc(d.rot)}</td><td>${esc(d.txt)}</td><td>${d.val}/${d.mx}</td></tr>`).join("")}</table><div class="res-aep"><div><small>Índice do modelo</small><br><span class="bd ${r.niv[1]}" style="font-size:1rem">${r.pct}% · ${r.niv[0]}</span></div></div><p>${esc(interp)}</p>`};
+};
+document.addEventListener("change",e=>{
+  const s=e.target.closest&&e.target.closest("[data-mt-mais]");if(!s||!s.value)return;
+  const v=s.value;s.value="";abrirMetodo(v);
+});
+const _htmlClasse26=htmlClasse;
+htmlClasse=function(c,dis){
+  let h=_htmlClasse26(c,dis);
+  h=h.replace('Calculadoras disponíveis: NIOSH e RULA. REBA, OCRA, Snook/Ciriello e ROSA ainda são registrados à mão.','Calculadoras oficiais: NIOSH (índice de levantamento), RULA, REBA, Strain Index e NASA-TLX. Os demais métodos do menu "Mais métodos" são modelos próprios do ErgoContexto, inspirados no método citado, e vêm rotulados como tal. O índice composto do NIOSH (CLI, várias tarefas) ainda não é calculado.');
+  if(dis)return h;
+  const sel=`<select class="btn sec peq" data-mt-mais="1" aria-label="Mais métodos"><option value="">Mais métodos…</option>${MD_NOMES.map(([k,n])=>`<option value="${k}">${n}</option>`).join("")}</select>`;
+  return h.replace(/(<button[^>]*data-mt-abrir="tlx">[^<]*<\/button>)/,`$1${sel}`);
 };
 /* =====================================================================
    INÍCIO
