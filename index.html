@@ -2234,8 +2234,8 @@ async function abrirEvidencia(i){
 }
 function htmlEvid(bloqueado){
   const d=G.ed.d,ev=d.evid||[];
-  return `<div class="evid">${ev.map((e,i)=>`<div class="evi">${e.mini?`<img src="${esc(e.mini)}" alt="">`:`<div class="pdf">PDF</div>`}<input data-g="evid.${i}.legenda" value="${esc(e.legenda||"")}" placeholder="Legenda (antes/depois, ponto marcado…)" ${bloqueado?"disabled":""}><small>${esc(e.nome)}${e.fila?" · aguardando envio (offline)":e.local?" · só neste aparelho":""}</small><span class="linha"><button type="button" class="btn sec peq" data-g-acao="evid-abrir" data-i="${i}">Abrir</button>${bloqueado?"":`<button type="button" class="btn sec peq" data-g-acao="evid-rm" data-i="${i}">Remover</button>`}</span></div>`).join("")||`<p class="mut">Nenhuma evidência anexada.</p>`}</div>
-  ${bloqueado?"":`<label class="btn sec peq" style="margin-top:8px">📷 Adicionar foto ou PDF<input type="file" id="evidIn" accept="image/*,application/pdf" capture="environment" hidden multiple></label><small class="mut"> Fotos são reduzidas antes do envio. Evite rostos identificáveis.</small>`}`;
+  return `<div class="evid">${ev.map((e,i)=>`<div class="evi">${e.mini?`<img src="${esc(e.mini)}" alt="">`:`<div class="pdf">${rotMidia(e)}</div>`}<input data-g="evid.${i}.legenda" value="${esc(e.legenda||"")}" placeholder="Legenda (antes/depois, ponto marcado…)" ${bloqueado?"disabled":""}><small>${esc(e.nome)}${e.fila?" · aguardando envio (offline)":e.local?" · só neste aparelho":""}</small><span class="linha"><button type="button" class="btn sec peq" data-g-acao="evid-abrir" data-i="${i}">Abrir</button>${bloqueado?"":`<button type="button" class="btn sec peq" data-g-acao="evid-rm" data-i="${i}">Remover</button>`}</span></div>`).join("")||`<p class="mut">Nenhuma evidência anexada.</p>`}</div>
+  ${bloqueado?"":`<label class="btn sec peq" style="margin-top:8px">📷 Adicionar foto ou PDF<input type="file" id="evidIn" accept="image/*,application/pdf,video/*,audio/*" capture="environment" hidden multiple></label><small class="mut"> Fotos são reduzidas antes do envio. Evite rostos identificáveis.</small>`}`;
 }
 
 /* =====================================================================
@@ -2295,6 +2295,7 @@ function htmlHistPosto(id){
   lista.filter(a=>a.ctx&&a.ctx.postoId===id).forEach(a=>{const i=indice(a.resultado);ev.push({t:a.ctx.data||"",k:"Triagem",n:a.id,x:(a.ctx.atividade||"")+(i?" · índice "+i.v:""),a:null})});
   regOf("aep").filter(r=>r.d.postoId===id).forEach(r=>ev.push({t:r.d.data||"",k:"AEP",n:r.d.numero||"(pendente)",x:"v"+(r.d.versao||1)+" · "+r.d.status,a:["abrir-reg",r.id]}));
   regOf("aet").filter(r=>r.d.postoId===id).forEach(r=>ev.push({t:r.d.data||"",k:"AET",n:r.d.numero||"(pendente)",x:"v"+(r.d.versao||1)+" · "+r.d.status,a:["abrir-reg",r.id]}));
+  regOf("cad").filter(r=>r.d.tc==="mudanca"&&mudPosto(r)===id).forEach(r=>ev.push({t:r.d.data||"",k:"Mudança",n:r.d.tipo||"",x:(r.d.nome||"")+(r.d.liberacao?" · liberação "+dataBR(r.d.liberacao):""),a:null}));
   ev.sort((a,b)=>b.t.localeCompare(a.t));
   return `<div class="card"><button class="btn sec peq" data-g-acao="hist-voltar">← Voltar</button><h3 style="margin-top:12px">Histórico do posto: ${esc(p.d.nome)}</h3><small>${esc(caminho(id))}${p.d.tag?" · TAG "+esc(p.d.tag):""}</small>${ev.map(e=>`<div class="sug"><span><b>${e.k}</b> ${esc(e.n)}<br><small>${dataBR(e.t)} · ${esc(e.x)}</small></span>${e.a?`<button class="btn sec peq" data-g-acao="${e.a[0]}" data-id="${e.a[1]}">Abrir</button>`:""}</div>`).join("")||`<p class="mut">Nenhum registro vinculado a este posto ainda.</p>`}</div>`;
 }
@@ -2540,7 +2541,7 @@ function htmlClasse(c,dis){
   <h4>Encaminhamentos</h4>${ENC.map(([k,r])=>`<label class="chk"><input type="checkbox" data-g="enc.${k}" ${d.enc[k]?"checked":""} ${dis}> ${r}</label>`).join("")}
   <h4>Métodos compatíveis com o que foi encontrado</h4>
   ${c.metodos.length?c.metodos.map(m=>`<div class="sug"><span><b>${esc(m.m)}</b><br><small>${esc(m.itens.slice(0,6).join(", "))}${m.itens.length>6?"…":""}</small></span></div>`).join(""):`<p class="mut">Avalie os fatores para receber sugestões.</p>`}
-  <h4>Métodos aplicados (registro)</h4><small class="mut">Guarde método, versão, parâmetros, resultado e limitações. Calculadoras de RULA, REBA, NIOSH, OCRA, Snook/Ciriello e ROSA chegam na próxima fase.</small>
+  <h4>Métodos aplicados (registro)</h4><small class="mut">Guarde método, versão, parâmetros, resultado e limitações. Há calculadoras de NIOSH, RULA, REBA, Strain Index e NASA-TLX nos botões abaixo. Para os demais métodos, registre aqui o método, a versão e o resultado, anexando a memória de cálculo.</small>
   ${(d.metodosAp||[]).map((m,i)=>`<div class="metodo"><div class="grid3"><input data-g="metodosAp.${i}.m" value="${esc(m.m||"")}" placeholder="Método" ${dis}><input data-g="metodosAp.${i}.v" value="${esc(m.v||"")}" placeholder="Versão" ${dis}><input data-g="metodosAp.${i}.r" value="${esc(m.r||"")}" placeholder="Resultado" ${dis}></div><textarea data-g="metodosAp.${i}.p" rows="2" placeholder="Parâmetros e memória de cálculo" ${dis}>${esc(m.p||"")}</textarea><textarea data-g="metodosAp.${i}.l" rows="2" placeholder="Interpretação e limitações" ${dis}>${esc(m.l||"")}</textarea></div>`).join("")}
   ${dis?"":`<button type="button" class="btn sec peq" data-g-acao="metodo-add">+ Método aplicado</button>`}
   ${T("provisoria","Medida provisória (obrigatória se a classificação for Crítica)",dis,2)}${T("conclusao","Conclusão e encaminhamento",dis,3)}`;
@@ -2607,7 +2608,7 @@ function htmlRelatorio(){
   <p class="mut" style="margin:4px 0 12px">Nº ${esc(d.numero||"(pendente de sincronização)")} · versão ${d.versao||1} · ${STATUS_REG[d.status]||d.status}${d.aprov?` · aprovada por ${esc(d.aprov.por)} em ${dataBR(d.aprov.em)}`:" · NÃO APROVADA"}</p>
   <table class="tab"><tr><th>Data</th><td>${dataBR(d.data)}</td><th>Avaliador(es)</th><td>${esc(d.avaliadores||"")}</td></tr><tr><th>Local</th><td colspan="3">${esc(loc||"—")}</td></tr><tr><th>Atividade</th><td>${esc(at||"—")}</td><th>Demanda</th><td>${esc(dem?dem.d.numero+" · "+dem.d.origem:"—")}</td></tr>${tipo==="aep"?`<tr><th>Expostos</th><td>${esc(d.nExpostos||"")}</td><th>Funções / GSTS</th><td>${esc(d.funcoes||"")}</td></tr>`:""}</table>
   ${corpo}
-  ${ev.length?`<h3>Evidências</h3><div class="evid-print">${ev.map(e=>`<figure><img src="${esc(e.mini)}"><figcaption>${esc(e.legenda||e.nome)}</figcaption></figure>`).join("")}</div>`:""}
+  ${ev.length?`<h3>Evidências</h3><div class="evid-print">${ev.map(e=>`<figure>${e.mini?`<img src="${esc(e.mini)}">`:`<div class="pdf">${rotMidia(e)}</div>`}<figcaption>${esc(e.legenda||e.nome)}</figcaption></figure>`).join("")}</div>`:""}
   <p class="mut" style="font-size:.78rem;margin-top:18px">Ferramenta de apoio. A classificação automática não substitui o julgamento do profissional responsável nem emite diagnóstico clínico. Revisão humana obrigatória.</p></div>`;
 }
 
@@ -2764,6 +2765,8 @@ function htmlAcaoEd(){
     <div class="grid2"><label class="campo">Confirmação com os trabalhadores<select data-g="ef.trabalhadores" ${dis}><option value=""></option>${sel1(["Confirmaram a melhoria","Confirmaram em parte","Não confirmaram"],d.ef.trabalhadores)}</select></label>
     <label class="campo">Risco residual<select data-g="ef.residual" ${dis}><option value=""></option>${sel1(["Adequado","Atenção","Alto","Crítico"],d.ef.residual)}</select></label></div>
     ${T("ef.efeitos","Efeitos indesejados observados",dis,2)}
+    <h4>Ganhos observados (opcional, para os indicadores de resultado)</h4>
+    <div class="grid2"><label class="campo">Tempo economizado (min por dia)<input inputmode="decimal" data-g="ef.tempoMin" value="${esc(d.ef.tempoMin||"")}" ${dis}></label><label class="campo">Redução de retrabalho (%)<input inputmode="decimal" data-g="ef.retrabalho" value="${esc(d.ef.retrabalho||"")}" ${dis}></label><label class="campo">Ganho de produtividade (%)<input inputmode="decimal" data-g="ef.produtividade" value="${esc(d.ef.produtividade||"")}" ${dis}></label><label class="campo">Redução de esforço percebido (%)<input inputmode="decimal" data-g="ef.esforco" value="${esc(d.ef.esforco||"")}" ${dis}></label><label class="campo">Custo realizado (R$)<input inputmode="decimal" data-g="ef.custoReal" value="${esc(d.ef.custoReal||"")}" ${dis}></label><label class="campo">Ganho estimado (R$ por ano)<input inputmode="decimal" data-g="ef.ganhoAno" value="${esc(d.ef.ganhoAno||"")}" ${dis}></label></div>
     <label class="campo">Decisão<select data-g="ef.decisao" ${dis}><option value=""></option>${sel1(["Encerrar como eficaz","Reabrir a ação","Complementar com nova ação"],d.ef.decisao)}</select></label>
     <p class="mut">Evidências: ${tem("antes")?"✔":"✘"} antes · ${tem("depois")?"✔":"✘"} depois · ${tem("conclusao")?"✔":"✘"} conclusão. Marque a fase de cada foto em <b>Evidências</b>.</p>`;
   };
@@ -2777,7 +2780,7 @@ function htmlAcaoEd(){
     <label class="campo">Tipo de ação (hierarquia de soluções)<select data-g="hier" data-re="1" ${dis}><option value="">Selecione…</option>${HIER.map((h,i)=>`<option value="${i}" ${String(d.hier)===String(i)?"selected":""}>${i+1}. ${h}</option>`).join("")}</select></label>
     <small class="mut">Prefira os primeiros níveis: eliminar a exigência e mudar o processo valem mais que orientar o trabalhador.</small>
     ${treino?`<div class="alerta">Treinamento isolado não resolve problema de projeto, layout, peso, altura, alcance ou organização. Justifique por que esta é a medida adequada.</div>${T("justTreino","Justificativa para usar treinamento como medida",dis,2)}`:""}
-    ${T("provisoria","Medida provisória (enquanto a definitiva não vem)",dis,2)}${T("definitiva","Medida definitiva",dis,2)}`,true);
+    ${T("provisoria","Medida provisória (enquanto a definitiva não vem)",dis,2)}<label class="campo">Prazo da medida provisória<input type="date" data-g="provPrazo" value="${esc(d.provPrazo||"")}" ${dis}></label>${T("definitiva","Medida definitiva",dis,2)}`,true);
   corpo+=bloco("3. Responsabilidades, custo e prazo",
     `<div class="grid2"><label class="campo">Prioridade<select data-g="prioridade" data-prazo2="1" ${dis}>${sel1(PRI_AC.map((p,i)=>[String(i),p]),d.prioridade)}</select></label>${I("prazo","Prazo",dis,"date")}
     ${I("responsavel","Responsável",dis)}${I("area","Área responsável",dis)}${I("dataPlan","Data planejada de execução",dis,"date")}${I("dataReal","Data realizada",dis,"date")}
@@ -5164,6 +5167,127 @@ document.addEventListener("click",e=>{
   else if(k==="solicitar"){location.href="mailto:"+c.contato+"?subject="+encodeURIComponent("Solicitação de titular de dados (LGPD, art. 18)")+"&body="+encodeURIComponent("Olá,\n\nSolicito (descreva o direito: acesso, correção, eliminação, portabilidade, informação ou revogação):\n\n\nNome:\nE-mail de contato:\n")}
   else if(k==="imprimir"){const w=window.open("");if(w){w.document.write(`<html><head><meta charset="utf-8"><title>Aviso de privacidade</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#000;font-size:12px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:4px;text-align:left}</style></head><body>${htmlPrivacidade().replace(/<div class="linha">.*?<\/div>/s,"")}<script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close()}}
 });
+/* =====================================================================
+   FASE 14: vídeo, áudio e croqui como evidência; histórico de mudanças com
+   alertas; prazo da medida provisória; ganhos e retorno do investimento;
+   contatos para aviso ao EHS e à liderança; relatório fotográfico; limites da IA.
+   ===================================================================== */
+function rotMidia(e){const t=e.tipo||"";return /^video\//.test(t)?"VÍDEO":/^audio\//.test(t)?"ÁUDIO":"PDF"}
+// ---------- vídeo e áudio ----------
+const _anexar23=anexarEvidencia;
+anexarEvidencia=async function(file,regId){
+  const t=file.type||"";
+  if(!/^(video|audio)\//.test(t))return _anexar23(file,regId);
+  if(file.size>25e6)throw new Error("Arquivo de mídia grande demais (máx. 25 MB). Use um vídeo curto.");
+  const ehAudio=/^audio\//.test(t);
+  if(ehAudio&&!confirm("Áudio só pode ser guardado com autorização da pessoa gravada. Confirma que há consentimento (veja o termo em Documentos)?"))throw new Error("Áudio não anexado.");
+  const ev={nome:file.name,tipo:t,mini:"",em:Date.now(),por:(autorAtual()||{}).nome||"",legenda:"",consentimento:ehAudio};
+  if(SB_ON&&sessao){
+    if(!navigator.onLine)throw new Error("Sem internet. Envie a evidência quando voltar a conexão.");
+    const tk=await tokenValido();if(!tk)throw new Error("Sessão expirada. Entre de novo.");
+    const pasta=(perfil&&perfil.equipe_id)||sessao.user.id,ext=(t.split("/")[1]||"bin").split(";")[0].replace(/[^a-z0-9]/gi,"").slice(0,5)||"bin";
+    const path=`${pasta}/${regId}/${Date.now()}-${Math.random().toString(36).slice(2,6)}.${ext}`;
+    const r=await fetch(`${SB_URL}/storage/v1/object/evidencias/${path}`,{method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+tk,"Content-Type":t},body:file});
+    if(!r.ok){let j={};try{j=await r.json()}catch(e){}throw new Error(j.message||j.error||"Falha no envio ("+r.status+")")}
+    ev.path=path;
+  }else{ev.local=true;aviso("Mídia guardada só neste aparelho: entre na conta para enviá-la ao servidor.")}
+  return ev;
+};
+// ---------- croqui ----------
+const _htmlEvid23=htmlEvid;
+htmlEvid=function(b){return _htmlEvid23(b)+(b?"":`<button type="button" class="btn sec peq" style="margin-top:6px" data-croqui="1">✏️ Novo croqui (desenho em branco)</button>`)};
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-croqui]");if(!b||!G.ed)return;
+  const c=document.createElement("canvas");c.width=1200;c.height=800;const x=c.getContext("2d");
+  x.fillStyle="#fff";x.fillRect(0,0,1200,800);x.strokeStyle="#e5e5e5";x.lineWidth=1;for(let i=0;i<=1200;i+=100){x.beginPath();x.moveTo(i,0);x.lineTo(i,800);x.stroke()}for(let j=0;j<=800;j+=100){x.beginPath();x.moveTo(0,j);x.lineTo(1200,j);x.stroke()}
+  const blob=await new Promise(r=>c.toBlob(r,"image/png"));
+  try{const f=new File([blob],"croqui-"+hojeISO()+".png",{type:"image/png"});const ev=await anexarEvidencia(f,G.ed.id);ev.legenda="Croqui";(G.ed.d.evid=G.ed.d.evid||[]).push(ev);if(G.ed.tipo!=="dem")gravarEd();reRender();aviso("Croqui criado. Abra a imagem para desenhar setas, círculos e textos.")}catch(err){aviso(err.message)}
+});
+// ---------- mudanças e alertas ----------
+CAD.mudanca={rot:"Mudanças (processo, posto, equipamento)",um:"mudança",pai:["posto","atividade"],campos:[["nome","Descrição da mudança *"],["tipo","Tipo",{op:["Processo","Posto ou layout","Equipamento ou ferramenta","Novo posto ou equipamento","Organização do trabalho"]}],["data","Data da mudança",{tipo:"date"}],["liberacao","Data de liberação para operação (se for posto novo)",{tipo:"date"}],["responsavel","Responsável pela mudança"]]};
+if(!CAD_ORD.includes("mudanca"))CAD_ORD.push("mudanca");
+function mudPosto(r){const p=r.d.pai&&regGet(r.d.pai);if(!p)return "";return p.d.tc==="posto"?p.id:(p.d.pai||"")}
+const aepAprovadas=pid=>regOf("aep").filter(a=>a.d.postoId===pid&&a.d.status==="aprovada"&&!aepVazia(a));
+const _calcAl23=calcAlertas;
+calcAlertas=function(){
+  const A=_calcAl23(),push=(sev,tipo,txt,ac)=>A.push({sev,tipo,txt,ac:ac||null}),hj=hojeISO();
+  regOf("cad").filter(r=>r.d.tc==="mudanca").forEach(r=>{
+    const d=r.d,pid=mudPosto(r),nome=pid?caminho(pid).split(" › ").slice(-1)[0]:"posto não vinculado",L=aepAprovadas(pid);
+    if(d.tipo==="Novo posto ou equipamento"){
+      const lib=d.liberacao||"",ok=L.some(a=>!lib||(a.d.data||"")<=lib);
+      if(!ok)push(lib&&lib<=hj?0:1,"Posto novo sem avaliação antes da liberação",`${nome}: "${d.nome||""}" ${lib?"liberado em "+dataBR(lib):"sem data de liberação"} e sem AEP aprovada anterior.`);
+    }else{
+      const ult=L.map(a=>a.d.data||"").sort().pop()||"";
+      if(!ult||ult<(d.data||""))push(1,d.tipo==="Equipamento ou ferramenta"?"Equipamento modificado após avaliação":"Mudança sem nova avaliação",`${nome}: "${d.nome||""}" (${dataBR(d.data)}) sem AEP aprovada posterior.`);
+    }
+  });
+  regOf("acao").forEach(r=>{const d=r.d;if((d.provisoria||"").trim()&&d.provPrazo&&!["eficaz","cancelada"].includes(d.status)){
+    const dias=Math.round((new Date(d.provPrazo+"T12:00:00")-new Date(hj+"T12:00:00"))/864e5);
+    if(dias<0)push(0,"Controle provisório vencido",`${d.numero||"Ação"}: o prazo da medida provisória venceu em ${dataBR(d.provPrazo)}.`,["ac-abrir",r.id]);
+    else if(dias<=15)push(1,"Controle provisório próximo do vencimento",`${d.numero||"Ação"}: medida provisória vence em ${dias} dia(s).`,["ac-abrir",r.id]);
+  }});
+  return A;
+};
+// ---------- indicadores de resultado e de liberação ----------
+const _renderDash23=renderDash;
+renderDash=function(){
+  _renderDash23();
+  const el=$("#v-dash");if(!el||el.querySelector("[data-ind14]"))return;
+  const N=x=>{const v=NG(x);return isFinite(v)?v:0};
+  const efz=regOf("acao").filter(a=>a.d.status==="eficaz"||(a.d.ef&&a.d.ef.decisao==="Encerrar como eficaz"));
+  const tempo=efz.reduce((s,a)=>s+N((a.d.ef||{}).tempoMin),0);
+  const med=k=>{const v=efz.map(a=>(a.d.ef||{})[k]).filter(x=>String(x||"").trim()!=="").map(N);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
+  const custo=efz.reduce((s,a)=>s+N((a.d.ef||{}).custoReal),0),ganho=efz.reduce((s,a)=>s+N((a.d.ef||{}).ganhoAno),0);
+  const roi=custo>0&&ganho>0?(ganho-custo)/custo:null;
+  const novos=regOf("cad").filter(r=>r.d.tc==="mudanca"&&r.d.tipo==="Novo posto ou equipamento");
+  const okN=novos.filter(r=>aepAprovadas(mudPosto(r)).some(a=>!r.d.liberacao||(a.d.data||"")<=r.d.liberacao)).length;
+  const kp=(n,r)=>`<div class="kpi"><b>${n}</b><small>${r}</small></div>`,fm=v=>v==null?"—":nf(v,0)+"%";
+  const d=document.createElement("div");d.className="card";d.dataset.ind14="1";
+  d.innerHTML=`<h3>Ganhos das melhorias e liberação de postos novos</h3><div class="kpis">${kp(tempo?nf(tempo,0)+" min/dia":"—","Tempo economizado (ações eficazes)")}${kp(fm(med("retrabalho")),"Redução média de retrabalho")}${kp(fm(med("produtividade")),"Ganho médio de produtividade")}${kp(fm(med("esforco")),"Redução média de esforço percebido")}${kp(roi==null?"—":nf(roi*100,0)+"%","Retorno do investimento ((ganho − custo) ÷ custo, anual)")}${kp(novos.length?okN+"/"+novos.length:"—","Postos novos avaliados antes da liberação")}</div><p class="mut" style="font-size:.82rem">Os ganhos vêm dos campos preenchidos na verificação de eficácia de cada ação. Sem preenchimento, o indicador fica em "—".</p>`;
+  el.appendChild(d);
+};
+// ---------- contatos de alerta e aviso crítico ----------
+CAD.alertas={rot:"Contatos para alertas (EHS e liderança)",um:"contato de alerta",pai:[],campos:[["nome","Nome ou função *"],["email","E-mail *"],["grupo","Grupo",{op:["EHS","Liderança","Saúde ocupacional","Engenharia"]}]]};
+if(!CAD_ORD.includes("alertas"))CAD_ORD.push("alertas");
+function avisarCriticosPorEmail(){
+  const to=regOf("cad").filter(r=>r.d.tc==="alertas"&&(r.d.email||"").includes("@")&&["EHS","Liderança"].includes(r.d.grupo)).map(r=>r.d.email);
+  if(!to.length){aviso("Cadastre os e-mails do EHS e da liderança em Cadastros › Contatos para alertas.");return}
+  const A=calcAlertas().filter(a=>a.sev===0);if(!A.length){aviso("Não há alertas críticos agora.");return}
+  const corpo="Alertas críticos do ErgoContexto ("+dataBR(hojeISO())+"):\n\n"+A.map(a=>"- "+a.tipo+": "+a.txt).join("\n");
+  location.href="mailto:"+to.join(",")+"?subject="+encodeURIComponent("ErgoContexto: alerta crítico")+"&body="+encodeURIComponent(corpo).slice(0,1800);
+  logAcesso("avisou críticos por e-mail",String(A.length)+" alerta(s)");
+}
+// ---------- relatório fotográfico ----------
+function relFoto(id){
+  const r=regGet(id);if(!r)return "<p>Escolha um registro.</p>";
+  const ev=(r.d.evid||[]);
+  return relCab("Relatório fotográfico",nomeReg(id)+(r.d.postoId?" · "+caminho(r.d.postoId):""))+(ev.length?`<div class="evid-print">${ev.map((e,i)=>`<figure>${e.mini?`<img src="${esc(e.mini)}" alt="">`:`<div class="pdf">${rotMidia(e)}</div>`}<figcaption><b>Foto ${i+1}${e.fase?" · "+esc(e.fase):""}</b><br>${esc(e.legenda||e.nome||"")}<br><small>${dataBR(new Date(e.em||Date.now()).toISOString().slice(0,10))}${e.por?" · "+esc(e.por):""}${(e.marcas||[]).length?" · com marcações":""}</small></figcaption></figure>`).join("")}</div>`:`<p class="mut">Este registro não tem evidências.</p>`);
+}
+const _renderRelat23=renderRelat;
+renderRelat=function(){
+  _renderRelat23();
+  const c=$("#v-relat .card:last-child .linha:last-of-type");
+  const ops=regOf("aep").concat(regOf("aet"),regOf("acao")).filter(r=>(r.d.evid||[]).length).map(r=>[r.id,nomeReg(r.id)]);
+  const sec=$("#v-relat");if(!sec)return;
+  sec.insertAdjacentHTML("beforeend",`<div class="card no-print"><h3>Fotos e avisos</h3><div class="linha"><select id="relFotoSel"><option value="">Relatório fotográfico de…</option>${sel1(ops,"")}</select><button class="btn sec" data-rel="foto">Gerar relatório fotográfico</button></div><div class="linha" style="margin-top:10px"><button class="btn sec" data-rel="critico">Avisar EHS e liderança (alertas críticos)</button></div></div>`);
+};
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-rel]");if(!b)return;
+  if(b.dataset.rel==="foto"){const id=$("#relFotoSel").value;if(!id){aviso("Escolha o registro.");return}mostrarRel(relFoto(id))}
+  else if(b.dataset.rel==="critico")avisarCriticosPorEmail();
+});
+// ---------- IA: limites e dados usados ----------
+const _htmlIA23=htmlIA;
+htmlIA=function(av){
+  const h=_htmlIA23(av);if(!h)return h;
+  return h+`<div class="ia-sec" style="margin-top:8px"><h4>Limites desta análise</h4><p style="font-size:.86rem">A IA é uma assistente. Ela não emite diagnóstico clínico, não declara aptidão, não conclui nexo causal, não classifica trabalhadores, não aprova ações e não substitui a AET. Toda sugestão precisa de revisão do avaliador. A análise se baseia somente nas respostas e observações desta avaliação (descritas acima). Não anexe imagens com rostos para a IA.</p></div>`;
+};
+// ---------- saúde coletiva na AET: sem dado clínico individual ----------
+const _regGravar23=regGravar;
+regGravar=function(r,agora){
+  if(r&&r.tipo==="aet"&&r.d&&r.d.sec&&RX_CLINICO.test(r.d.sec.saude||"")){aviso("A seção de saúde coletiva não aceita diagnóstico, CID, medicamento ou dado individual. Use apenas números e tendências do grupo.");return}
+  return _regGravar23(r,agora);
+};
 /* =====================================================================
    INÍCIO
    ===================================================================== */
