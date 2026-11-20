@@ -291,6 +291,10 @@ body.sem-acesso .topo,body.sem-acesso .wrap{display:none}
 .codigo{display:inline-block;font:800 1.3rem ui-monospace,monospace;letter-spacing:.2em;background:var(--soft);border:1px dashed var(--verde2);border-radius:10px;padding:4px 14px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
+/* ---- modal de métodos ---- */
+.modal-fundo{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60}
+.modal-caixa{position:fixed;z-index:61;left:50%;top:50%;transform:translate(-50%,-50%);width:min(680px,94vw);max-height:90vh;overflow:auto;background:var(--card);border-radius:18px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.modal-x{position:absolute;right:12px;top:8px;border:0;background:transparent;font-size:1.8rem;line-height:1;color:var(--mut);cursor:pointer}
 /* ---- gestão (fase 1) ---- */
 .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
 .kpis>div{flex:1 1 110px;background:var(--soft);border-radius:12px;padding:10px 12px;text-align:center}
@@ -2940,6 +2944,150 @@ gravarEd=function(){
   _gravarEd();
 };
 setTimeout(atualizarSinoAlertas,300);
+
+/* =====================================================================
+   FASE 3 (parte 1): CALCULADORAS DE MÉTODOS
+   NIOSH (equação revisada, tarefa única) e RULA.
+   Fórmulas e tabelas conferidas com as publicações originais:
+   Waters et al., 1993/1994 (NIOSH) e McAtamney e Corlett, 1993 (RULA).
+   O resultado vai para "Métodos aplicados" com parâmetros e memória de cálculo.
+   ===================================================================== */
+const FM_FREQ=[0.2,0.5,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+// colunas: ≤1h V<75, V≥75, ≤2h V<75, V≥75, ≤8h V<75, V≥75
+const FM_TAB={0.2:[1,1,.95,.95,.85,.85],0.5:[.97,.97,.92,.92,.81,.81],1:[.94,.94,.88,.88,.75,.75],2:[.91,.91,.84,.84,.65,.65],3:[.88,.88,.79,.79,.55,.55],4:[.84,.84,.72,.72,.45,.45],5:[.8,.8,.6,.6,.35,.35],6:[.75,.75,.5,.5,.27,.27],7:[.7,.7,.42,.42,.22,.22],8:[.6,.6,.35,.35,.18,.18],9:[.52,.52,.3,.3,0,.15],10:[.45,.45,.26,.26,0,.13],11:[.41,.41,0,.23,0,0],12:[.37,.37,0,.21,0,0],13:[0,.34,0,0,0,0],14:[0,.31,0,0,0,0],15:[0,.28,0,0,0,0]};
+const nf=(x,d=2)=>Number(x).toFixed(d).replace(".",",");
+function niosh(i){
+  const clamp=(v,a,b)=>Math.min(Math.max(v,a),b);
+  const D=Math.abs(i.v2-i.v1),dur={1:0,2:2,8:4}[i.dur]??0;
+  const ponto=(H,V,A)=>{
+    const m={};
+    m.HM=H>63?0:25/Math.max(H,25);
+    m.VM=V>175||V<0?0:1-0.003*Math.abs(V-75);
+    m.DM=D>175?0:0.82+4.5/Math.max(D,25);
+    m.AM=A>135?0:1-0.0032*A;
+    const f=FM_TAB[i.freq]||FM_TAB[0.2];m.FM=f[dur+(V>=75?1:0)];
+    m.CM={boa:1,regular:V<75?0.95:1,ruim:0.9}[i.pega];
+    const rwl=23*m.HM*m.VM*m.DM*m.AM*m.FM*m.CM;
+    return {...m,RWL:rwl,LI:rwl>0?i.peso/rwl:Infinity};
+  };
+  const o=ponto(i.h1,i.v1,i.a1),d=ponto(i.h2,i.v2,i.a2),pior=o.LI>=d.LI?"origem":"destino",LI=Math.max(o.LI,d.LI);
+  return {o,d,pior,LI,D};
+}
+const interpNiosh=li=>!isFinite(li)||li>3?"Risco elevado para a maioria dos trabalhadores (LI > 3)":li>1?"Risco aumentado para parte dos trabalhadores (1 < LI ≤ 3)":"Aceitável para a maioria dos trabalhadores (LI ≤ 1)";
+// RULA
+const RULA_A=[[1,2,2,2,2,3,3,3],[2,2,2,2,3,3,3,3],[2,3,3,3,3,3,4,4],[2,3,3,3,3,4,4,4],[3,3,3,3,3,4,4,4],[3,4,4,4,4,4,5,5],[3,3,4,4,4,4,5,5],[3,4,4,4,4,4,5,5],[4,4,4,4,4,5,5,5],[4,4,4,4,4,5,5,5],[4,4,4,4,4,5,5,5],[4,4,4,5,5,5,6,6],[5,5,5,5,5,6,6,7],[5,6,6,6,6,7,7,7],[6,6,6,7,7,7,7,8],[7,7,7,7,7,8,8,9],[8,8,8,8,8,9,9,9],[9,9,9,9,9,9,9,9]];
+const RULA_B=[[1,3,2,3,3,4,5,5,6,6,7,7],[2,3,2,3,4,5,5,5,6,7,7,7],[3,3,3,4,4,5,5,6,6,7,7,7],[5,5,5,6,6,7,7,7,7,7,8,8],[7,7,7,7,7,8,8,8,8,8,8,8],[8,8,8,8,8,8,8,9,9,9,9,9]];
+const RULA_C=[[1,2,3,3,4,5,5],[2,2,3,4,4,5,5],[3,3,3,4,4,5,6],[3,3,3,4,5,6,6],[4,4,4,5,6,7,7],[4,4,5,6,6,7,7],[5,5,6,6,7,7,7],[5,5,6,7,7,7,7]];
+const RULA_CAMPOS=[
+ ["ub","Braço (ombro)",[["1","Entre 20° de extensão e 20° de flexão (1)"],["2","Extensão > 20° ou flexão 20°–45° (2)"],["3","Flexão 45°–90° (3)"],["4","Flexão > 90° (4)"]]],
+ ["ubOmbro","Ombro elevado?",[["0","Não"],["1","Sim (+1)"]]],
+ ["ubAbd","Braço abduzido?",[["0","Não"],["1","Sim (+1)"]]],
+ ["ubApoio","Braço apoiado ou pessoa inclinada?",[["0","Não"],["1","Sim (−1)"]]],
+ ["lb","Antebraço",[["1","Flexão 60°–100° (1)"],["2","Flexão < 60° ou > 100° (2)"]]],
+ ["lbLado","Antebraço cruza a linha média ou trabalha para o lado?",[["0","Não"],["1","Sim (+1)"]]],
+ ["wr","Punho",[["1","Posição neutra (1)"],["2","Flexão/extensão 0°–15° (2)"],["3","Flexão/extensão > 15° (3)"]]],
+ ["wrDesv","Desvio radial ou ulnar do punho?",[["0","Não"],["1","Sim (+1)"]]],
+ ["tw","Torção do punho",[["1","Posição média (1)"],["2","Perto do fim da amplitude (2)"]]],
+ ["musA","Uso muscular, braço e punho: postura estática (> 1 min) ou repetida 4 vezes/min ou mais?",[["0","Não"],["1","Sim (+1)"]]],
+ ["forA","Carga ou força, braço e punho",[["0","Menos de 2 kg, intermitente (0)"],["1","2 a 10 kg, intermitente (1)"],["2","2 a 10 kg, estática ou repetida (2)"],["3","Mais de 10 kg, ou repetida, ou com choques (3)"]]],
+ ["nk","Pescoço",[["1","Flexão 0°–10° (1)"],["2","Flexão 10°–20° (2)"],["3","Flexão > 20° (3)"],["4","Em extensão (4)"]]],
+ ["nkTorc","Pescoço torcido?",[["0","Não"],["1","Sim (+1)"]]],
+ ["nkLado","Pescoço inclinado de lado?",[["0","Não"],["1","Sim (+1)"]]],
+ ["tr","Tronco",[["1","Sentado, bem apoiado, ângulo tronco–quadril > 90° (1)"],["2","Flexão 0°–20° (2)"],["3","Flexão 20°–60° (3)"],["4","Flexão > 60° (4)"]]],
+ ["trTorc","Tronco torcido?",[["0","Não"],["1","Sim (+1)"]]],
+ ["trLado","Tronco inclinado de lado?",[["0","Não"],["1","Sim (+1)"]]],
+ ["lg","Pernas e pés",[["1","Apoiados e equilibrados (1)"],["2","Sem apoio ou desequilibrados (2)"]]],
+ ["musB","Uso muscular, pescoço, tronco e pernas: postura estática (> 1 min) ou repetida 4 vezes/min ou mais?",[["0","Não"],["1","Sim (+1)"]]],
+ ["forB","Carga ou força, pescoço, tronco e pernas",[["0","Menos de 2 kg, intermitente (0)"],["1","2 a 10 kg, intermitente (1)"],["2","2 a 10 kg, estática ou repetida (2)"],["3","Mais de 10 kg, ou repetida, ou com choques (3)"]]]
+];
+function rula(r){
+  const n=k=>Number(r[k]||0);
+  const ub=Math.min(6,Math.max(1,n("ub")+n("ubOmbro")+n("ubAbd")-n("ubApoio")));
+  const lb=Math.min(3,n("lb")+n("lbLado")),wr=Math.min(4,n("wr")+n("wrDesv")),tw=n("tw");
+  const A=RULA_A[(ub-1)*3+(lb-1)][(wr-1)*2+(tw-1)];
+  const nk=Math.min(6,n("nk")+n("nkTorc")+n("nkLado")),tr=Math.min(6,n("tr")+n("trTorc")+n("trLado")),lg=n("lg");
+  const B=RULA_B[nk-1][(tr-1)*2+(lg-1)];
+  const C=Math.min(8,A+n("musA")+n("forA")),D=Math.min(7,B+n("musB")+n("forB"));
+  const g=RULA_C[C-1][D-1];
+  return {ub,lb,wr,tw,A,nk,tr,lg,B,C,D,g};
+}
+const interpRula=g=>g<=2?"Postura aceitável se não for mantida ou repetida por longos períodos":g<=4?"Investigar mais; mudanças podem ser necessárias":g<=6?"Investigar e mudar em breve":"Investigar e mudar imediatamente";
+const RULA_OK=r=>RULA_CAMPOS.every(([k,,o])=>r[k]!==undefined&&r[k]!=="");
+
+/* ---------- modal ---------- */
+const M={tipo:null,v:{}};
+function abrirMetodo(tipo){
+  M.tipo=tipo;M.v=tipo==="niosh"?{peso:"",h1:"",v1:"",a1:"0",h2:"",v2:"",a2:"0",freq:"0.2",dur:"1",pega:"boa"}:{};
+  let el=$("#metodoModal");if(!el){el=document.createElement("div");el.id="metodoModal";document.body.appendChild(el)}
+  desenharMetodo();
+}
+function fecharMetodo(){const el=$("#metodoModal");if(el)el.remove();M.tipo=null}
+const mi=(k,rot,ph,un)=>`<label class="campo">${rot}${un?` <small>(${un})</small>`:""}<input data-mt="${k}" inputmode="decimal" value="${esc(M.v[k]??"")}" ${ph?`placeholder="${ph}"`:""}></label>`;
+function desenharMetodo(){
+  const el=$("#metodoModal");if(!el)return;
+  let corpo="";
+  if(M.tipo==="niosh"){
+    corpo=`<h2>Equação NIOSH revisada</h2><p class="mut" style="font-size:.86rem">Levantamento manual de carga, tarefa única, duas mãos, até 8 h, em pé. Informe as medidas na <b>origem</b> (onde a carga é pega) e no <b>destino</b> (onde é colocada). Distâncias em cm.</p>
+    <div class="grid2">${mi("peso","Peso da carga","","kg")}
+    <label class="campo">Frequência de levantamento (por min)<select data-mt="freq">${FM_FREQ.map(f=>`<option value="${f}" ${String(M.v.freq)===String(f)?"selected":""}>${String(f).replace(".",",")}${f===0.2?" (menos de 1 a cada 5 min)":""}</option>`).join("")}</select></label>
+    <label class="campo">Duração do trabalho com levantamentos<select data-mt="dur">${sel1([["1","Até 1 hora"],["2","Mais de 1 e até 2 horas"],["8","Mais de 2 e até 8 horas"]],M.v.dur)}</select></label>
+    <label class="campo">Pega da carga (acoplamento)<select data-mt="pega">${sel1([["boa","Boa (alças ou recortes, fácil de segurar)"],["regular","Regular"],["ruim","Ruim (sem alça, difícil de segurar)"]],M.v.pega)}</select></label></div>
+    <h4>Origem</h4><div class="grid3">${mi("h1","Distância horizontal H","","cm")}${mi("v1","Altura das mãos V","","cm")}${mi("a1","Assimetria A","","graus")}</div>
+    <h4>Destino</h4><div class="grid3">${mi("h2","Distância horizontal H","","cm")}${mi("v2","Altura das mãos V","","cm")}${mi("a2","Assimetria A","","graus")}</div>`;
+  }else{
+    corpo=`<h2>RULA</h2><p class="mut" style="font-size:.86rem">Postura de membros superiores e do corpo, em atividades predominantemente sentadas ou manuais. Escolha a faixa observada em cada item, avaliando o lado mais exigido.</p>
+    ${RULA_CAMPOS.map(([k,r,o])=>`<label class="campo">${r}<select data-mt="${k}"><option value="">Selecione…</option>${sel1(o,M.v[k]??"")}</select></label>`).join("")}`;
+  }
+  el.innerHTML=`<div class="modal-fundo" data-mt-fechar="1"></div><div class="modal-caixa" role="dialog" aria-modal="true"><button type="button" class="modal-x" data-mt-fechar="1" aria-label="Fechar">×</button>${corpo}<div id="metodoRes"></div></div>`;
+  atualizarMetodo();
+}
+function numM(k){const x=parseFloat(String(M.v[k]).replace(",","."));return isFinite(x)?x:NaN}
+function resultadoMetodo(){
+  if(M.tipo==="niosh"){
+    const i={peso:numM("peso"),h1:numM("h1"),v1:numM("v1"),a1:numM("a1"),h2:numM("h2"),v2:numM("v2"),a2:numM("a2"),freq:Number(M.v.freq),dur:M.v.dur,pega:M.v.pega};
+    if([i.peso,i.h1,i.v1,i.a1,i.h2,i.v2,i.a2].some(isNaN)||i.peso<=0)return null;
+    const r=niosh(i);
+    const lin=(t,p)=>`${t}: HM ${nf(p.HM)} · VM ${nf(p.VM)} · DM ${nf(p.DM)} · AM ${nf(p.AM)} · FM ${nf(p.FM)} · CM ${nf(p.CM)} → RWL ${nf(p.RWL,1)} kg · LI ${isFinite(p.LI)?nf(p.LI):"∞ (multiplicador zero)"}`;
+    const li=isFinite(r.LI)?nf(r.LI):"> 3 (multiplicador zero)";
+    return {
+      nome:"Equação NIOSH revisada",versao:"Waters, Putz-Anderson, Garg e Fine, 1993; Manual de Aplicações, 1994",
+      resultado:`LI = ${li} (${r.pior}) · ${interpNiosh(r.LI)}`,
+      parametros:`Peso ${nf(i.peso,1)} kg · frequência ${String(i.freq).replace(".",",")}/min · duração até ${i.dur} h · pega ${i.pega}. Origem: H ${i.h1}, V ${i.v1}, A ${i.a1}°. Destino: H ${i.h2}, V ${i.v2}, A ${i.a2}°. D = ${nf(r.D,0)} cm. Constante de carga 23 kg. RWL = 23 × HM × VM × DM × AM × FM × CM.\n${lin("Origem",r.o)}\n${lin("Destino",r.d)}`,
+      limites:"Válido para tarefa única, duas mãos, em pé, até 8 h, com boa fricção entre piso e calçado, ambiente de 19 a 26 °C e sem carregar, empurrar ou puxar. Não cobre carga instável, levantamento com uma mão, sentado ou ajoelhado. Para várias tarefas é preciso o índice composto (CLI), ainda não calculado aqui. Interpretar com julgamento profissional.",
+      html:`<table class="tab"><tr><th></th><th>HM</th><th>VM</th><th>DM</th><th>AM</th><th>FM</th><th>CM</th><th>RWL (kg)</th><th>LI</th></tr>${[["Origem",r.o],["Destino",r.d]].map(([t,p])=>`<tr><td><b>${t}</b></td>${["HM","VM","DM","AM","FM","CM"].map(k=>`<td>${nf(p[k])}</td>`).join("")}<td>${nf(p.RWL,1)}</td><td><b>${isFinite(p.LI)?nf(p.LI):"∞"}</b></td></tr>`).join("")}</table><div class="res-aep"><div><small>LI (pior ponto: ${r.pior})</small><br><span class="bd ${r.LI>3||!isFinite(r.LI)?"n3":r.LI>1?"n2":"n0"}" style="font-size:1rem">${li}</span></div></div><p>${interpNiosh(r.LI)}</p>`
+    };
+  }
+  if(!RULA_OK(M.v))return null;
+  const r=rula(M.v),campos=RULA_CAMPOS.map(([k,rot,o])=>rot.split(":")[0]+": "+((o.find(x=>x[0]===String(M.v[k]))||[0,""])[1])).join("; ");
+  return {
+    nome:"RULA",versao:"McAtamney e Corlett, 1993 (Applied Ergonomics 24(2): 91-99)",
+    resultado:`Pontuação final ${r.g} · ${interpRula(r.g)}`,
+    parametros:`${campos}.\nBraço ${r.ub} · antebraço ${r.lb} · punho ${r.wr} · torção ${r.tw} → pontuação A ${r.A}. Pescoço ${r.nk} · tronco ${r.tr} · pernas ${r.lg} → pontuação B ${r.B}. Com músculo e força: C ${r.C} (braço e punho) · D ${r.D} (pescoço, tronco e pernas) → final ${r.g}.`,
+    limites:"Método rápido de triagem postural de membros superiores. Avalia um instante ou posição representativa, não a duração total da jornada, e não mede vibração, frio ou fatores psicossociais. Pontuação alta indica prioridade de investigação, não diagnóstico.",
+    html:`<table class="tab"><tr><th>Braço</th><th>Antebraço</th><th>Punho</th><th>Torção</th><th>A</th><th>Pescoço</th><th>Tronco</th><th>Pernas</th><th>B</th><th>C</th><th>D</th></tr><tr><td>${r.ub}</td><td>${r.lb}</td><td>${r.wr}</td><td>${r.tw}</td><td><b>${r.A}</b></td><td>${r.nk}</td><td>${r.tr}</td><td>${r.lg}</td><td><b>${r.B}</b></td><td>${r.C}</td><td>${r.D}</td></tr></table><div class="res-aep"><div><small>Pontuação final</small><br><span class="bd ${r.g>=7?"n3":r.g>=5?"n2":r.g>=3?"n1":"n0"}" style="font-size:1rem">${r.g} de 7</span></div></div><p>${interpRula(r.g)}</p>`
+  };
+}
+function atualizarMetodo(){
+  const box=$("#metodoRes");if(!box)return;
+  const r=resultadoMetodo();M.res=r;
+  box.innerHTML=r?`<div class="card" style="margin-top:12px;background:var(--soft);box-shadow:none">${r.html}<p class="mut" style="font-size:.8rem">${esc(r.limites)}</p><div class="linha"><button type="button" class="btn verde" data-mt-salvar="1" ${G.ed&&(G.ed.tipo==="aep"||G.ed.tipo==="aet")?"":"disabled"}>Salvar em Métodos aplicados</button><button type="button" class="btn sec" data-mt-fechar="1">Fechar</button></div></div>`:`<p class="mut" style="margin-top:12px">Preencha todos os campos para ver o resultado.</p>`;
+}
+document.addEventListener("input",e=>{const t=e.target;if(t.dataset&&t.dataset.mt!==undefined&&M.tipo){M.v[t.dataset.mt]=t.value;if(t.tagName!=="INPUT")return;atualizarMetodo()}});
+document.addEventListener("change",e=>{const t=e.target;if(t.dataset&&t.dataset.mt!==undefined&&M.tipo){M.v[t.dataset.mt]=t.value;if(t.tagName==="INPUT")return;atualizarMetodo()}});
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-mt-abrir]");if(b){abrirMetodo(b.dataset.mtAbrir);return}
+  if(e.target.closest("[data-mt-fechar]")){fecharMetodo();return}
+  if(e.target.closest("[data-mt-salvar]")){
+    const r=M.res;if(!r||!G.ed)return;
+    (G.ed.d.metodosAp=G.ed.d.metodosAp||[]).push({m:r.nome,v:r.versao,r:r.resultado,p:r.parametros,l:r.limites});
+    gravarEd();fecharMetodo();reRender();aviso("Resultado salvo em Métodos aplicados.");
+  }
+});
+// botões dentro do bloco de métodos da AEP
+const _htmlClasse9=htmlClasse;
+htmlClasse=function(c,dis){
+  return _htmlClasse9(c,dis).replace('<h4>Métodos aplicados (registro)</h4>','<h4>Métodos aplicados (registro)</h4>'+(dis?"":'<div class="linha" style="margin:6px 0"><button type="button" class="btn sec peq" data-mt-abrir="niosh">Calcular NIOSH</button><button type="button" class="btn sec peq" data-mt-abrir="rula">Calcular RULA</button></div>')).replace('Calculadoras de RULA, REBA, NIOSH, OCRA, Snook/Ciriello e ROSA chegam na próxima fase.','Calculadoras disponíveis: NIOSH e RULA. REBA, OCRA, Snook/Ciriello e ROSA ainda são registrados à mão.');
+};
 /* =====================================================================
    INÍCIO
    ===================================================================== */
