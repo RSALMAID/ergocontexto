@@ -1152,7 +1152,7 @@ function htmlDominio(d){
     return `<fieldset class="item" style="min-width:0"><legend class="sr" style="position:absolute;left:-9999px">${esc(q.t)}</legend>
       <h4><span class="num">${i+1}</span>${esc(q.t)}${r.ia?' <span class="iatag">sugerido pela IA · validado</span>':""}</h4>
       <p class="dica">${esc(q.d)}</p>
-      <div class="item-grid${comFig?" has-fig":""}">${comFig?htmlFig(q.id):""}
+      <div class="item-grid${(comFig||(typeof TRI_FIG!=="undefined"&&TRI_FIG[q.id]))?" has-fig":""}">${(comFig||(typeof TRI_FIG!=="undefined"&&TRI_FIG[q.id]))?htmlFig(q.id):""}
         <div><div class="opts">${op}${na}</div>
           <div class="ev"><span>Fonte:</span>${ev}</div>
           <details class="nota" ${r.obs?"open":""}><summary>＋ Observação</summary><textarea data-obs="${q.id}" placeholder="O que você viu ou ouviu">${esc(r.obs||"")}</textarea></details>
@@ -9182,7 +9182,8 @@ renderInicio=function(){
    e (2) anexo da folha preenchida (foto ou PDF) para a IA transcrever. A IA só lê marcações e texto; o avaliador revisa e aplica. */
 const CP_NIV=["Adequado","Atenção","Alto","Crítico"];
 const CP_EVID=["Hipótese","Relatado","Observado","Medido"];
-const TRI_FIG={f1:"tronco",f2:"bracos",f3:"punhos",f4:"pernas",f5:"repet",f6:"ferramenta",f7:"levanta",f8:"estatica",a1:"luz",a4:"vcorpo",a5:"espaco"};
+const TRI_FIG={f1:["tronco","torcao","pescoco"],f2:["bracos","ombros","acima","alcance"],f3:["punhos"],f4:["pernas","agacha","sentada"],f5:["repet"],f6:["ferramenta","empurra","pedal","comando"],f7:["levanta","pessoas"],f8:["estatica","duracao"],a1:["luz","monitor"],a4:["vcorpo"],a5:["espaco","acesso","bancada","antropo"]};
+const CP_CENA={tronco:"Tronco",torcao:"Torções",pescoco:"Pescoço",bracos:"Elevação dos braços",ombros:"Posição dos ombros",acima:"Acima da linha dos ombros",alcance:"Alcance horizontal e vertical",punhos:"Cotovelos e punhos",pernas:"Membros inferiores",agacha:"Agachado ou ajoelhado",sentada:"Permanência sentada",repet:"Repetitividade",ferramenta:"Ferramentas e pega",empurra:"Empurrar e puxar",pedal:"Pedais",comando:"Dispositivos de comando",levanta:"Levantamento de carga",pessoas:"Movimentação de pessoas",estatica:"Postura estática",duracao:"Duração da exposição",luz:"Iluminação e ofuscamento",monitor:"Monitores",vcorpo:"Vibração de corpo inteiro",espaco:"Espaço e circulação",acesso:"Acesso para operação",bancada:"Bancada e altura de trabalho",antropo:"Adequação antropométrica"};
 const CP_COD={triagem:"ERGO-TRI-1",aep:"ERGO-AEP-1",aet:"ERGO-AET-1",ishikawa:"ERGO-DET-1",arvore:"ERGO-ARV-1",bowtie:"ERGO-BOW-1",fram:"ERGO-FRAM-1",hfacs:"ERGO-HFACS-1"};
 
 /* ---------- figuras (cenas 3D desenhadas de lado, em imagem) ---------- */
@@ -9208,7 +9209,7 @@ function cpSpecTriagem(){
   return {tipo:"triagem",titulo:"Triagem rápida de risco ergonômico",
     cab:[cpTx("ctx.unidade","Unidade"),cpTx("ctx.area","Área"),cpTx("ctx.local","Posto ou local"),cpTx("ctx.atividade","Atividade"),cpTx("ctx.funcao","Função"),
       {id:"ctx.gravidade",rot:"Gravidade potencial",tipo:"opcao",opcoes:GRAVIDADES},{id:"ctx.exposicao",rot:"Exposição diária",tipo:"opcao",opcoes:EXPOSICOES}],
-    secoes:DOMINIOS.map(d=>({t:d.nome,dica:d.pergunta,itens:d.itens.map(q=>({id:q.id,rot:(++n)+". "+q.t,tipo:"nivel",desc:q.c,fig:TRI_FIG[q.id]||""}))})),
+    secoes:DOMINIOS.map(d=>({t:d.nome,dica:d.pergunta,itens:d.itens.map(q=>({id:q.id,rot:(++n)+". "+q.t,tipo:"nivel",desc:q.c,fig:TRI_FIG[q.id]||null}))})),
     fim:[cpTx("ctx.obs","Observações",3)]};
 }
 function cpSpecAEP(){
@@ -9263,6 +9264,11 @@ function cpCampoHtml(c){
   const rl=n=>Array.from({length:n},()=>'<div class="rl"></div>').join("");
   if(c.tipo==="nivel"){
     const cab=`<div class="tt">${esc(c.rot)}${c.m?` <small>(${esc(c.m)})</small>`:""}</div>`;
+    if(Array.isArray(c.fig)){
+      const cel=(f)=>[0,1,2,3].map(n=>{const im=cpFig(f,n),cap=(cenaPara(f,n)||{}).cap||"";return `<div class="fg">${im?`<img src="${im}" alt="">`:""}<div class="fc"><b>${n}</b> ${CP_NIV[n]}</div><small>${esc(cap)}</small></div>`}).join("");
+      const ops=[0,1,2,3].map(n=>`<div class="o">${cpBx()}<b>${n}</b> ${CP_NIV[n]}${c.desc?`<small>${esc(c.desc[n]||"")}</small>`:""}</div>`).join("");
+      return `<div class="it">${cab}${c.fig.map(f=>`<div class="sc">${esc(CP_CENA[f]||f)} <small>(referência)</small></div><div class="figs">${cel(f)}</div>`).join("")}<div class="sc">Marque o nível observado</div><div class="ops d">${ops}${c.na?`<div class="o">${cpBx()} NA</div>`:""}</div></div>`;
+    }
     if(c.fig){
       const cel=[0,1,2,3].map(n=>{const im=cpFig(c.fig,n),cap=c.desc?(c.desc[n]||""):((cenaPara(c.fig,n)||{}).cap||"");return `<div class="fg">${im?`<img src="${im}" alt="">`:""}<div class="fc">${cpBx()}<b>${n}</b> ${CP_NIV[n]}</div><small>${esc(cap)}</small></div>`}).join("");
       return `<div class="it">${cab}<div class="figs">${cel}</div>${c.na?`<div class="na">${cpBx()} NA (não se aplica)</div>`:""}</div>`;
@@ -9294,7 +9300,7 @@ h1{font-size:15pt;margin:0 0 2px}.sub0{color:#333;font-size:8.5pt}.id{display:fl
 .sec{background:#222;color:#fff;padding:3px 8px;font-weight:700;margin:9px 0 3px;break-after:avoid}.dica{font-size:8pt;color:#333;margin:0 0 3px;break-after:avoid}.cat{font-weight:700;font-size:9pt;margin:5px 0 1px;border-bottom:1px solid #999;break-after:avoid}.cat small{font-weight:400;color:#444}
 .it,.it0{border:1px solid #888;border-radius:3px;padding:3px 6px;margin:0 0 3px;break-inside:avoid}.it0{border:0;padding:0}.tt{font-weight:700;margin-bottom:2px}.tt small{font-weight:400;color:#444}
 .figs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}.fg img{width:100%;display:block;border:1px solid #bbb}.fc{margin-top:1px;font-size:8.5pt}.fg small{display:block;font-size:7pt;color:#333;line-height:1.1}
-.na{margin-top:2px;font-size:8.5pt}.ops{display:grid;gap:3px 8px}.ops.c{grid-template-columns:repeat(auto-fit,minmax(70px,1fr))}.ops.d{grid-template-columns:repeat(4,1fr)}.o{font-size:8.5pt}.o small{display:block;font-size:7.2pt;color:#333;line-height:1.12;margin-top:1px}
+.sc{font-weight:700;font-size:8.5pt;margin:3px 0 1px}.sc small{font-weight:400;color:#444}.na{margin-top:2px;font-size:8.5pt}.ops{display:grid;gap:3px 8px}.ops.c{grid-template-columns:repeat(auto-fit,minmax(70px,1fr))}.ops.d{grid-template-columns:repeat(4,1fr)}.o{font-size:8.5pt}.o small{display:block;font-size:7.2pt;color:#333;line-height:1.12;margin-top:1px}
 .rl{border-bottom:1px solid #777;height:6.2mm}.ln{display:flex;align-items:flex-end;gap:5px;margin:0 0 2px;min-height:7mm;break-inside:avoid}.ln>b{width:11mm;font-size:8.5pt;flex:none}.ln.sub{margin-left:9mm}.rl2{flex:1 1 auto;border-bottom:1px solid #777;height:5.4mm;min-width:30mm}.ln0{display:inline-block;width:18mm;border-bottom:1px solid #000}
 .ex{display:inline-flex;align-items:center;gap:2px;flex:none;font-size:7.5pt;padding-bottom:1px}.ex small{font-size:7.3pt;margin-right:3mm}.blk .asp{display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px 8px;margin-top:2px}.blk .asp small{font-size:7.3pt}
 .pe{margin-top:8px;font-size:7.5pt;color:#444;border-top:1px solid #aaa;padding-top:3px}
@@ -9509,7 +9515,7 @@ function cpBarra(tipo,titulo,extra){
 }
 (function(){
   if(!document.getElementById("cpFile")){const i=document.createElement("input");i.type="file";i.id="cpFile";i.hidden=true;i.multiple=true;i.accept="image/*,application/pdf";document.body.appendChild(i)}
-  const s=document.createElement("style");s.textContent=`.cp-bar{border-left:4px solid #FF9900}#cpModal{position:fixed;inset:0;z-index:9000}`;document.head.appendChild(s);
+  const s=document.createElement("style");s.textContent=`.cp-bar{border-left:4px solid #FF9900}.fig-cenas{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}.fig-cenas .btn.on{background:#FF9900;color:#000;border-color:#FF9900}#cpModal{position:fixed;inset:0;z-index:9000}`;document.head.appendChild(s);
 })();
 // AEP e AET: no editor e nas listas
 const _htmlRegEd53=htmlRegEd;
@@ -9547,15 +9553,16 @@ renderCausas=function(){
 };
 
 /* ---------- Triagem: mesma modelo 3D (a mulher) da AEP, no lugar do boneco antigo ---------- */
-const TRI_TIT={};DOMINIOS.forEach(d=>d.itens.forEach(q=>{if(TRI_FIG[q.id])TRI_TIT[q.t]=TRI_FIG[q.id]}));
+const TRI_TIT={};DOMINIOS.forEach(d=>d.itens.forEach(q=>{if(TRI_FIG[q.id])TRI_TIT[q.t]=TRI_FIG[q.id][0]}));
 const _cena3dDe53=cena3dDe;
 cena3dDe=function(t){return TRI_TIT[t]||_cena3dDe53(t)};
 htmlFig=function(id){
-  const f=TRI_FIG[id];if(!f)return "";
+  const L=TRI_FIG[id];if(!L)return "";
   const chips=ROT_ITEM.map((r,n)=>`<button type="button" class="n${n}" data-t3="${n}">${r}</button>`).join("");
   const q=DOMINIOS.reduce((a,d)=>a||d.itens.find(x=>x.id===id),null);
-  return `<div class="fig item-fig fig3" data-t3id="${id}" data-t3f="${f}" data-t3t="${esc(q?q.t:"")}"><div class="fig-top"><span>Exemplo 3D · modelo da AEP</span><button type="button" class="btn sec peq" data-t3="ampliar" style="padding:2px 8px">Ampliar e girar</button></div>
-  <canvas width="680" height="440" style="width:100%;height:auto;display:block;border-radius:8px;background:#fff" role="img" aria-label="Modelo 3D ilustrando o item"></canvas>
+  const cenas=L.length>1?`<div class="fig-cenas" role="group" aria-label="Situações ilustradas">${L.map((f,i)=>`<button type="button" class="btn sec peq${i?"":" on"}" data-t3s="${f}">${esc(CP_CENA[f]||f)}</button>`).join("")}</div>`:"";
+  return `<div class="fig item-fig fig3" data-t3id="${id}" data-t3f="${L[0]}" data-t3t="${esc(q?q.t:"")}"><div class="fig-top"><span>Exemplo 3D · modelo da AEP</span><button type="button" class="btn sec peq" data-t3="ampliar" style="padding:2px 8px">Ampliar e girar</button></div>
+  ${cenas}<canvas width="680" height="440" style="width:100%;height:auto;display:block;border-radius:8px;background:#fff" role="img" aria-label="Modelo 3D ilustrando o item"></canvas>
   <div class="fig-cap"></div><div class="fig-chips" role="group" aria-label="Ver exemplo por nível">${chips}</div></div>`;
 };
 function tri3dNivel(el,n){
@@ -9570,8 +9577,10 @@ iniciarFigs=function(){
   $$(".fig3").forEach(el=>{const r=estado.resp[el.dataset.t3id];tri3dNivel(el,r&&typeof r.n==="number"?r.n:0)});
 };
 document.addEventListener("click",e=>{
+  const sb=e.target.closest("[data-t3s]");
+  if(sb){const el=sb.closest(".fig3");if(el){el.dataset.t3f=sb.dataset.t3s;el.querySelectorAll("[data-t3s]").forEach(x=>x.classList.toggle("on",x===sb));tri3dNivel(el,el._n||0)}return}
   const b=e.target.closest("[data-t3]");if(!b)return;const el=b.closest(".fig3");if(!el)return;
-  if(b.dataset.t3==="ampliar"){abrir3d(0,el.dataset.t3t,"",el._n||0);return}
+  if(b.dataset.t3==="ampliar"){TRI_TIT[el.dataset.t3t]=el.dataset.t3f;abrir3d(0,el.dataset.t3t,"",el._n||0);return}
   tri3dNivel(el,Number(b.dataset.t3));
 });
 /* =====================================================================
