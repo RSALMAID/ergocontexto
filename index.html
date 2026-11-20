@@ -7620,7 +7620,7 @@ void main(){
     GL3.dyn={P:gl.createBuffer(),N:gl.createBuffer(),C:gl.createBuffer()};
     const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([200,200,200,255]));
     GL3.tex=tex;GL3.pronta=false;
-    const im=new Image();im.onload=()=>{gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,im);gl.generateMipmap&&0;gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);GL3.pronta=true;if(V3D&&V3D.redes)V3D.redes()};im.src=MULHER.tex;
+    const im=new Image();im.onload=()=>{gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,im);gl.generateMipmap&&0;gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);GL3.pronta=true;if(V3D&&V3D.redes)V3D.redes();if(typeof glPronto53==="function")glPronto53()};im.src=MULHER.tex;
     GL3.ok=true;return true;
   }catch(err){console.warn("WebGL indisponível, usando o desenho antigo:",err&&err.message);GL3.ok=false;return false}
 }
@@ -9190,6 +9190,7 @@ const CP_COD={triagem:"ERGO-TRI-1",aep:"ERGO-AEP-1",aet:"ERGO-AET-1",ishikawa:"E
 const CP_FIG={};
 function cpFig(id,n){
   const k=id+"/"+n;if(k in CP_FIG)return CP_FIG[k];
+  const pronto=!GL3.ok||GL3.pronta;
   let u="";
   try{
     const c=cenaPara(id,n);
@@ -9199,6 +9200,7 @@ function cpFig(id,n){
       const o=document.createElement("canvas");o.width=340;o.height=220;const x=o.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,340,220);x.drawImage(cv,0,0,340,220);u=o.toDataURL("image/jpeg",.78);
     }
   }catch(e){u=""}
+  if(!pronto)return u;
   return CP_FIG[k]=u;
 }
 
@@ -9313,7 +9315,8 @@ h1{font-size:15pt;margin:0 0 2px}.sub0{color:#333;font-size:8.5pt}.id{display:fl
   ${cab}${sp.secoes.map(sec).join("")}${fimS.map(sec).join("")}
   <div class="pe">ErgoContexto · ${CP_COD[sp.tipo]} · impresso em ${esc(dataBR(hojeISO()))}. Documento de apoio ao registro de campo; a decisão técnica é do avaliador.</div></body></html>`;
 }
-function cpImprimir(tipo){
+async function cpImprimir(tipo){
+  await cpGlPronto();
   let sp;try{sp=cpSpec(tipo)}catch(e){return aviso("Não consegui montar o formulário: "+(e.message||e))}
   if(!sp)return aviso("Formulário indisponível para este método.");
   aviso("Preparando o formulário…");
@@ -9572,7 +9575,13 @@ function tri3dNivel(el,n){
   const r=estado.resp[el.dataset.t3id],ans=r&&typeof r.n==="number"?r.n:null;
   el.querySelectorAll(".fig-chips button").forEach(b=>{const k=Number(b.dataset.t3);b.classList.toggle("on",k===n);b.classList.toggle("ans",k===ans);b.setAttribute("aria-pressed",k===n)});
 }
+function glPronto53(){$$(".fig3").forEach(el=>tri3dNivel(el,el._n||0))}
+function cpGlPronto(){
+  return new Promise(res=>{let t=0;(function v(){let ok=false;try{ok=glIniciar()}catch(e){}
+    if(!ok||GL3.pronta||t>60)return res();t++;setTimeout(v,100)})()});
+}
 iniciarFigs=function(){
+  try{glIniciar()}catch(e){}
   figInst.clear();
   $$(".fig3").forEach(el=>{const r=estado.resp[el.dataset.t3id];tri3dNivel(el,r&&typeof r.n==="number"?r.n:0)});
 };
