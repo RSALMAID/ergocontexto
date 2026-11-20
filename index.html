@@ -422,6 +422,7 @@ h4{color:var(--verde)}
 <script src="config.js"></script>
 <script>
 "use strict";
+var LANG_APP="pt-BR";function trTxt(s){return s}
 /* =====================================================================
    MODELO — domínios, itens e critérios de triagem
    Níveis do item: 0 Adequado · 1 Baixa · 2 Moderada · 3 Alta
@@ -1613,7 +1614,7 @@ function ditar(did,btn){
   if(!SR){aviso("Este navegador não tem ditado. Use o microfone do teclado do celular.");return}
   if(reconhecedor){reconhecedor.stop();return}
   const ta=$(`[data-desc="${did}"]`);
-  const rc=new SR();rc.lang="pt-BR";rc.continuous=true;rc.interimResults=false;
+  const rc=new SR();rc.lang=(typeof LANG_APP!=="undefined"?LANG_APP:"pt-BR");rc.continuous=true;rc.interimResults=false;
   rc.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal){ta.value=(ta.value?ta.value.trim()+" ":"")+e.results[i][0].transcript.trim();sugDesc[did]=Object.assign(sugDesc[did]||{},{texto:ta.value})}}};
   rc.onend=()=>{reconhecedor=null;btn.classList.remove("rec");btn.textContent="🎤 Ditar"};
   rc.onerror=()=>{aviso("Não consegui usar o microfone. Verifique a permissão do navegador.")};
@@ -4542,7 +4543,7 @@ irPara=function(v){_irPara18(v);if(v==="busca")renderBusca()};
   btn.addEventListener("click",()=>{
     if(!alvo)return;
     if(ativo){parar();return}
-    rec=new SR();rec.lang="pt-BR";rec.continuous=true;rec.interimResults=false;
+    rec=new SR();rec.lang=(typeof LANG_APP!=="undefined"?LANG_APP:"pt-BR");rec.continuous=true;rec.interimResults=false;
     rec.onresult=ev=>{let t="";for(let i=ev.resultIndex;i<ev.results.length;i++)if(ev.results[i].isFinal)t+=ev.results[i][0].transcript;
       if(t&&alvo){const sep=alvo.value&&!/\s$/.test(alvo.value)?" ":"";alvo.value+=sep+t.trim();alvo.dispatchEvent(new Event("input",{bubbles:true}))}};
     rec.onend=()=>{if(ativo){try{rec.start()}catch(e){parar()}}};
@@ -7459,7 +7460,7 @@ function cena3dQuadro(cv,cena,cam,dpr){
     cx.save();cx.strokeStyle="#FF9900";cx.lineWidth=2.4;cx.setLineDash([]);cx.beginPath();pts.forEach((o,i)=>i?cx.lineTo(o.x,o.y):cx.moveTo(o.x,o.y));cx.stroke();cx.restore();
     const s=projetar([c3[0]+(v0[0]+v1[0])/2*rad*.7,c3[1]+(v0[1]+v1[1])/2*rad*.7,c3[2]],cam);return s};
   const ps=cena.pose,Pj=bd.joint;
-  (cena.lab||[]).forEach(([j,t])=>{
+  (cena.lab||[]).forEach(([j,t0])=>{const t=trTxt(t0);
     const pt=Pj[j];if(!pt)return;const o=projetar(pt,cam);
     // arco quando houver ângulo representável no plano sagital
     if(j==="S"&&Math.abs(ps.trunk||0)>3){const a=ps.trunk*D2R;arco(Pj.P,[0,1],[Math.sin(a),Math.cos(a)],.22,"")}
@@ -7473,7 +7474,7 @@ function cena3dQuadro(cv,cena,cam,dpr){
     cx.fillStyle="#111827";cx.fillText(t,bx+8,by+17);
   });
   // selo do nível
-  if(V3D){const nv=V3D.nivel,cor=["#9CA3AF","#FFD699","#FF9900","#FF3300"][nv];cx.font="bold 13px Inter,Arial,sans-serif";const t="Nível: "+nivelTxt(nv),w=cx.measureText(t).width+30;cx.fillStyle="rgba(255,255,255,.95)";cx.beginPath();if(cx.roundRect)cx.roundRect(12,12,w,28,14);else cx.rect(12,12,w,28);cx.fill();cx.fillStyle=cor;cx.beginPath();cx.arc(27,26,6,0,7);cx.fill();cx.fillStyle="#111827";cx.fillText(t,40,31)}
+  if(V3D){const nv=V3D.nivel,cor=["#9CA3AF","#FFD699","#FF9900","#FF3300"][nv];cx.font="bold 13px Inter,Arial,sans-serif";const t=trTxt("Nível")+": "+nivelTxt(nv),w=cx.measureText(t).width+30;cx.fillStyle="rgba(255,255,255,.95)";cx.beginPath();if(cx.roundRect)cx.roundRect(12,12,w,28,14);else cx.rect(12,12,w,28);cx.fill();cx.fillStyle=cor;cx.beginPath();cx.arc(27,26,6,0,7);cx.fill();cx.fillStyle="#111827";cx.fillText(t,40,31)}
 }
 // comparação com a postura adequada
 const _abrir3d39=abrir3d;
@@ -7494,8 +7495,8 @@ TILES.forEach(t=>{if(t[0]==="tri")t[2]=""});
   if(marca&&marca.parentNode)marca.parentNode.insertBefore(r,marca.nextSibling);else dir.insertBefore(r,dir.firstChild);
 })();
 function tick40(){
-  const d=new Date(),dia=d.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}),
-        hora=d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  const d=new Date(),dia=d.toLocaleDateString(typeof LANG_APP!=="undefined"?LANG_APP:"pt-BR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}),
+        hora=d.toLocaleTimeString(typeof LANG_APP!=="undefined"?LANG_APP:"pt-BR",{hour:"2-digit",minute:"2-digit"});
   document.querySelectorAll("#relTopo .rel-h").forEach(e=>{if(e.textContent!==hora)e.textContent=hora});
   document.querySelectorAll("#relTopo .rel-d").forEach(e=>{const t=dia.charAt(0).toUpperCase()+dia.slice(1);if(e.textContent!==t)e.textContent=t});
 }
@@ -7711,7 +7712,7 @@ function desenhaRotulos(cx,cena,cam,bd,W,H){
   const ps=cena.pose,Pj=bd.joint;
   if(cena.ondas){cx.strokeStyle="#FF9900";cx.lineWidth=2.4;const o=projetar([.0,.1,0],cam);for(let i=0;i<cena.ondas*3;i++){cx.globalAlpha=.8-i*.05;cx.beginPath();for(let s=0;s<=20;s++){const xx=o.x-60+s*6,yy=o.y+14+i*8+Math.sin(s*1.2+i)*4;s?cx.lineTo(xx,yy):cx.moveTo(xx,yy)}cx.stroke()}cx.globalAlpha=1}
   const arco=(c3,v0,v1,rad)=>{const pts=[];for(let i=0;i<=16;i++){const t=i/16,v=[v0[0]*(1-t)+v1[0]*t,v0[1]*(1-t)+v1[1]*t],l=Math.hypot(v[0],v[1])||1;pts.push(projetar([c3[0]+v[0]/l*rad,c3[1]+v[1]/l*rad,c3[2]],cam))}cx.save();cx.strokeStyle="#FF9900";cx.lineWidth=2.6;cx.beginPath();pts.forEach((o,i)=>i?cx.lineTo(o.x,o.y):cx.moveTo(o.x,o.y));cx.stroke();cx.restore()};
-  (cena.lab||[]).forEach(([j,t])=>{
+  (cena.lab||[]).forEach(([j,t0])=>{const t=trTxt(t0);
     const pt=Pj[j];if(!pt)return;const o=projetar(pt,cam);
     if(j==="S"&&Math.abs(ps.trunk||0)>3){const a=ps.trunk*D2R;arco(Pj.P,[0,1],[Math.sin(a),Math.cos(a)],.26)}
     if(j==="Hc"&&Math.abs(ps.neck||0)>3){const a0=(ps.trunk||0)*D2R,a1=((ps.trunk||0)+ps.neck)*D2R;arco(Pj.S,[Math.sin(a0),Math.cos(a0)],[Math.sin(a1),Math.cos(a1)],.22)}
@@ -7723,8 +7724,1118 @@ function desenhaRotulos(cx,cena,cam,bd,W,H){
     cx.strokeStyle="#FF9900";cx.lineWidth=1.5;cx.beginPath();cx.roundRect?cx.roundRect(bx,by,w,24,12):cx.rect(bx,by,w,24);cx.stroke();
     cx.fillStyle="#111827";cx.fillText(t,bx+8,by+17);
   });
-  if(V3D){const nv=V3D.nivel,c=["#9CA3AF","#FFD699","#FF9900","#FF3300"][nv];cx.font="bold 13px Inter,Arial,sans-serif";const t="Nível: "+nivelTxt(nv),w=cx.measureText(t).width+30;cx.fillStyle="rgba(255,255,255,.95)";cx.beginPath();cx.roundRect?cx.roundRect(12,12,w,28,14):cx.rect(12,12,w,28);cx.fill();cx.fillStyle=c;cx.beginPath();cx.arc(27,26,6,0,7);cx.fill();cx.fillStyle="#111827";cx.fillText(t,40,31)}
+  if(V3D){const nv=V3D.nivel,c=["#9CA3AF","#FFD699","#FF9900","#FF3300"][nv];cx.font="bold 13px Inter,Arial,sans-serif";const t=trTxt("Nível")+": "+nivelTxt(nv),w=cx.measureText(t).width+30;cx.fillStyle="rgba(255,255,255,.95)";cx.beginPath();cx.roundRect?cx.roundRect(12,12,w,28,14):cx.rect(12,12,w,28);cx.fill();cx.fillStyle=c;cx.beginPath();cx.arc(27,26,6,0,7);cx.fill();cx.fillStyle="#111827";cx.fillText(t,40,31)}
 }
+/* =====================================================================
+   FASE 26: ANÁLISE DE CAUSAS (módulo à parte)
+   Cinco métodos, cada um com editor visual e assistente de IA:
+   Ishikawa + 5 Porquês, Árvore de causas, Bowtie, FRAM e HFACS adaptado.
+   Registro tipo "causa" (CAU-2026-0001), sincroniza como os demais.
+   Cada método se registra em CM[chave] (arquivos p46 a p50).
+   ===================================================================== */
+const CM={};
+const CZ_ORDEM=["ishikawa","arvore","bowtie","fram","hfacs"];
+G.cz={ed:null,novo:null,aba:"modelo",f:"todos",q:"",busy:false};
+const czid=()=>"n"+Math.random().toString(36).slice(2,7);
+const EVID=[["hipotese","Hipótese"],["relatado","Relatado"],["observado","Observado"],["medido","Medido ou documentado"]];
+const EVC={hipotese:"h",relatado:"r",observado:"o",medido:"m"};
+const czEv=e=>`<span class="cz-ev ${EVC[e]||"h"}" title="Nível de evidência">${esc((EVID.find(x=>x[0]===e)||EVID[0])[1])}</span>`;
+const czSelEv=(path,v,dis)=>`<select class="cz-mini" data-cz-f="${path}" data-cz-live="1" ${dis} aria-label="Nível de evidência">${sel1(EVID,v||"hipotese")}</select>`;
+const CZ_CULPA=/descuido|desaten[cç]|falta de aten[cç]|neglig[eê]n|imprud[eê]n|irrespons|desleix|pregui[cç]|incompet[eê]n|culpa d|ato inseguro d|erro humano|indisciplin|n[aã]o quis|displic[eê]n/i;
+const czTxtLivre=v=>String(v==null?"":v).replace(/\s+/g," ").trim();
+
+// ---------- registro ----------
+function novaCausa(metodo,base){
+  const M=CM[metodo];
+  return {id:rid(),tipo:"causa",d:Object.assign({metodo,titulo:"",evento:"",data:hojeISO(),postoId:"",atividadeId:"",origemId:"",responsavel:(perfil&&perfil.nome)||"",status:"andamento",dados:M.vazio(),conclusao:"",ia:{}},base||{})};
+}
+(function(){const rg=regGravar;
+  regGravar=function(r,t){
+    if(r&&r.tipo==="causa"&&r.d&&!r.d.numero&&!(typeof SB_ON!=="undefined"&&SB_ON)){
+      const ano=new Date().getFullYear(),n=regOf("causa").filter(x=>x.d&&x.d.numero&&x.id!==r.id).length+1;r.d.numero="CAU-"+ano+"-"+String(n).padStart(4,"0");
+    }
+    return rg.apply(this,arguments);
+  };
+})();
+let _czT=null;
+function czSalvar(){clearTimeout(_czT);_czT=setTimeout(czFlush,500)}
+function czFlush(){clearTimeout(_czT);_czT=null;if(G.cz&&G.cz.ed)regGravar(G.cz.ed)}
+const czRec=()=>G.cz.ed;
+const czDis=()=>soLeitura()?"disabled":"";
+
+// ---------- estilo ----------
+(function(){
+  const s=document.createElement("style");s.textContent=`
+.cz-hero{background:linear-gradient(135deg,#003352,#01688A);color:#fff;border-radius:16px;padding:20px 22px;margin-bottom:14px}
+.cz-hero h2{margin:0 0 4px;color:#fff}.cz-hero p{margin:0;opacity:.92;font-size:.93rem}
+.cz-met{display:grid;grid-template-columns:1fr;gap:10px}
+.cz-m{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;text-align:left;border:1.5px solid var(--bd,#d8e0e6);border-radius:14px;padding:12px 14px;background:var(--card,#fff);cursor:pointer;width:100%;font:inherit;color:inherit}
+.cz-m:hover{border-color:var(--verde2);box-shadow:0 4px 14px rgba(1,104,138,.14)}
+.cz-m .ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:#e8f3f8;color:var(--verde2)}
+.cz-m .sit{font-size:.8rem;color:var(--mut);text-transform:uppercase;letter-spacing:.03em;font-weight:700}
+.cz-m b{display:block;font-size:1.02rem}.cz-m small{display:block;margin-top:2px}
+.cz-m .go{color:var(--verde2);font-weight:700;white-space:nowrap}
+@media(max-width:560px){.cz-m{grid-template-columns:44px 1fr}.cz-m .go{display:none}}
+.cz-abas{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 14px;border-bottom:2px solid var(--bd,#e3e9ee)}
+.cz-abas button{border:0;background:none;padding:10px 16px;font:inherit;font-weight:700;color:var(--mut);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
+.cz-abas button.on{color:var(--verde);border-bottom-color:var(--laranja)}
+.cz-box{border:1.5px solid var(--bd,#d8e0e6);border-radius:14px;padding:14px;margin:12px 0;background:var(--card,#fff)}
+.cz-box h4{margin:0 0 8px}
+.cz-como{border-left:4px solid var(--verde2);background:#eef6fa;border-radius:10px;padding:10px 14px;margin:10px 0;font-size:.9rem}
+.cz-como summary{cursor:pointer;font-weight:700;color:var(--verde)}
+.cz-como ol{margin:8px 0 4px 18px;padding:0}.cz-como li{margin:4px 0}
+.cz-ev{display:inline-block;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.cz-ev.h{background:#eceff1;color:#546e7a}.cz-ev.r{background:#e3f0fb;color:#1565c0}.cz-ev.o{background:#e0f4f1;color:#00695c}.cz-ev.m{background:#dff3e0;color:#1b5e20}
+.cz-mini{padding:5px 8px;font-size:.8rem;border-radius:8px;border:1px solid var(--bd,#cfd8dc);background:var(--card,#fff);max-width:100%}
+.cz-in{width:100%;padding:9px 11px;border:1.5px solid var(--bd,#cfd8dc);border-radius:10px;font:inherit;background:var(--card,#fff);color:inherit}
+.cz-in:focus,.cz-mini:focus{outline:2px solid var(--verde2);outline-offset:1px}
+textarea.cz-in{min-height:64px;resize:vertical}
+.cz-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cz-row>.cz-in{flex:1 1 180px;width:auto}
+.cz-x{border:0;background:none;color:#b0bec5;font-size:1.1rem;cursor:pointer;padding:2px 6px;border-radius:6px}.cz-x:hover{color:#c62828;background:#fdecea}
+.cz-diag{overflow:auto;border:1.5px solid var(--bd,#d8e0e6);border-radius:14px;background:#fbfdfe;padding:6px;margin:10px 0}
+.cz-diag svg{display:block;margin:0 auto;max-width:none}
+.cz-lint{margin:10px 0}.cz-lint .it{display:flex;gap:8px;align-items:flex-start;padding:7px 10px;border-radius:9px;margin:5px 0;font-size:.86rem}
+.cz-lint .it.a{background:#fdecea;color:#8a1c12}.cz-lint .it.m{background:#fff3e0;color:#7a4a00}.cz-lint .it.b{background:#e8f5e9;color:#1b5e20}.cz-lint .it.i{background:#eef6fa;color:#0b4a63}
+.cz-ia{border:1.5px solid #c9b6f2;background:linear-gradient(180deg,#faf7ff,#fff);border-radius:14px;padding:14px;margin:14px 0}
+.cz-ia h4{margin:0 0 4px;color:#4b2e91}
+.cz-prop{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;border-bottom:1px dashed #d9cff0;padding:9px 0;font-size:.9rem}
+.cz-prop:last-child{border-bottom:0}.cz-prop .tx{flex:1}
+.cz-lbl{display:inline-block;font-size:.72rem;font-weight:700;background:#ede7f9;color:#4b2e91;border-radius:6px;padding:2px 7px;margin-right:6px}
+.cz-chip{display:inline-block;font-size:.76rem;font-weight:700;border-radius:99px;padding:3px 10px;background:#e8f3f8;color:var(--verde2)}
+.cz-sit{display:flex;gap:10px;flex-wrap:wrap}
+.cz-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:.8rem;color:var(--mut);margin:6px 2px}
+.cz-leg i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.cz-sel-bar{position:sticky;top:64px;z-index:5}
+#v-causas input[type=checkbox]{width:auto;display:inline-block;margin:0 6px 0 0;vertical-align:-2px;flex:none}
+#v-causas label:has(>input[type=checkbox]){display:inline-flex;align-items:center;gap:2px;margin-top:0}
+#v-causas select.cz-mini{width:auto;flex:0 0 auto}
+.cz-print-only{display:none}
+body.czp *{visibility:hidden}body.czp #czPrint,body.czp #czPrint *{visibility:visible}
+body.czp #czPrint{display:block;position:absolute;left:0;top:0;width:100%;padding:18px;background:#fff;color:#000}
+body.czp #czPrint svg{max-width:100%;height:auto}
+`;document.head.appendChild(s);
+})();
+
+// ---------- tela: lista e escolha de método ----------
+const ICM={
+  ishikawa:'<path d="M3 12h15M18 12l3-3m-3 3l3 3M6 12l3-5M10 12l3-5M6 12l3 5M10 12l3 5"/>',
+  arvore:'<path d="M21 12H14M14 12l-4-6H4M14 12l-4 6H4M10 6V4M10 18v2"/><circle cx="21" cy="12" r="1.5"/>',
+  bowtie:'<path d="M3 6l6 6-6 6M21 6l-6 6 6 6"/><circle cx="12" cy="12" r="2.5"/><path d="M9 12h.5M14.5 12h.5"/>',
+  fram:'<path d="M8 3l4 2.5v4L8 12 4 9.5v-4zM17 12l4 2.5v4L17 21l-4-2.5v-4z"/><path d="M12 8l2.5 5"/>',
+  hfacs:'<path d="M4 20h16M6 15h12M8 10h8M10 5h4"/>'
+};
+const icoM=k=>`<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICM[k]}</svg>`;
+function htmlCzLista(){
+  const L=regOf("causa").filter(r=>(G.cz.f==="todos"||r.d.metodo===G.cz.f)&&(!G.cz.q||normB([r.d.numero,r.d.titulo,r.d.evento].join(" ")).includes(normB(G.cz.q)))).sort((a,b)=>(b.atualizadoEm||0)-(a.atualizadoEm||0));
+  const todas=regOf("causa");
+  const cartoes=CZ_ORDEM.map(k=>{const m=CM[k].meta;return `<button type="button" class="cz-m" data-cz-a="escolher" data-m="${k}"><span class="ic">${icoM(k)}</span><span><span class="sit">${esc(m.situacao)}</span><b>${esc(m.nome)}</b><small class="mut">${esc(m.quando)}</small></span><span class="go">Começar →</span></button>`}).join("");
+  const chips=[["todos","Todas ("+todas.length+")"]].concat(CZ_ORDEM.filter(k=>todas.some(r=>r.d.metodo===k)).map(k=>[k,CM[k].meta.nome.split(" + ")[0]+" ("+todas.filter(r=>r.d.metodo===k).length+")"]));
+  const lst=L.length?L.map(r=>{const d=r.d,M=CM[d.metodo];const o=d.origemId&&regGet(d.origemId);const n=M?M.raizes(d).length:0;
+    return `<div class="sug"><span><span class="chp">${esc(M?M.meta.nome.split(" + ")[0]:d.metodo)}</span> <b>${esc(d.numero||"(pendente)")}</b> · ${esc(d.titulo||"(sem título)")}<br><small class="mut">${d.status==="concluida"?"Concluída":"Em andamento"} · ${n} causa(s)-raiz${o?" · origem "+esc(o.d.numero||o.tipo):""} · ${esc(dataBR((d.data||"")))}</small></span><button type="button" class="btn peq sec" data-cz-a="abrir" data-id="${esc(r.id)}">Abrir</button></div>`}).join(""):`<p class="mut">Nenhuma análise ainda. Escolha um método acima para começar.</p>`;
+  return `<div class="cz-hero"><h2>Análise de causas</h2><p>Depois da AEP ou da AET, descubra <b>por que</b> o problema acontece, com método, evidências e ações ligadas às causas. Escolha o método pela situação.</p></div>
+  <div class="card"><h3 style="margin-top:0">Qual é a sua situação?</h3><div class="cz-met">${cartoes}</div>
+  <div class="cz-box" style="margin-top:14px"><h4>Não sabe qual método usar?</h4><p class="mut" style="margin:0 0 8px;font-size:.88rem">Descreva a situação em poucas linhas. A IA indica o método mais adequado e explica por quê. Você decide.</p>
+  <textarea class="cz-in" id="czRecTxt" placeholder="Ex.: três operadores da linha de embalagem relataram dor no ombro nas últimas semanas; mudamos a altura da esteira há dois meses"></textarea>
+  <div class="cz-row" style="margin-top:8px"><button type="button" class="btn sec" data-cz-a="recomendar">✨ Recomendar método</button><span id="czRecEst" class="mut"></span></div><div id="czRecRes"></div></div></div>
+  <div class="card"><h3 style="margin-top:0">Minhas análises</h3><div class="linha" style="margin-bottom:8px">${chips.map(([k,t])=>`<button type="button" class="chp ${G.cz.f===k?"b":""}" data-cz-a="filtro" data-f="${k}">${esc(t)}</button>`).join("")}<input type="search" id="czQ" class="cz-in" style="max-width:260px" placeholder="Buscar" value="${esc(G.cz.q)}"></div>${lst}</div>`;
+}
+function htmlCzNovo(){
+  const k=G.cz.novo.metodo,M=CM[k],m=M.meta,x=G.cz.novo;
+  return `<div class="card"><button type="button" class="btn sec peq" data-cz-a="voltar">← Voltar</button>
+  <div class="cz-hero" style="margin:12px 0"><h2>${esc(m.nome)}</h2><p>${esc(m.situacao)}</p></div>
+  <div class="cz-como" style="border-left-color:var(--laranja);background:#fff8ec"><b>Quando usar</b><br>${esc(m.quando)}<br><b>Quando não usar</b><br>${esc(m.limite)}</div>
+  <label class="campo">Título da análise<input class="cz-in" id="czNT" value="${esc(x.titulo||"")}" placeholder="Ex.: Dor no ombro na embalagem, linha 3"></label>
+  <label class="campo">O que aconteceu ou qual é o problema?<textarea class="cz-in" id="czNE" placeholder="Descreva fatos e consequências, sem apontar culpados. Quem, onde, quando, o que foi observado.">${esc(x.evento||"")}</textarea></label>
+  <div class="grid2"><label class="campo">Origem (opcional)<select class="cz-in" id="czNO"><option value="">(sem origem)</option>${sel1(origensCz(),x.origemId||"")}</select></label>
+  <label class="campo">Posto de trabalho (opcional)<select class="cz-in" id="czNP"><option value="">(não vinculado)</option>${sel1(opsPosto(),x.postoId||"")}</select></label></div>
+  <div class="linha" style="margin-top:14px"><button type="button" class="btn" data-cz-a="criar">Criar análise</button></div></div>`;
+}
+function origensCz(){
+  const f=(t,r)=>regOf(t).filter(x=>!x.excluido).map(x=>[x.id,r+" "+(x.d.numero||"(pendente)")+(x.d.titulo?" · "+String(x.d.titulo).slice(0,40):x.d.motivo?" · "+String(x.d.motivo).slice(0,40):"")]);
+  return f("dem","Demanda").concat(f("aep","AEP"),f("aet","AET"));
+}
+
+// ---------- tela: editor ----------
+function htmlLint(d){
+  const M=CM[d.metodo],L=[];
+  if(czTxtLivre(d.evento).length<40)L.push({s:"m",t:"Descreva melhor o evento ou problema (fatos, quem, onde, quando). Sem isso a análise perde o foco."});
+  const blob=JSON.stringify(d.dados)+" "+(d.evento||"")+" "+(d.conclusao||"");
+  const mm=blob.match(CZ_CULPA);
+  if(mm)L.push({s:"a",t:`O texto usa "${mm[0]}". Reescreva como condição de trabalho (ferramenta, tempo, layout, informação, carga), sem culpar a pessoa. Pergunte "o que tornou esse ato provável?".`});
+  (M.lint(d)||[]).forEach(x=>L.push(x));
+  if(!L.length)L.push({s:"b",t:"Nada a apontar nesta verificação automática. Isso não substitui a conferência no posto de trabalho."});
+  return `<div class="cz-lint"><h4 style="margin:0 0 4px">Verificação rápida <small class="mut">(automática, funciona sem internet)</small></h4>${L.map(x=>`<div class="it ${x.s}"><span>${x.s==="a"?"⚠":x.s==="m"?"●":x.s==="b"?"✓":"ℹ"}</span><span>${esc(x.t)}</span></div>`).join("")}</div>`;
+}
+function htmlCzIA(d,dis){
+  const M=CM[d.metodo],ia=d.ia||{};
+  const sug=ia.sug?`<div style="margin-top:8px"><b style="font-size:.9rem">Sugestões da IA</b> <small class="mut">(hipóteses para você conferir; nada entra no modelo sem o seu clique)</small>${(ia.sug.itens||[]).map((it,i)=>`<div class="cz-prop"><span class="tx"><span class="cz-lbl">${esc(M.rotuloItem(d,it))}</span>${esc(it.texto||"")}${it.detalhe?`<br><small class="mut">${esc(it.detalhe)}</small>`:""}${it.pergunta?`<br><small class="mut">Pergunta para o campo: ${esc(it.pergunta)}</small>`:""}</span>${it.add?'<span class="bd n0">✔ no modelo</span>':`<button type="button" class="btn peq sec" data-cz-a="add-item" data-i="${i}" ${dis}>+ Adicionar</button>`}</div>`).join("")||'<p class="mut">A IA não encontrou sugestões com base no que está preenchido.</p>'}
+    ${(ia.sug.perguntas||[]).length?`<div style="margin-top:6px"><b style="font-size:.88rem">Perguntas para levar ao campo</b><ul style="margin:4px 0 0 18px;font-size:.88rem">${ia.sug.perguntas.map(q=>`<li>${esc(q)}</li>`).join("")}</ul></div>`:""}
+    ${ia.sug.lim?`<small class="mut">Limitações: ${esc(ia.sug.lim)}</small><br>`:""}<small class="mut">${esc((ia.sug.em||"").slice(0,16).replace("T"," "))}</small></div>`:"";
+  const crit=ia.crit?`<div style="margin-top:10px"><b style="font-size:.9rem">Crítica da IA ao modelo</b>${(ia.crit.achados||[]).map(x=>`<div class="sug"><span><span class="chp ${x.severidade==="alta"?"r":x.severidade==="media"?"o":"b"}">${esc(x.severidade)}</span> <b>${esc(x.titulo)}</b>${x.onde?` <small>(${esc(x.onde)})</small>`:""}<br><small>${esc(x.detalhe)}</small></span></div>`).join("")||'<p class="mut">A IA não apontou problemas.</p>'}${ia.crit.lim?`<small class="mut">Não verificado: ${esc(ia.crit.lim)}</small>`:""}</div>`:"";
+  return `<div class="cz-ia"><h4>✨ Assistente de IA · ${esc(M.meta.nome.split(" + ")[0])}</h4><p class="mut" style="margin:0 0 8px;font-size:.86rem">${esc(M.meta.ajudaIA)}</p>
+   <div class="cz-row"><button type="button" class="btn" data-cz-a="ia-sug" ${dis}>Sugerir ideias</button><button type="button" class="btn sec" data-cz-a="ia-crit" ${dis}>Criticar o modelo</button><span id="czIAEst" class="mut"></span></div>${sug}${crit}
+   <p class="mut" style="font-size:.78rem;margin:8px 0 0">A IA lê só o que está nesta análise. Ela sugere hipóteses; quem confirma a causa é a evidência do posto de trabalho. Não coloque nomes de pessoas.</p></div>`;
+}
+function htmlCzEd(){
+  const r=G.cz.ed,d=r.d,M=CM[d.metodo],dis=czDis();
+  const o=d.origemId&&regGet(d.origemId);
+  const cab=`<div class="card"><div class="linha" style="justify-content:space-between"><button type="button" class="btn sec peq" data-cz-a="voltar">← Análises</button><span><span class="chp b">${esc(M.meta.nome)}</span> <span class="bd ${d.status==="concluida"?"n0":"n1"}">${d.status==="concluida"?"Concluída":"Em andamento"}</span></span></div>
+   <p class="mut" style="margin:10px 0 0;font-size:.84rem">${esc(d.numero||"(número definido ao sincronizar)")} · Salvo automaticamente neste aparelho</p>
+   <label class="campo">Título<input class="cz-in" data-cz-f="titulo" ${dis} value="${esc(d.titulo)}"></label>
+   <details style="margin-top:10px"><summary><b>Dados da análise</b> <small class="mut">posto, origem, responsável</small></summary>
+    <div class="grid2"><label class="campo">Posto de trabalho<select class="cz-in" data-cz-f="postoId" data-cz-re="1" ${dis}><option value="">(não vinculado)</option>${sel1(opsPosto(),d.postoId)}</select></label>
+    <label class="campo">Origem<select class="cz-in" data-cz-f="origemId" ${dis}><option value="">(sem origem)</option>${sel1(origensCz(),d.origemId)}</select></label>
+    <label class="campo">Responsável<input class="cz-in" data-cz-f="responsavel" ${dis} value="${esc(d.responsavel||"")}"></label>
+    <label class="campo">Data<input class="cz-in" type="date" data-cz-f="data" ${dis} value="${esc(d.data||"")}"></label></div></details></div>`;
+  const abas=`<div class="cz-abas" role="tablist"><button type="button" class="${G.cz.aba==="modelo"?"on":""}" data-cz-a="aba" data-aba="modelo">1. Modelo</button><button type="button" class="${G.cz.aba==="concl"?"on":""}" data-cz-a="aba" data-aba="concl">2. Conclusão e ações</button></div>`;
+  let corpo;
+  if(G.cz.aba==="modelo"){
+    corpo=`<div class="card"><details class="cz-como" ${M.vazioQ(d)?"open":""}><summary>Como funciona este método</summary><ol>${M.meta.passos.map(p=>`<li>${p}</li>`).join("")}</ol><p style="margin:6px 0 0"><b>Cuidado:</b> ${esc(M.meta.cuidado)}</p>${M.vazioQ(d)&&!dis?`<p style="margin:8px 0 0"><button type="button" class="btn peq sec" data-cz-a="exemplo">Carregar um exemplo para ver como fica</button></p>`:""}</details>
+     <label class="campo">Evento ou problema analisado<textarea class="cz-in" data-cz-f="evento" data-cz-live="1" ${dis} placeholder="Fatos observáveis, sem culpar pessoas.">${esc(d.evento)}</textarea></label>
+     <div class="cz-row" style="margin:10px 0 0"><button type="button" class="btn peq sec" data-cz-a="ampliar">⤢ Ampliar o diagrama</button><small class="mut">Deslize o diagrama para os lados ou amplie para ver inteiro.</small></div><div id="czEditor">${M.render(d,dis)}</div><div id="czLint">${htmlLint(d)}</div>${htmlCzIA(d,dis)}</div>`;
+  }else corpo=htmlCzConcl(r,dis);
+  return cab+abas+corpo;
+}
+function htmlCzConcl(r,dis){
+  const d=r.d,M=CM[d.metodo],R=M.raizes(d);
+  const acs=regOf("acao").filter(a=>a.d.origemId===r.id);
+  const iaA=(d.ia||{}).acoes;
+  const raizes=R.length?R.map((x,i)=>{const ja=acs.some(a=>a.d.origemItem==="cz"+x.k);return `<div class="sug"><span><span class="cz-lbl">${esc(x.n||"Causa")}</span>${esc(x.t)}</span>${ja?'<span class="bd n0">✔ com ação</span>':`<button type="button" class="btn peq sec" data-cz-a="criar-acao" data-k="${esc(x.k)}" data-i="${i}" ${dis}>+ Criar ação</button>`}</div>`}).join(""):`<p class="mut">Nenhuma causa-raiz marcada ainda. Volte ao modelo e marque as causas que, se eliminadas, fariam o problema deixar de acontecer.</p>`;
+  const prop=iaA?`<div style="margin-top:8px">${(iaA.acoes||[]).map((a,i)=>`<div class="cz-prop"><span class="tx"><span class="cz-lbl">${esc(HIER[Number(a.hier)]||"Ação")}</span>${esc(a.acao)}${a.causa?`<br><small class="mut">Causa tratada: ${esc(a.causa)}</small>`:""}${a.criterio?`<br><small class="mut">Como saber se funcionou: ${esc(a.criterio)}</small>`:""}</span>${a.add?'<span class="bd n0">✔ criada</span>':`<button type="button" class="btn peq sec" data-cz-a="add-acao-ia" data-i="${i}" ${dis}>+ Criar ação</button>`}</div>`).join("")||'<p class="mut">Sem propostas.</p>'}${iaA.lim?`<small class="mut">${esc(iaA.lim)}</small>`:""}</div>`:"";
+  return `<div class="card"><h3 style="margin-top:0">Causas-raiz identificadas</h3><p class="mut" style="font-size:.88rem;margin-top:0">${esc(M.meta.raizDef)}</p>${raizes}
+   <label class="campo">Conclusão da análise<textarea class="cz-in" style="min-height:110px" data-cz-f="conclusao" ${dis} placeholder="Em linguagem de condição de trabalho: por que o problema acontece, o que sustenta essa conclusão e o que ainda precisa ser confirmado.">${esc(d.conclusao||"")}</textarea></label></div>
+   <div class="card"><h3 style="margin-top:0">Ações</h3><p class="mut" style="font-size:.88rem;margin-top:0">Priorize eliminar ou reprojetar antes de orientar ou treinar. As ações criadas aqui ficam no módulo Ações, ligadas a esta análise, com responsável, prazo e verificação de eficácia.</p>
+   <div class="cz-row"><button type="button" class="btn" data-cz-a="ia-acoes" ${dis}>✨ Propor ações com a IA</button><span id="czAEst" class="mut"></span></div>${prop}
+   <h4 style="margin:14px 0 4px">Ações ligadas a esta análise (${acs.length})</h4>${acs.length?acs.map(a=>`<div class="sug"><span><b>${esc(a.d.numero||"(pendente)")}</b> · ${esc(String(a.d.acao||(a.d.causa?"Causa: "+a.d.causa:"(sem descrição)")).slice(0,110))}<br><small class="mut">${esc((ST_ACAO.find(s=>s[0]===a.d.status)||[0,a.d.status])[1])}${a.d.prazo?" · prazo "+esc(dataBR(a.d.prazo)):""}</small></span></div>`).join(""):'<p class="mut">Nenhuma ação criada ainda.</p>'}</div>
+   <div class="card"><div class="linha"><button type="button" class="btn sec" data-cz-a="imprimir">Imprimir ou salvar em PDF</button>${document.querySelector?`<button type="button" class="btn sec" data-cz-a="png">Baixar imagem do diagrama</button>`:""}${d.status==="concluida"?`<button type="button" class="btn sec" data-cz-a="reabrir" ${dis}>Reabrir análise</button>`:`<button type="button" class="btn verde" data-cz-a="concluir" ${dis}>Marcar como concluída</button>`}
+   <button type="button" class="btn perigo peq" data-cz-a="excluir" ${dis} style="margin-left:auto">Excluir análise</button></div></div>`;
+}
+function renderCausas(){
+  const el=$("#v-causas");if(!el)return;
+  const z=G.cz;
+  el.innerHTML=z.ed?htmlCzEd():z.novo?htmlCzNovo():htmlCzLista();
+  if(z.ed&&z.aba==="modelo"){const M=CM[z.ed.d.metodo];if(M.pos)M.pos(z.ed.d);if(M.ini)M.ini(z.ed.d)}
+}
+function czRefresh(full){
+  const r=G.cz.ed;if(!r)return;const M=CM[r.d.metodo],dis=czDis();
+  if(full){const e=$("#czEditor");if(e)e.innerHTML=M.render(r.d,dis)}
+  else{const e=$("#czDiag");if(e&&M.diag)e.innerHTML=M.diag(r.d,false)}
+  const l=$("#czLint");if(l)l.innerHTML=htmlLint(r.d);
+  if(M.pos)M.pos(r.d);
+  czSalvar();
+}
+
+// ---------- IA ----------
+async function czIA(acao,extra){
+  const r=G.cz.ed;if(!r)return null;const d=r.d,M=CM[d.metodo];
+  const corpo=Object.assign({metodo:d.metodo,acao,evento:d.evento||"",titulo:d.titulo||"",contexto:M.resumo(d),posto:d.postoId?caminho(d.postoId):""},extra||{});
+  if(acao==="acoes")corpo.hierarquia=HIER;
+  return await chamarIA("/api/ergo/causas",corpo);
+}
+function czBusy(id,msg,on){const e=$("#"+id);if(e)e.textContent=on?msg:""}
+
+// ---------- ações da interface ----------
+function czAbrir(id){const r=regGet(id);if(!r)return;if(!CM[r.d.metodo]){aviso("Método desconhecido.");return}G.cz.ed=r;G.cz.novo=null;G.cz.aba="modelo";renderCausas();window.scrollTo(0,0)}
+function czNovaAcao(r,base){
+  const a=novaAcao(Object.assign({postoId:r.d.postoId||"",atividadeId:r.d.atividadeId||"",origemId:r.id,problema:czTxtLivre(r.d.evento).slice(0,200)},base));
+  delete a.novo;regGravar(a);return a;
+}
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("#v-causas [data-cz-a]");if(!b)return;
+  const k=b.dataset.czA,r=G.cz.ed,dis=czDis();
+  if(k.includes(":")){const [m,s]=k.split(":");if(r&&CM[m]&&CM[m].acao)CM[m].acao(s,b,r,dis);return}
+  if(k==="escolher"){G.cz.novo={metodo:b.dataset.m};renderCausas();window.scrollTo(0,0)}
+  else if(k==="voltar"){czFlush();G.cz.ed=null;G.cz.novo=null;renderCausas();window.scrollTo(0,0)}
+  else if(k==="abrir")czAbrir(b.dataset.id);
+  else if(k==="filtro"){G.cz.f=b.dataset.f;renderCausas()}
+  else if(k==="criar"){
+    const x=G.cz.novo,t=czTxtLivre($("#czNT").value),ev=($("#czNE").value||"").trim();
+    if(!t)return aviso("Dê um título para a análise.");
+    if(ev.length<20)return aviso("Descreva o problema em pelo menos uma frase.");
+    const base={titulo:t,evento:ev,origemId:$("#czNO").value,postoId:$("#czNP").value};
+    const o=base.origemId&&regGet(base.origemId);if(o){base.postoId=base.postoId||o.d.postoId||"";base.atividadeId=o.d.atividadeId||""}
+    const rec=novaCausa(x.metodo,base);regGravar(rec);G.cz.ed=regGet(rec.id);G.cz.novo=null;G.cz.aba="modelo";renderCausas();window.scrollTo(0,0);
+  }
+  else if(k==="recomendar"){
+    const tx=($("#czRecTxt").value||"").trim();if(tx.length<30)return aviso("Descreva a situação em pelo menos duas frases.");
+    b.disabled=true;czBusy("czRecEst","A IA está analisando…",true);
+    try{
+      const j=await chamarIA("/api/ergo/causas",{metodo:"",acao:"recomendar",evento:tx,contexto:""});
+      const m=CM[j.metodo]?j.metodo:null,alt=j.alternativa&&CM[j.alternativa.metodo]?j.alternativa:null;
+      $("#czRecRes").innerHTML=m?`<div class="cz-ia" style="margin-top:10px"><b>Método sugerido: ${esc(CM[m].meta.nome)}</b><p style="margin:6px 0">${esc(j.motivo||"")}</p>${alt?`<p class="mut" style="margin:6px 0;font-size:.88rem">Alternativa: <b>${esc(CM[alt.metodo].meta.nome)}</b>. ${esc(alt.motivo||"")}</p>`:""}${(j.perguntas||[]).length?`<small class="mut">Antes de começar, esclareça: ${j.perguntas.map(esc).join("; ")}</small><br>`:""}<button type="button" class="btn" style="margin-top:8px" data-cz-a="escolher" data-m="${m}">Usar este método</button></div>`:`<p class="mut">A IA não conseguiu indicar um método. Escolha pela tabela.</p>`;
+      czBusy("czRecEst","",false);
+    }catch(err){czBusy("czRecEst",err.message&&err.message!=="falha"?err.message:"Não foi possível recomendar agora. Escolha pela tabela acima.",true)}
+    b.disabled=false;
+  }
+  else if(!r)return;
+  else if(k==="aba"){czFlush();G.cz.aba=b.dataset.aba;renderCausas();window.scrollTo(0,0)}
+  else if(k==="exemplo"){
+    if(!confirm("Carregar o exemplo substitui o conteúdo atual do modelo. Continuar?"))return;
+    const M=CM[r.d.metodo],ex=M.exemplo();r.d.dados=ex.dados;if(!czTxtLivre(r.d.evento))r.d.evento=ex.evento;czFlush();renderCausas();
+  }
+  else if(k==="ia-sug"){
+    czFlush();const M=CM[r.d.metodo];if(M.vazioQ(r.d)&&czTxtLivre(r.d.evento).length<40)return aviso("Descreva o evento ou preencha algo do modelo antes.");
+    b.disabled=true;czBusy("czIAEst","A IA está pensando…",true);
+    try{
+      const j=await czIA("sugerir",{foco:M.foco?M.foco(r.d):""});
+      r.d.ia=r.d.ia||{};r.d.ia.sug={em:new Date().toISOString(),itens:(j.itens||[]).filter(x=>x&&x.texto),perguntas:j.perguntas||[],lim:j.limitacoes||""};
+      czFlush();const y=window.scrollY;const ia=$(".cz-ia");if(ia)ia.outerHTML=htmlCzIA(r.d,dis);window.scrollTo(0,y);
+    }catch(err){czBusy("czIAEst",err.message&&err.message!=="falha"?err.message:"Não foi possível agora. Use a verificação rápida e as perguntas guia.",true)}
+    b.disabled=false;
+  }
+  else if(k==="ia-crit"){
+    czFlush();const M=CM[r.d.metodo];if(M.vazioQ(r.d))return aviso("Preencha algo no modelo antes de pedir a crítica.");
+    b.disabled=true;czBusy("czIAEst","A IA está revisando…",true);
+    try{
+      const j=await czIA("criticar");
+      r.d.ia=r.d.ia||{};r.d.ia.crit={em:new Date().toISOString(),achados:j.achados||[],lim:j.limitacoes||""};
+      czFlush();const y=window.scrollY;const ia=$(".cz-ia");if(ia)ia.outerHTML=htmlCzIA(r.d,dis);window.scrollTo(0,y);
+    }catch(err){czBusy("czIAEst",err.message&&err.message!=="falha"?err.message:"Não foi possível agora.",true)}
+    b.disabled=false;
+  }
+  else if(k==="add-item"){
+    const it=((r.d.ia||{}).sug||{}).itens;const i=Number(b.dataset.i);if(!it||!it[i]||it[i].add)return;
+    const ok=CM[r.d.metodo].aplicar(r.d,it[i]);if(ok===false){aviso("Não consegui encaixar essa sugestão no modelo. Adicione manualmente.");return}
+    it[i].add=true;czFlush();const y=window.scrollY;renderCausas();window.scrollTo(0,y);
+  }
+  else if(k==="ia-acoes"){
+    czFlush();const M=CM[r.d.metodo];if(!M.raizes(r.d).length)return aviso("Marque primeiro as causas-raiz no modelo.");
+    b.disabled=true;czBusy("czAEst","A IA está propondo ações…",true);
+    try{
+      const j=await czIA("acoes",{raizes:M.raizes(r.d).map(x=>x.t)});
+      r.d.ia=r.d.ia||{};r.d.ia.acoes={em:new Date().toISOString(),acoes:(j.acoes||[]).filter(x=>x&&x.acao),lim:j.limitacoes||""};
+      czFlush();const y=window.scrollY;renderCausas();window.scrollTo(0,y);
+    }catch(err){czBusy("czAEst",err.message&&err.message!=="falha"?err.message:"Não foi possível agora. Crie as ações manualmente a partir das causas-raiz.",true)}
+    b.disabled=false;
+  }
+  else if(k==="add-acao-ia"){
+    const A=((r.d.ia||{}).acoes||{}).acoes;const i=Number(b.dataset.i);if(!A||!A[i]||A[i].add)return;const x=A[i];
+    const hi=Number(x.hier),pr=Math.max(0,Math.min(3,Number(x.prioridade)||1));
+    const a=czNovaAcao(r,{causa:czTxtLivre(x.causa).slice(0,300),acao:czTxtLivre(x.acao)+" (sugestão da IA, validar)",hier:isNaN(hi)?"":String(hi),prioridade:String(pr),prazo:somaDias(PRAZO_AC[pr]||60),origemItem:"czia"+i});
+    if(x.criterio)a.d.ef.obs="Critério de eficácia sugerido: "+x.criterio;regGravar(a);
+    x.add=true;czFlush();const y=window.scrollY;renderCausas();window.scrollTo(0,y);aviso("Ação criada como proposta. Defina responsável e prazo em Ações.");
+  }
+  else if(k==="criar-acao"){
+    const R=CM[r.d.metodo].raizes(r.d)[Number(b.dataset.i)];if(!R)return;
+    czNovaAcao(r,{causa:R.t.slice(0,300),origemItem:"cz"+R.k});
+    const y=window.scrollY;renderCausas();window.scrollTo(0,y);aviso("Ação criada como proposta. Complete a descrição, o responsável e o prazo em Ações.");
+  }
+  else if(k==="concluir"){
+    const M=CM[r.d.metodo],pend=[];
+    if(czTxtLivre(r.d.evento).length<40)pend.push("descreva o evento");
+    if(!M.raizes(r.d).length)pend.push("marque ao menos uma causa-raiz");
+    if(czTxtLivre(r.d.conclusao).length<40)pend.push("escreva a conclusão");
+    if(pend.length)return aviso("Para concluir: "+pend.join("; ")+".");
+    r.d.status="concluida";czFlush();renderCausas();
+  }
+  else if(k==="reabrir"){r.d.status="andamento";czFlush();renderCausas()}
+  else if(k==="excluir"){if(confirm("Excluir esta análise? As ações ligadas permanecem no módulo Ações.")){regExcluir(r.id);G.cz.ed=null;renderCausas()}}
+  else if(k==="ampliar")czAmpliar(r);
+  else if(k==="imprimir")czImprimir(r);
+  else if(k==="png")czPNG(r);
+});
+document.addEventListener("input",e=>{
+  const t=e.target;if(!t.closest||!t.closest("#v-causas"))return;
+  if(t.id==="czQ"){G.cz.q=t.value;const p=t.selectionStart;renderCausas();const q=$("#czQ");if(q){q.focus();q.setSelectionRange(p,p)}return}
+  const f=t.dataset&&t.dataset.czF;if(!f||!G.cz.ed)return;
+  gset(G.cz.ed.d,f,t.value);
+  if(t.dataset.czLive)czRefresh(false);else czSalvar();
+});
+document.addEventListener("change",e=>{
+  const t=e.target;if(!t.closest||!t.closest("#v-causas")||!G.cz.ed)return;
+  const f=t.dataset&&t.dataset.czF;if(!f)return;
+  gset(G.cz.ed.d,f,t.type==="checkbox"?t.checked:t.value);
+  if(f==="postoId"){G.cz.ed.d.atividadeId=""}
+  if(t.dataset.czRe){czFlush();const y=window.scrollY;renderCausas();window.scrollTo(0,y)}
+  else if(t.dataset.czLive)czRefresh(t.dataset.czFull==="1");else czSalvar();
+});
+
+// ---------- impressão e imagem ----------
+function czRelatorio(r){
+  const d=r.d,M=CM[d.metodo],R=M.raizes(d),acs=regOf("acao").filter(a=>a.d.origemId===r.id);
+  return `<h2 style="margin:0">Análise de causas · ${esc(M.meta.nome)}</h2><p style="margin:2px 0 10px;color:#444">${esc(d.numero||"")} · ${esc(d.titulo||"")} · ${esc(dataBR(d.data))}${d.responsavel?" · "+esc(d.responsavel):""}${d.postoId?" · "+esc(caminho(d.postoId)):""}</p>
+  <h3 style="margin:8px 0 2px">Evento ou problema</h3><p style="margin:0;white-space:pre-wrap">${esc(d.evento||"")}</p>
+  <h3 style="margin:12px 0 2px">Modelo</h3>${M.diag(d,true)}
+  <h3 style="margin:12px 0 2px">Causas-raiz</h3>${R.length?`<ul>${R.map(x=>`<li>${esc(x.t)}</li>`).join("")}</ul>`:"<p>Nenhuma marcada.</p>"}
+  <h3 style="margin:12px 0 2px">Conclusão</h3><p style="margin:0;white-space:pre-wrap">${esc(d.conclusao||"(sem conclusão)")}</p>
+  <h3 style="margin:12px 0 2px">Ações</h3>${acs.length?`<ul>${acs.map(a=>`<li><b>${esc(a.d.numero||"(pendente)")}</b> ${esc(a.d.acao||"")}${a.d.prazo?" · prazo "+esc(dataBR(a.d.prazo)):""}</li>`).join("")}</ul>`:"<p>Nenhuma ação criada.</p>"}
+  <p style="font-size:.8rem;color:#555;margin-top:14px">Documento gerado no ErgoContexto. Sugestões de IA, quando usadas, são hipóteses conferidas pelo responsável.</p>`;
+}
+function czImprimir(r){
+  czFlush();let p=document.getElementById("czPrint");if(p)p.remove();
+  p=document.createElement("div");p.id="czPrint";p.innerHTML=czRelatorio(r);document.body.appendChild(p);
+  document.body.classList.add("czp");
+  const fim=()=>{document.body.classList.remove("czp");const x=document.getElementById("czPrint");if(x)x.remove();window.removeEventListener("afterprint",fim)};
+  window.addEventListener("afterprint",fim);setTimeout(()=>window.print(),50);
+}
+function czPNG(r){
+  const s=document.querySelector("#czPrint svg")||null;
+  const tmp=document.createElement("div");tmp.innerHTML=CM[r.d.metodo].diag(r.d,true);const svg=tmp.querySelector("svg");
+  if(!svg)return aviso("Este método não tem diagrama em imagem. Use Imprimir ou salvar em PDF.");
+  svg.setAttribute("xmlns","http://www.w3.org/2000/svg");
+  const vb=svg.getAttribute("viewBox").split(/\s+/).map(Number),W=vb[2],H=vb[3],esc2=2;
+  const url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)],{type:"image/svg+xml;charset=utf-8"}));
+  const im=new Image();im.onload=()=>{const c=document.createElement("canvas");c.width=W*esc2;c.height=H*esc2;const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(url);
+    c.toBlob(b=>{const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=((r.d.numero||"analise")+"-"+r.d.metodo+".png");document.body.appendChild(a);a.click();a.remove()})};
+  im.onerror=()=>aviso("Não foi possível gerar a imagem.");im.src=url;
+}
+
+// ---------- integração: visão, tile, rota ----------
+(function(){
+  if(!$("#v-causas")){const s=document.createElement("section");s.id="v-causas";s.className="view";const ref=$("#v-demandas");if(ref)ref.before(s);else document.body.appendChild(s)}
+  IC.causas='<circle cx="12" cy="5" r="2.2"/><circle cx="5" cy="19" r="2.2"/><circle cx="19" cy="19" r="2.2"/><path d="M12 7.2v4.3M12 11.5L6 17M12 11.5L18 17"/>';
+  if(!TILES.some(t=>t[0]==="causas")){const i=TILES.findIndex(t=>t[0]==="aet");TILES.splice(i>=0?i+1:TILES.length,0,["causas","Causas","Ishikawa, árvore, Bowtie, FRAM e HFACS","causas"])}
+})();
+const _irPara45=irPara;
+irPara=function(v){
+  if(v==="causas"){
+    if(G.ed&&G.ed.tipo&&typeof gravarEd==="function"){try{gravarEd()}catch(e){}G.ed=null;G.rel=false}
+    czFlush();
+    $$(".view").forEach(s=>s.classList.toggle("on",s.id==="v-causas"));
+    $$("#nav button").forEach(b=>b.classList.remove("on"));
+    renderCausas();window.scrollTo(0,0);return;
+  }
+  if(G.cz&&(G.cz.ed||G.cz.novo)){czFlush();G.cz.ed=null;G.cz.novo=null}
+  _irPara45(v);
+};
+
+// ---------- diagrama ampliado (tela cheia, com zoom) ----------
+function czAmpliar(r){
+  let z=document.getElementById("czZoom");if(z)z.remove();
+  z=document.createElement("div");z.id="czZoom";z.style.cssText="position:fixed;inset:0;z-index:9999;background:#fff;display:flex;flex-direction:column";
+  z.innerHTML=`<div class="cz-row" style="padding:10px 12px;border-bottom:1px solid #dde4e8"><b style="flex:1;min-width:120px">${esc(r.d.titulo||"Diagrama")}</b><button type="button" class="btn peq sec" data-cz-z="-" aria-label="Diminuir">−</button><button type="button" class="btn peq sec" data-cz-z="+" aria-label="Aumentar">+</button><button type="button" class="btn peq sec" data-cz-z="fit">Ajustar</button><button type="button" class="btn peq" data-cz-z="x">Fechar</button></div><div id="czZoomBox" style="flex:1;overflow:auto;padding:8px;background:#fbfdfe">${CM[r.d.metodo].diag(r.d,true)}</div>`;
+  document.body.appendChild(z);
+  const box=z.querySelector("#czZoomBox"),svg=box.querySelector("svg");if(!svg)return;
+  const W=svg.viewBox.baseVal.width;let k=1;
+  const fit=()=>{k=Math.min(1.4,Math.max(.25,(box.clientWidth-16)/W));ap()},ap=()=>{svg.style.width=Math.round(W*k)+"px";svg.style.height="auto";svg.style.maxWidth="none"};
+  z._z={fit,mais:()=>{k=Math.min(3,k*1.25);ap()},menos:()=>{k=Math.max(.2,k/1.25);ap()}};fit();
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-cz-z]");if(!b)return;const z=document.getElementById("czZoom");if(!z)return;
+  const a=b.dataset.czZ;if(a==="x")z.remove();else if(a==="+")z._z.mais();else if(a==="-")z._z.menos();else z._z.fit();
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){const z=document.getElementById("czZoom");if(z)z.remove()}});
+/* FASE 26: método 1 · Ishikawa ergonômico + 5 Porquês */
+const czTrunc=(s,n)=>{s=czTxtLivre(s);return s.length>n?s.slice(0,n-1)+"…":s};
+function czWrap(s,n,max){
+  const p=czTxtLivre(s).split(" "),L=[];let c="";
+  p.forEach(w=>{if((c+" "+w).trim().length>n&&c){L.push(c);c=w}else c=(c+" "+w).trim()});
+  if(c)L.push(c);
+  if(L.length>max){const r=L.slice(0,max);r[max-1]=czTrunc(r[max-1]+"…",n);return r}
+  return L;
+}
+const EVCOR={hipotese:"#90a4ae",relatado:"#1e88e5",observado:"#00897b",medido:"#2e7d32"};
+const ISH_CATS=[
+  {k:"tarefa",n:"Tarefa e carga",cor:"#c0392b",dica:"Peso, repetição, postura exigida, ritmo, precisão, duração."},
+  {k:"posto",n:"Posto e equipamento",cor:"#2471a3",dica:"Altura, alcance, layout, ferramentas, assento, máquina."},
+  {k:"ambiente",n:"Ambiente",cor:"#117a65",dica:"Iluminação, ruído, temperatura, piso, vibração, espaço."},
+  {k:"organizacao",n:"Organização do trabalho",cor:"#a04000",dica:"Metas, turnos, pausas, rodízio, equipe, interrupções."},
+  {k:"metodo",n:"Método e procedimento",cor:"#6c3483",dica:"Instruções, sequência de passos, informação, mudanças recentes."},
+  {k:"pessoas",n:"Pessoas e capacitação",cor:"#5d6d7e",dica:"Diferenças individuais, experiência, treinamento. Descreva condições, nunca culpe."}
+];
+CM.ishikawa={
+  meta:{
+    nome:"Ishikawa ergonômico + 5 Porquês",situacao:"Problema ergonômico relativamente simples",
+    quando:"Um problema claro (dor, queixa, retrabalho, posto inadequado) com causas que a equipe consegue levantar em uma conversa e confirmar no posto.",
+    limite:"Evento com sequência de fatos no tempo, risco com várias barreiras, ou atividade muito variável e organizacional. Nesses casos prefira Árvore de causas, Bowtie ou FRAM.",
+    passos:["Escreva o problema como um fato observável (o que, onde, quem, desde quando).","Em cada uma das 6 categorias, liste as causas possíveis. Marque o nível de evidência: hipótese, relatado, observado ou medido.","Nas causas mais importantes, abra os <b>5 Porquês</b>: pergunte \"por que isso acontece?\" até chegar a algo que a organização pode mudar.","Marque com ★ as causas-raiz e confirme no posto antes de agir."],
+    cuidado:"parar em \"falta de atenção\" ou \"erro do operador\" não é causa-raiz. Pergunte o que tornou aquele comportamento provável.",
+    raizDef:"Causa-raiz é a que, se eliminada, faz o problema deixar de acontecer e que a organização consegue mudar (projeto, método, organização).",
+    ajudaIA:"A IA sugere causas por categoria, propõe o próximo porquê, aponta categorias esquecidas e critica o raciocínio. Tudo entra como hipótese."
+  },
+  vazio:()=>({cats:{tarefa:[],posto:[],ambiente:[],organizacao:[],metodo:[],pessoas:[]}}),
+  vazioQ:d=>ISH_CATS.every(c=>!(d.dados.cats[c.k]||[]).length),
+  exemplo:()=>{
+    const C=(t,ev,raiz,why)=>({id:czid(),t,ev,raiz:!!raiz,why:why||[]});
+    return {evento:"Três operadores da embalagem da linha 3 relatam dor no ombro direito há seis semanas, após a troca da esteira por um modelo mais alto.",dados:{cats:{
+      tarefa:[C("Ciclo de 6 segundos com o braço acima da altura do ombro","observado"),C("Peças de 4 kg movimentadas cerca de 600 vezes por turno","medido")],
+      posto:[C("Esteira nova 12 cm mais alta que a anterior, sem regulagem de altura","medido",true,[{t:"O braço fica elevado para alcançar a peça","ev":"observado"},{t:"A esteira nova é mais alta e fixa","ev":"medido"},{t:"O modelo foi comprado sem requisito de regulagem","ev":"relatado"},{t:"A compra não passa por validação ergonômica antes da aquisição","ev":"relatado"}])],
+      ambiente:[C("Piso com pequeno desnível onde o operador apoia o pé","hipotese")],
+      organizacao:[C("Sem rodízio entre postos nas oito horas de turno","relatado",true)],
+      metodo:[C("Instrução de trabalho não foi revisada após a troca da esteira","observado")],
+      pessoas:[C("Operadores novos ainda sem treinamento em técnica de manuseio","relatado")]}}};
+  },
+  render(d,dis){
+    return `<div id="czDiag" class="cz-diag">${this.diag(d,false)}</div>
+    <div class="cz-leg">${EVID.map(e=>`<span><i style="background:${EVCOR[e[0]]}"></i>${e[1]}</span>`).join("")}<span><b style="color:#c62828">★</b> causa-raiz</span><span>⛓ tem 5 Porquês</span></div>
+    <div class="grid2">${ISH_CATS.map(c=>this.cat(d,c.k,dis)).join("")}</div>`;
+  },
+  cat(d,k,dis){
+    const c=ISH_CATS.find(x=>x.k===k),arr=d.dados.cats[k];
+    return `<div class="cz-box" style="border-top:4px solid ${c.cor}"><h4 style="color:${c.cor}">${c.n} <small class="mut">(${arr.length})</small></h4><small class="mut">${c.dica}</small>
+    ${arr.map((x,i)=>this.causa(d,k,i,x,dis)).join("")}<div style="margin-top:8px"><button type="button" class="btn peq sec" data-cz-a="ishikawa:add" data-k="${k}" ${dis}>+ Causa</button></div></div>`;
+  },
+  causa(d,k,i,x,dis){
+    const P=`dados.cats.${k}.${i}`,ab=G.cz.ish&&G.cz.ish[x.id];
+    return `<div style="border:1px solid var(--bd,#dfe6ea);border-radius:10px;padding:8px;margin:8px 0;background:var(--card,#fff)">
+     <div class="cz-row"><input class="cz-in" data-cz-f="${P}.t" data-cz-live="1" ${dis} value="${esc(x.t)}" placeholder="Causa possível (condição de trabalho)" aria-label="Causa">${czSelEv(P+".ev",x.ev,dis)}</div>
+     <div class="cz-row" style="margin-top:6px"><label style="font-size:.84rem;font-weight:600"><input type="checkbox" data-cz-f="${P}.raiz" data-cz-live="1" ${x.raiz?"checked":""} ${dis}> <span style="color:#c62828">★</span> Causa-raiz</label>
+      <button type="button" class="btn peq sec" data-cz-a="ishikawa:abrir" data-id="${x.id}">⛓ 5 Porquês${(x.why||[]).length?" ("+x.why.length+")":""} ${ab?"▲":"▼"}</button>
+      <button type="button" class="cz-x" data-cz-a="ishikawa:del" data-k="${k}" data-i="${i}" ${dis} aria-label="Remover causa" style="margin-left:auto">✕</button></div>
+     ${ab?this.porques(d,k,i,x,dis):""}</div>`;
+  },
+  porques(d,k,i,x,dis){
+    const P=`dados.cats.${k}.${i}`,w=x.why||[],pq=G.cz.porq&&G.cz.porq.id===x.id?G.cz.porq:null;
+    return `<div style="margin:10px 0 2px 6px;border-left:3px solid #c9d6de;padding-left:10px">
+     <p class="mut" style="margin:0 0 6px;font-size:.84rem">Por que <b>"${esc(czTrunc(x.t,70)||"…")}"</b> acontece? Continue perguntando até chegar a algo que a organização pode mudar.</p>
+     ${w.map((y,j)=>`<div class="cz-row" style="margin:5px 0"><span class="cz-chip">Por quê ${j+1}</span><input class="cz-in" data-cz-f="${P}.why.${j}.t" data-cz-live="1" ${dis} value="${esc(y.t)}" aria-label="Por quê ${j+1}">${czSelEv(P+".why."+j+".ev",y.ev,dis)}<button type="button" class="cz-x" data-cz-a="ishikawa:delwhy" data-k="${k}" data-i="${i}" data-j="${j}" ${dis} aria-label="Remover porquê">✕</button></div>`).join("")}
+     <div class="cz-row" style="margin-top:6px">${w.length<7?`<button type="button" class="btn peq sec" data-cz-a="ishikawa:addwhy" data-k="${k}" data-i="${i}" ${dis}>+ Por quê</button>`:""}<button type="button" class="btn peq" style="background:#6a3fc2" data-cz-a="ishikawa:porq" data-k="${k}" data-i="${i}" ${dis}>✨ Sugerir próximo porquê</button><span id="czPorqEst" class="mut"></span></div>
+     ${w.length>=2?`<label style="display:block;margin-top:8px;font-size:.84rem;font-weight:600"><input type="checkbox" data-cz-f="${P}.teste" ${x.teste?"checked":""} ${dis}> Teste de reversão: se o último porquê fosse eliminado, o problema deixaria de acontecer?</label>`:""}
+     ${pq?`<div class="cz-ia" style="margin:8px 0 0">${(pq.itens||[]).map((it,n)=>`<div class="cz-prop"><span class="tx">${esc(it.texto)}${it.pergunta?`<br><small class="mut">Pergunte no campo: ${esc(it.pergunta)}</small>`:""}</span><button type="button" class="btn peq sec" data-cz-a="ishikawa:usarporq" data-k="${k}" data-i="${i}" data-n="${n}">+ Usar</button></div>`).join("")||'<small class="mut">Sem sugestões. Reformule o porquê anterior.</small>'}${pq.fim?`<small class="mut">A IA entende que o último porquê já é acionável.</small>`:""}</div>`:""}</div>`;
+  },
+  diag(d,ro){
+    const mx=Math.max(3,Math.min(7,...[0]),...ISH_CATS.map(c=>Math.min(7,(d.dados.cats[c.k]||[]).length))),SY=50+mx*25+46,W=1060,H=SY*2,DY=SY-50,out=[];
+    const xs=[370,590,810],xl=[240,460,680];
+    out.push(`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif" role="img" aria-label="Diagrama de Ishikawa"><rect width="${W}" height="${H}" fill="#fbfdfe"/>`);
+    out.push(`<line x1="30" y1="${SY}" x2="842" y2="${SY}" stroke="#003352" stroke-width="5" stroke-linecap="round"/><polygon points="842,${SY-9} 858,${SY} 842,${SY+9}" fill="#003352"/>`);
+    const ev=czWrap(d.evento||"Descreva o problema",22,8),hh=Math.max(90,ev.length*17+44);
+    out.push(`<rect x="858" y="${SY-hh/2}" width="192" height="${hh}" rx="12" fill="#003352"/><text x="954" y="${SY-hh/2+19}" text-anchor="middle" font-size="10" font-weight="700" fill="#FFB84D" letter-spacing="1">PROBLEMA</text>`);
+    ev.forEach((l,i)=>out.push(`<text x="954" y="${SY-hh/2+40+i*17}" text-anchor="middle" font-size="12.5" fill="#fff">${esc(l)}</text>`));
+    ISH_CATS.forEach((c,ci)=>{
+      const top=ci<3,col=ci%3,lx=xl[col],sx=xs[col],arr=d.dados.cats[c.k]||[];
+      const y0=top?50:H-50;
+      out.push(`<line x1="${lx}" y1="${y0}" x2="${sx}" y2="${SY}" stroke="${c.cor}" stroke-width="3" stroke-linecap="round"/>`);
+      out.push(`<rect x="${lx-92}" y="${top?12:H-46}" width="184" height="32" rx="8" fill="${c.cor}"/><text x="${lx}" y="${top?33:H-25}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">${esc(c.n)}</text>`);
+      arr.slice(0,7).forEach((x,i)=>{
+        const y=top?82+i*25:H-82-i*25,bx=top?sx-(SY-y)*130/DY:sx-(y-SY)*130/DY;
+        out.push(`<line x1="${bx-26}" y1="${y}" x2="${bx}" y2="${y}" stroke="${c.cor}" stroke-width="1.2" opacity=".6"/><circle cx="${bx-26}" cy="${y}" r="3.6" fill="${EVCOR[x.ev]||EVCOR.hipotese}"/>`);
+        const w=(x.why||[]).length,mk=(x.raiz?"★ ":"")+(w?"⛓ ":"");
+        out.push(`<text x="${bx-33}" y="${y+4}" text-anchor="end" font-size="11" fill="${x.raiz?"#b71c1c":"#263238"}" ${x.raiz?'font-weight="700"':""}>${esc(mk+czTrunc(x.t||"(vazio)",32))}</text>`);
+      });
+      if(arr.length>7)out.push(`<text x="${sx-30}" y="${top?82+7*25:H-82-7*25}" text-anchor="end" font-size="10.5" fill="#78909c">+${arr.length-7} causa(s) na lista</text>`);
+    });
+    out.push("</svg>");
+    return out.join("");
+  },
+  resumo(d){
+    const L=[];ISH_CATS.forEach(c=>{(d.dados.cats[c.k]||[]).forEach(x=>{L.push(`[${c.n}] ${x.t} (evidência: ${x.ev})${x.raiz?" [marcada como causa-raiz]":""}`+((x.why||[]).length?"\n   Porquês: "+x.why.map((w,j)=>`${j+1}) ${w.t} (${w.ev})`).join(" → "):""))})});
+    return L.join("\n")||"(modelo vazio)";
+  },
+  foco(d){const v=ISH_CATS.filter(c=>!(d.dados.cats[c.k]||[]).length).map(c=>c.k);return v.length?"categorias vazias: "+v.join(", "):""},
+  rotuloItem(d,it){const c=ISH_CATS.find(x=>x.k===it.alvo);return c?c.n:"Categoria"},
+  aplicar(d,it){
+    const c=ISH_CATS.find(x=>x.k===it.alvo);if(!c)return false;
+    d.dados.cats[c.k].push({id:czid(),t:czTxtLivre(it.texto).slice(0,200),ev:EVC[it.evidencia]?it.evidencia:"hipotese",raiz:false,why:[]});return true;
+  },
+  raizes(d){
+    const R=[];ISH_CATS.forEach(c=>(d.dados.cats[c.k]||[]).forEach(x=>{if(x.raiz&&czTxtLivre(x.t)){const w=(x.why||[]).filter(y=>czTxtLivre(y.t));R.push({k:x.id,t:w.length?czTxtLivre(w[w.length-1].t):czTxtLivre(x.t),n:c.n})}}));return R;
+  },
+  lint(d){
+    const L=[],A=ISH_CATS.flatMap(c=>(d.dados.cats[c.k]||[]).map(x=>({c,x})));
+    if(!A.length)return [{s:"i",t:"Comece listando causas possíveis nas categorias. Use o exemplo para ver como fica."}];
+    const vaz=ISH_CATS.filter(c=>!(d.dados.cats[c.k]||[]).length);
+    if(vaz.length>=3)L.push({s:"i",t:`Categorias sem causas: ${vaz.map(c=>c.n).join(", ")}. Verifique se foram investigadas ou se não se aplicam.`});
+    if(A.every(a=>a.x.ev==="hipotese"))L.push({s:"m",t:"Todas as causas ainda são hipóteses. Confirme as principais no posto (observação, medição ou conversa com quem executa) e atualize o nível de evidência."});
+    const pe=A.filter(a=>a.c.k==="pessoas").length;
+    if(A.length>=4&&pe/A.length>.5)L.push({s:"m",t:"Mais da metade das causas está em Pessoas. Pergunte o que no posto, no método ou na organização tornou esses comportamentos prováveis."});
+    const R=A.filter(a=>a.x.raiz);
+    if(!R.length)L.push({s:"m",t:"Nenhuma causa-raiz marcada (★). Aprofunde as mais importantes com os 5 Porquês."});
+    R.forEach(a=>{if((a.x.why||[]).length<3&&czTxtLivre(a.x.t))L.push({s:"i",t:`A causa "${czTrunc(a.x.t,50)}" está marcada como raiz mas tem poucos porquês. Aprofunde para não parar num sintoma.`})});
+    R.forEach(a=>{if((a.x.why||[]).length>=2&&!a.x.teste)L.push({s:"i",t:`Faça o teste de reversão em "${czTrunc(a.x.t,50)}": eliminando a causa final, o problema deixa de acontecer?`})});
+    return L.slice(0,6);
+  },
+  acao(s,b,r,dis){
+    const d=r.d,cats=d.dados.cats,k=b.dataset.k,i=Number(b.dataset.i),j=Number(b.dataset.j);G.cz.ish=G.cz.ish||{};
+    if(s==="add"){cats[k].push({id:czid(),t:"",ev:"hipotese",raiz:false,why:[]});czRefresh(true);const e=document.querySelector(`[data-cz-f="dados.cats.${k}.${cats[k].length-1}.t"]`);if(e)e.focus()}
+    else if(s==="del"){cats[k].splice(i,1);czRefresh(true)}
+    else if(s==="abrir"){G.cz.ish[b.dataset.id]=!G.cz.ish[b.dataset.id];czRefresh(true)}
+    else if(s==="addwhy"){const x=cats[k][i];x.why=x.why||[];x.why.push({t:"",ev:"hipotese"});czRefresh(true);const e=document.querySelector(`[data-cz-f="dados.cats.${k}.${i}.why.${x.why.length-1}.t"]`);if(e)e.focus()}
+    else if(s==="delwhy"){cats[k][i].why.splice(j,1);czRefresh(true)}
+    else if(s==="porq"){
+      const x=cats[k][i];if(czTxtLivre(x.t).length<5)return aviso("Escreva a causa antes de pedir o próximo porquê.");
+      b.disabled=true;czBusy("czPorqEst","A IA está pensando…",true);
+      czIA("porques",{foco:x.t,cadeia:(x.why||[]).map(y=>y.t),categoria:ISH_CATS.find(c=>c.k===k).n}).then(j=>{
+        G.cz.porq={id:x.id,itens:(j.itens||[]).filter(y=>y&&y.texto),fim:!!j.fim};czRefresh(true);
+      }).catch(err=>{b.disabled=false;czBusy("czPorqEst",err.message&&err.message!=="falha"?err.message:"Não foi possível agora.",true)});
+    }
+    else if(s==="usarporq"){
+      const pq=G.cz.porq,x=cats[k][i];if(!pq||pq.id!==x.id)return;const it=pq.itens[Number(b.dataset.n)];if(!it)return;
+      x.why=x.why||[];x.why.push({t:czTxtLivre(it.texto).slice(0,200),ev:EVC[it.evidencia]?it.evidencia:"hipotese"});G.cz.porq=null;czRefresh(true);
+    }
+  }
+};
+/* FASE 26: método 2 · Árvore de causas (fatos antecedentes, do evento para trás) */
+const ARV_T={
+  fato:{n:"Fato",cor:"#2471a3",fundo:"#e8f1f9",dica:"Algo que aconteceu."},
+  variacao:{n:"Variação",cor:"#e67e22",fundo:"#fff1e0",dica:"Algo diferente do habitual (mudança, falha, ausência)."},
+  habitual:{n:"Condição habitual",cor:"#6b7b83",fundo:"#eef1f3",dica:"Algo que existe sempre no trabalho (projeto, regra, rotina)."}
+};
+const arvKids=(d,id)=>d.dados.nos.filter(n=>n.pai===id);
+function arvOrdem(d){
+  const o=[],go=(id,dep)=>{arvKids(d,id).forEach(n=>{o.push({n,dep});go(n.id,dep+1)})};go("r",1);return o;
+}
+CM.arvore={
+  meta:{
+    nome:"Árvore de causas",situacao:"Queixa, exposição ou evento com sequência identificável",
+    quando:"Há um evento ou desfecho claro (lesão, queixa, parada, quase-acidente) e dá para reconstruir, passo a passo, o que precisou acontecer antes para ele ocorrer.",
+    limite:"Problema difuso e crônico sem um evento definido, ou quando a pergunta é sobre risco futuro. Prefira Ishikawa ou Bowtie.",
+    passos:["Escreva o evento final como fato (o desfecho que você quer explicar).","Pergunte: <b>\"o que foi necessário para isso acontecer?\"</b> Cada resposta é um antecedente (um nó). Pergunte também: <b>\"isso bastava, ou foi preciso outro fato?\"</b>","Classifique cada nó: <b>fato</b> (aconteceu), <b>variação</b> (algo diferente do habitual) ou <b>condição habitual</b> (existe sempre). As variações costumam mostrar o que mudou.","Continue até a origem de cada ramo. Marque ⚑ os pontos onde uma ação romperia a sequência."],
+    cuidado:"descreva fatos, não julgamentos. \"Operador distraído\" não é fato. \"Operador atendeu o telefone durante a tarefa\" é.",
+    raizDef:"Pontos de intervenção são os nós onde uma ação quebra a sequência que levou ao evento. Prefira condições habituais e variações de projeto ou organização a atos isolados.",
+    ajudaIA:"A IA propõe antecedentes para o nó escolhido (ou para o primeiro ramo sem origem), sugere o tipo de cada nó e perguntas para o campo, e critica a lógica da árvore."
+  },
+  vazio:()=>({nos:[]}),
+  vazioQ:d=>!d.dados.nos.length,
+  exemplo:()=>{
+    const N=(id,pai,t,tipo,ev,o)=>Object.assign({id,pai,t,tipo,ev,pi:false,fim:false},o||{});
+    return {evento:"Operador sofreu lombalgia aguda ao levantar uma caixa de 18 kg do piso no setor de expedição.",dados:{nos:[
+      N("a1","r","Operador flexionou o tronco e girou ao levantar a caixa de um palete baixo","fato","observado"),
+      N("a2","a1","Caixa estava no primeiro nível do palete, rente ao chão","variacao","observado"),
+      N("a3","a2","Mesa elevatória do palete estava fora de serviço há dois dias","variacao","observado"),
+      N("a4","a3","Manutenção preventiva da mesa elevatória sem periodicidade definida","habitual","relatado",{pi:true,fim:true}),
+      N("a5","a1","Caixa de 18 kg, larga e sem alças","habitual","observado",{pi:true,fim:true}),
+      N("a6","a1","Operador estava sozinho no turno, sem o colega de apoio","variacao","relatado"),
+      N("a7","a6","Dimensionamento da equipe não prevê cobertura para ausências","habitual","relatado",{pi:true,fim:true}),
+      N("a8","r","Operador tinha pressa para fechar a carga antes da saída do caminhão","fato","relatado"),
+      N("a9","a8","Caminhão chegou 40 minutos atrasado e o horário de saída foi mantido","variacao","relatado",{fim:true})]}};
+  },
+  render(d,dis){
+    return `<div id="czDiag" class="cz-diag">${this.diag(d,false)}</div>
+    <div class="cz-leg">${Object.keys(ARV_T).map(k=>`<span><i style="background:${ARV_T[k].cor}"></i><b>${ARV_T[k].n}</b>: ${ARV_T[k].dica}</span>`).join("")}<span><b style="color:#c62828">⚑</b> ponto de intervenção</span></div>
+    <div class="cz-box"><h4>Construa a árvore</h4><p class="mut" style="margin:0 0 8px;font-size:.86rem">Comece pelo evento e pergunte: <b>o que foi necessário para isso acontecer?</b></p>${this.lista(d,dis)}</div>`;
+  },
+  lista(d,dis){
+    const ord=arvOrdem(d);
+    const raiz=`<div class="cz-row" style="margin-bottom:6px"><span class="cz-chip" style="background:#003352;color:#fff">E</span><span style="flex:1 1 200px;font-weight:700">${esc(czTrunc(d.evento,120)||"(descreva o evento acima)")}</span><button type="button" class="btn peq sec" data-cz-a="arvore:add" data-p="r" ${dis}>+ Antecedente</button><button type="button" class="btn peq" style="background:#6a3fc2" data-cz-a="arvore:sug" data-p="r" ${dis}>✨</button></div>`;
+    const linhas=ord.map((x,i)=>{const n=x.n,T=ARV_T[n.tipo]||ARV_T.fato,P=`dados.nos.${d.dados.nos.indexOf(n)}`;
+      return `<div style="margin:6px 0 6px ${Math.min(x.dep-1,6)*18}px;border-left:4px solid ${T.cor};background:var(--card,#fff);border-radius:8px;padding:7px 9px;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+       <div class="cz-row"><span class="cz-chip" style="background:${T.fundo};color:${T.cor}">${i+1}</span><select class="cz-mini" data-cz-f="${P}.tipo" data-cz-live="1" data-cz-full="1" ${dis} aria-label="Tipo">${sel1(Object.keys(ARV_T).map(k=>[k,ARV_T[k].n]),n.tipo)}</select>
+       <input class="cz-in" data-cz-f="${P}.t" data-cz-live="1" ${dis} value="${esc(n.t)}" placeholder="O que aconteceu ou existia (fato observável)" aria-label="Antecedente ${i+1}">${czSelEv(P+".ev",n.ev,dis)}</div>
+       <div class="cz-row" style="margin-top:5px"><label style="font-size:.82rem;font-weight:600"><input type="checkbox" data-cz-f="${P}.pi" data-cz-live="1" ${n.pi?"checked":""} ${dis}> <span style="color:#c62828">⚑</span> Ponto de intervenção</label><label style="font-size:.82rem;font-weight:600"><input type="checkbox" data-cz-f="${P}.fim" data-cz-live="1" ${n.fim?"checked":""} ${dis}> Fim do ramo</label>
+       <button type="button" class="btn peq sec" data-cz-a="arvore:add" data-p="${n.id}" ${dis}>+ Antecedente</button><button type="button" class="btn peq" style="background:#6a3fc2" data-cz-a="arvore:sug" data-p="${n.id}" ${dis}>✨</button><button type="button" class="cz-x" data-cz-a="arvore:del" data-p="${n.id}" ${dis} style="margin-left:auto" aria-label="Remover nó e antecedentes">✕</button></div></div>`}).join("");
+    return raiz+(linhas||`<p class="mut">Nenhum antecedente ainda. Toque em "+ Antecedente" no evento.</p>`);
+  },
+  layout(d){
+    const nos=d.dados.nos,by={};nos.forEach(n=>by[n.id]=n);
+    const pos={};let yc=22,maxD=0;
+    const go=(id,dep)=>{
+      maxD=Math.max(maxD,dep);const t=id==="r"?(d.evento||"Descreva o evento"):(by[id].t||"(vazio)");
+      const lines=czWrap(t,27,4),h=Math.max(46,20+lines.length*15),ch=arvKids(d,id);
+      if(!ch.length){pos[id]={dep,y:yc+h/2,h,lines};yc+=h+16;return}
+      ch.forEach(c=>go(c.id,dep+1));
+      const ys=ch.map(c=>pos[c.id].y);pos[id]={dep,y:(Math.min(...ys)+Math.max(...ys))/2,h,lines};
+    };
+    go("r",0);return {pos,maxD,H:Math.max(yc+6,150)};
+  },
+  diag(d,ro){
+    const BW=204,GAP=56,L=this.layout(d),W=(L.maxD+1)*(BW+GAP)-GAP+40,H=L.H;
+    const X=dep=>W-BW-20-dep*(BW+GAP);
+    const ord={};arvOrdem(d).forEach((x,i)=>ord[x.n.id]=i+1);
+    const o=[`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif" role="img" aria-label="Árvore de causas"><defs><marker id="czArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#546e7a"/></marker></defs><rect width="${W}" height="${H}" fill="#fbfdfe"/>`];
+    const ids=["r"].concat(d.dados.nos.map(n=>n.id));
+    ids.forEach(id=>{
+      const ch=arvKids(d,id);if(!ch.length)return;const p=L.pos[id],px=X(p.dep),jx=px-30;
+      const ys=ch.map(c=>L.pos[c.id].y).concat([p.y]);
+      o.push(`<line x1="${jx}" y1="${Math.min(...ys)}" x2="${jx}" y2="${Math.max(...ys)}" stroke="#546e7a" stroke-width="1.6"/>`);
+      ch.forEach(c=>{const q=L.pos[c.id];o.push(`<line x1="${X(q.dep)+BW}" y1="${q.y}" x2="${jx}" y2="${q.y}" stroke="#546e7a" stroke-width="1.6"/>`)});
+      o.push(`<line x1="${jx}" y1="${p.y}" x2="${px-1}" y2="${p.y}" stroke="#546e7a" stroke-width="1.6" marker-end="url(#czArr)"/>`);
+      if(ch.length>1)o.push(`<circle cx="${jx}" cy="${p.y}" r="9" fill="#fff" stroke="#546e7a" stroke-width="1.4"/><text x="${jx}" y="${p.y+3.6}" text-anchor="middle" font-size="10" font-weight="700" fill="#37474f">E</text>`);
+    });
+    ids.forEach(id=>{
+      const p=L.pos[id],x=X(p.dep),y=p.y-p.h/2,raiz=id==="r",n=raiz?null:d.dados.nos.find(z=>z.id===id),T=raiz?null:(ARV_T[n.tipo]||ARV_T.fato);
+      if(raiz)o.push(`<rect x="${x}" y="${y}" width="${BW}" height="${p.h}" rx="10" fill="#003352"/><text x="${x+12}" y="${y+15}" font-size="9.5" font-weight="700" fill="#FFB84D" letter-spacing="1">EVENTO</text>`);
+      else o.push(`<rect x="${x}" y="${y}" width="${BW}" height="${p.h}" rx="9" fill="${T.fundo}" stroke="${T.cor}" stroke-width="${n.pi?3:1.8}"/><rect x="${x}" y="${y}" width="7" height="${p.h}" rx="3" fill="${T.cor}"/><circle cx="${x+22}" cy="${y+13}" r="9" fill="${T.cor}"/><text x="${x+22}" y="${y+16.5}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${ord[id]}</text><text x="${x+36}" y="${y+16}" font-size="9.5" font-weight="700" fill="${T.cor}" letter-spacing=".6">${T.n.toUpperCase()}</text>`);
+      p.lines.forEach((l,i)=>o.push(`<text x="${x+12}" y="${y+(raiz?30:32)+i*15}" font-size="12" fill="${raiz?"#fff":"#1b2a33"}">${esc(l)}</text>`));
+      if(n&&n.pi)o.push(`<text x="${x+BW-8}" y="${y+16}" text-anchor="end" font-size="15" fill="#c62828">⚑</text>`);
+      if(n){o.push(`<circle cx="${x+BW-10}" cy="${y+p.h-9}" r="3.6" fill="${EVCOR[n.ev]||EVCOR.hipotese}"/>`)}
+    });
+    o.push("</svg>");return o.join("");
+  },
+  resumo(d){
+    const o=arvOrdem(d),L=["EVENTO: "+(d.evento||"")];
+    o.forEach((x,i)=>{const n=x.n,pa=n.pai==="r"?"E":"#"+(o.findIndex(z=>z.n.id===n.pai)+1);L.push(`${"  ".repeat(x.dep)}#${i+1} (id ${n.id}) antecedente de ${pa} [${n.tipo}] ${n.t} (evidência: ${n.ev})${n.pi?" [ponto de intervenção]":""}${n.fim?" [fim do ramo]":""}`)});
+    return L.join("\n");
+  },
+  foco(d){
+    const o=arvOrdem(d);const f=o.find(x=>!arvKids(d,x.n.id).length&&!x.n.fim&&x.n.tipo!=="habitual");
+    return f?`ramo sem origem: id ${f.n.id} "${f.n.t}"`:(o.length?"":"árvore vazia: proponha os primeiros antecedentes do evento (alvo r)");
+  },
+  rotuloItem(d,it){if(!it.alvo||it.alvo==="r")return "Antecedente do evento";const o=arvOrdem(d),i=o.findIndex(z=>z.n.id===it.alvo);return i>=0?"Antecedente de #"+(i+1):"Antecedente"},
+  aplicar(d,it){
+    const alvo=it.alvo&&d.dados.nos.some(n=>n.id===it.alvo)?it.alvo:"r";
+    d.dados.nos.push({id:czid(),pai:alvo,t:czTxtLivre(it.texto).slice(0,220),tipo:ARV_T[it.tipo]?it.tipo:"fato",ev:EVC[it.evidencia]?it.evidencia:"hipotese",pi:false,fim:false});return true;
+  },
+  raizes(d){const o=arvOrdem(d);return o.map((x,i)=>({x,i})).filter(a=>a.x.n.pi&&czTxtLivre(a.x.n.t)).map(a=>({k:a.x.n.id,t:czTxtLivre(a.x.n.t),n:"Ponto de intervenção #"+(a.i+1)}))},
+  lint(d){
+    const L=[],o=arvOrdem(d);
+    if(!o.length)return [{s:"i",t:"Comece perguntando: o que foi necessário para este evento acontecer? Cada resposta é um antecedente."}];
+    const maxD=Math.max(...o.map(x=>x.dep));
+    if(maxD<3)L.push({s:"m",t:"A árvore tem só "+maxD+" nível(is). Continue perguntando \"o que foi necessário para isso?\" até a origem de cada ramo."});
+    o.forEach((x,i)=>{const n=x.n;if(!arvKids(d,n.id).length&&!n.fim&&n.tipo!=="habitual"&&czTxtLivre(n.t))L.push({s:"i",t:`O nó #${i+1} não tem antecedentes. Pergunte o que foi necessário para ele ou marque "Fim do ramo".`})});
+    if(!o.some(x=>x.n.tipo==="variacao"))L.push({s:"m",t:"Nenhuma variação registrada. A árvore costuma revelar o que mudou em relação ao habitual (falha, ausência, mudança). Procure."});
+    if(!o.some(x=>x.n.pi))L.push({s:"m",t:"Marque ⚑ os pontos onde uma ação quebraria a sequência. Prefira condições habituais e variações a atos isolados."});
+    if(o.every(x=>x.n.ev==="hipotese"))L.push({s:"m",t:"Todos os nós são hipóteses. Confirme os fatos com observação, registros ou relato de quem estava lá."});
+    o.forEach((x,i)=>{if(x.n.tipo==="fato"&&x.n.pi&&/oper|trabalh|colab|funcion/i.test(x.n.t)&&!arvKids(d,x.n.id).length)L.push({s:"i",t:`O ponto de intervenção #${i+1} parece ser um ato de uma pessoa. Pergunte o que na tarefa ou na organização tornou esse ato provável.`})});
+    return L.slice(0,6);
+  },
+  ini(d){const e=$("#czDiag");if(e)e.scrollLeft=e.scrollWidth},
+  acao(s,b,r,dis){
+    const d=r.d,nos=d.dados.nos,p=b.dataset.p;
+    if(s==="add"){const n={id:czid(),pai:p,t:"",tipo:"fato",ev:"hipotese",pi:false,fim:false};nos.push(n);czRefresh(true);const i=nos.indexOf(n),e=document.querySelector(`[data-cz-f="dados.nos.${i}.t"]`);if(e)e.focus()}
+    else if(s==="del"){
+      const sub=new Set([p]);let mudou=true;while(mudou){mudou=false;nos.forEach(n=>{if(!sub.has(n.id)&&sub.has(n.pai)){sub.add(n.id);mudou=true}})}
+      if(sub.size>1&&!confirm("Remover este nó e os "+(sub.size-1)+" antecedente(s) abaixo dele?"))return;
+      d.dados.nos=nos.filter(n=>!sub.has(n.id));czRefresh(true);
+    }
+    else if(s==="sug"){
+      const n=p==="r"?null:nos.find(z=>z.id===p);const txt=n?n.t:d.evento;if(czTxtLivre(txt).length<8)return aviso("Escreva o texto do nó antes de pedir sugestões.");
+      b.disabled=true;
+      const o=arvOrdem(d),i=o.findIndex(z=>z.n.id===p);
+      czIA("sugerir",{foco:`antecedentes do nó id ${p} (${p==="r"?"evento final":"#"+(i+1)}): "${txt}"`}).then(j=>{
+        r.d.ia=r.d.ia||{};r.d.ia.sug={em:new Date().toISOString(),itens:(j.itens||[]).filter(x=>x&&x.texto).map(x=>Object.assign(x,{alvo:p})),perguntas:j.perguntas||[],lim:j.limitacoes||""};
+        czFlush();b.disabled=false;const ia=$(".cz-ia");if(ia){ia.outerHTML=htmlCzIA(r.d,dis);const q=$(".cz-ia");if(q)q.scrollIntoView({behavior:"smooth",block:"center"})}
+      }).catch(err=>{b.disabled=false;aviso(err.message&&err.message!=="falha"?err.message:"Não foi possível agora.")});
+    }
+  }
+};
+/* FASE 26: método 3 · Bowtie (ameaças, evento central, consequências e barreiras) */
+const BW_TIPO=[["elim","Eliminação ou substituição"],["eng","Engenharia"],["org","Organização do trabalho"],["adm","Administrativa"],["epi","EPI ou ação humana"]];
+const BW_EST=[["eficaz","Eficaz"],["degradada","Degradada"],["ausente","Ausente"],["verificar","A verificar"]];
+const BW_COR={eficaz:"#2e7d32",degradada:"#f9a825",ausente:"#c62828",verificar:"#78909c"};
+const BW_GLIFO={eficaz:"✓",degradada:"!",ausente:"✕",verificar:"?"};
+const BW_SEV=[["1","Leve"],["2","Moderada"],["3","Grave"],["4","Crítica"]];
+function bwNums(d){const m={};let n=0;d.dados.ameacas.concat(d.dados.consequencias).forEach(x=>x.barreiras.forEach(b=>{m[b.id]=++n}));return m}
+CM.bowtie={
+  meta:{
+    nome:"Bowtie",situacao:"Risco com ameaças, evento central, consequências e barreiras",
+    quando:"Você quer enxergar como um risco chega a acontecer e o que protege hoje: o que pode causar o evento (ameaças), o que impede (barreiras de prevenção) e o que limita o dano (barreiras de mitigação).",
+    limite:"Quando o foco é descobrir por que um evento que já aconteceu ocorreu, em detalhe e em sequência. Prefira Árvore de causas.",
+    passos:["Defina o <b>perigo</b> (fonte do dano) e o <b>evento central</b> (o momento em que o controle do risco é perdido).","À esquerda, liste as <b>ameaças</b>: o que pode levar ao evento. Em cada uma, registre as <b>barreiras de prevenção</b> que existem ou deveriam existir.","À direita, liste as <b>consequências</b> possíveis e as <b>barreiras de mitigação</b> que reduzem o dano.","Para cada barreira, marque o tipo e o estado real: eficaz, degradada, ausente ou a verificar. Barreira \"eficaz\" só com verificação no posto."],
+    cuidado:"barreira é algo que funciona sem depender de lembrar ou de boa vontade. Treinamento e aviso, sozinhos, são barreiras fracas.",
+    raizDef:"Lacunas são barreiras ausentes ou degradadas e ameaças ou consequências sem barreira. É onde a ação deve atuar.",
+    ajudaIA:"A IA sugere ameaças, consequências e barreiras (sempre como \"a verificar\"), aponta lacunas e dependência excessiva de medidas administrativas, e critica o diagrama."
+  },
+  vazio:()=>({perigo:"",central:"",ameacas:[],consequencias:[]}),
+  vazioQ:d=>!d.dados.ameacas.length&&!d.dados.consequencias.length&&!czTxtLivre(d.dados.central),
+  exemplo:()=>{
+    const B=(t,tipo,estado,esc)=>({id:czid(),t,tipo,estado,esc:esc||""});
+    return {evento:"Operador sofreu lombalgia aguda ao levantar uma caixa de 18 kg do piso na expedição. Quero mapear o risco e as barreiras.",dados:{perigo:"Movimentação manual de caixas de 18 kg na expedição",central:"Operador levanta a caixa em postura inadequada, acima do limite recomendado",
+      ameacas:[
+        {id:czid(),t:"Caixa posicionada rente ao piso",ev:"observado",barreiras:[B("Mesa elevatória do palete","eng","degradada","Fora de serviço sem aviso nem substituto"),B("Regra de não empilhar abaixo de 40 cm","adm","verificar")]},
+        {id:czid(),t:"Operador sozinho no turno",ev:"relatado",barreiras:[B("Carrinho com elevação para apoio","eng","ausente")]},
+        {id:czid(),t:"Pressa para fechar a carga",ev:"relatado",barreiras:[B("Folga no cronograma de carregamento","org","ausente")]}],
+      consequencias:[
+        {id:czid(),t:"Lombalgia aguda do operador",sev:"3",barreiras:[B("Atendimento ambulatorial e registro imediato","org","eficaz"),B("Reavaliação do posto após o caso","org","verificar")]},
+        {id:czid(),t:"Afastamento e perda de capacidade produtiva",sev:"2",barreiras:[B("Plano de retorno gradual com restrição","org","eficaz")]}]}};
+  },
+  render(d,dis){
+    const D=d.dados;
+    return `<div id="czDiag" class="cz-diag">${this.diag(d,false)}</div>
+    <div class="cz-leg">${BW_EST.map(e=>`<span><i style="background:${BW_COR[e[0]]}"></i>${e[1]}</span>`).join("")}<span>Barra = barreira (número na legenda)</span></div>
+    <div class="cz-box"><h4>Perigo e evento central</h4><div class="grid2">
+     <label class="campo">Perigo (fonte do dano)<input class="cz-in" data-cz-f="dados.perigo" data-cz-live="1" ${dis} value="${esc(D.perigo)}" placeholder="Ex.: movimentação manual de cargas pesadas"></label>
+     <label class="campo">Evento central (perda de controle)<input class="cz-in" data-cz-f="dados.central" data-cz-live="1" ${dis} value="${esc(D.central)}" placeholder="Ex.: operador levanta carga em postura inadequada"></label></div></div>
+    <div class="grid2"><div class="cz-box" style="border-top:4px solid #c0392b"><h4 style="color:#c0392b">Ameaças e barreiras de prevenção</h4><small class="mut">O que pode levar ao evento central, e o que impede.</small>${D.ameacas.map((a,i)=>this.item(d,"ameacas",i,a,dis)).join("")}<div style="margin-top:8px"><button type="button" class="btn peq sec" data-cz-a="bowtie:add" data-l="ameacas" ${dis}>+ Ameaça</button></div></div>
+    <div class="cz-box" style="border-top:4px solid #e67e22"><h4 style="color:#d35400">Consequências e barreiras de mitigação</h4><small class="mut">O que pode resultar, e o que limita o dano.</small>${D.consequencias.map((a,i)=>this.item(d,"consequencias",i,a,dis)).join("")}<div style="margin-top:8px"><button type="button" class="btn peq sec" data-cz-a="bowtie:add" data-l="consequencias" ${dis}>+ Consequência</button></div></div></div>
+    <div id="czBwLeg">${this.legenda(d)}</div>`;
+  },
+  item(d,l,i,a,dis){
+    const P=`dados.${l}.${i}`,N=bwNums(d),amea=l==="ameacas";
+    return `<div style="border:1px solid var(--bd,#dfe6ea);border-radius:10px;padding:8px;margin:8px 0;background:var(--card,#fff)">
+     <div class="cz-row"><input class="cz-in" data-cz-f="${P}.t" data-cz-live="1" ${dis} value="${esc(a.t)}" placeholder="${amea?"Ameaça: o que pode levar ao evento":"Consequência possível"}" aria-label="${amea?"Ameaça":"Consequência"}">${amea?czSelEv(P+".ev",a.ev,dis):`<select class="cz-mini" data-cz-f="${P}.sev" data-cz-live="1" ${dis} aria-label="Gravidade">${sel1(BW_SEV,a.sev||"2")}</select>`}<button type="button" class="cz-x" data-cz-a="bowtie:del" data-l="${l}" data-i="${i}" ${dis} aria-label="Remover">✕</button></div>
+     ${a.barreiras.map((b,j)=>`<div style="margin:7px 0 0 10px;padding:6px 8px;border-left:4px solid ${BW_COR[b.estado]};background:#f7fafb;border-radius:6px"><div class="cz-row"><span class="cz-chip" style="background:${BW_COR[b.estado]};color:#fff">B${N[b.id]}</span><input class="cz-in" data-cz-f="${P}.barreiras.${j}.t" data-cz-live="1" ${dis} value="${esc(b.t)}" placeholder="Barreira ${amea?"de prevenção":"de mitigação"}" aria-label="Barreira"><button type="button" class="cz-x" data-cz-a="bowtie:delb" data-l="${l}" data-i="${i}" data-j="${j}" ${dis} aria-label="Remover barreira">✕</button></div>
+       <div class="cz-row" style="margin-top:5px"><select class="cz-mini" data-cz-f="${P}.barreiras.${j}.tipo" data-cz-live="1" ${dis} aria-label="Tipo">${sel1(BW_TIPO,b.tipo)}</select><select class="cz-mini" data-cz-f="${P}.barreiras.${j}.estado" data-cz-live="1" data-cz-full="1" ${dis} aria-label="Estado">${sel1(BW_EST,b.estado)}</select><input class="cz-in" style="font-size:.84rem;padding:6px 9px" data-cz-f="${P}.barreiras.${j}.esc" ${dis} value="${esc(b.esc||"")}" placeholder="O que pode fazer esta barreira falhar?" aria-label="Fator de escalada"></div></div>`).join("")}
+     <div class="cz-row" style="margin-top:8px"><button type="button" class="btn peq sec" data-cz-a="bowtie:addb" data-l="${l}" data-i="${i}" ${dis}>+ Barreira</button><button type="button" class="btn peq" style="background:#6a3fc2" data-cz-a="bowtie:sug" data-l="${l}" data-i="${i}" ${dis}>✨ Barreiras</button></div></div>`;
+  },
+  legenda(d){
+    const N=bwNums(d),all=d.dados.ameacas.concat(d.dados.consequencias).flatMap(x=>x.barreiras);
+    if(!all.length)return "";
+    const c=k=>all.filter(b=>b.estado===k).length;
+    return `<div class="cz-box"><h4>Barreiras (${all.length})</h4><p style="margin:0 0 6px;font-size:.88rem"><b style="color:${BW_COR.eficaz}">${c("eficaz")} eficaz(es)</b> · <b style="color:#b8860b">${c("degradada")} degradada(s)</b> · <b style="color:${BW_COR.ausente}">${c("ausente")} ausente(s)</b> · <b style="color:${BW_COR.verificar}">${c("verificar")} a verificar</b></p>
+     ${d.dados.ameacas.concat(d.dados.consequencias).flatMap(x=>x.barreiras.map(b=>({x,b}))).map(({x,b})=>`<div style="font-size:.84rem;margin:3px 0"><b style="color:${BW_COR[b.estado]}">B${N[b.id]}</b> ${esc(b.t||"(vazio)")} <span class="mut">· ${esc((BW_TIPO.find(t=>t[0]===b.tipo)||[0,""])[1])} · ${esc((BW_EST.find(t=>t[0]===b.estado)||[0,""])[1])}${b.esc?" · pode falhar por: "+esc(b.esc):""}</span></div>`).join("")}</div>`;
+  },
+  diag(d,ro){
+    const D=d.dados,A=D.ameacas,C=D.consequencias,N=bwNums(d),n=Math.max(A.length,C.length,1),RH=88,H=Math.max(n*RH+100,350),W=1180,cy=H/2+22;
+    const o=[`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif" role="img" aria-label="Diagrama Bowtie"><defs><marker id="czArr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#37474f"/></marker></defs><rect width="${W}" height="${H}" fill="#fbfdfe"/>`];
+    const cl=520,cr=660,ty0=i=>cy-(A.length-1)*RH/2+i*RH,cy0=i=>cy-(C.length-1)*RH/2+i*RH;
+    const barra=(b,cx,y)=>{
+      const m=1,bw=66,col=BW_COR[b.estado],aus=b.estado==="ausente";
+      const lines=czWrap(b.t||"",14,3);
+      return `<rect x="${cx-bw/2}" y="${y-27}" width="${bw}" height="54" rx="6" fill="${aus?"#fff":"#fff"}" stroke="${col}" stroke-width="2.6" ${aus?'stroke-dasharray="5 3"':""}/><rect x="${cx-bw/2}" y="${y-27}" width="${bw}" height="14" rx="6" fill="${col}"/><text x="${cx-bw/2+6}" y="${y-16.5}" font-size="9.5" font-weight="700" fill="#fff">B${N[b.id]}</text><text x="${cx+bw/2-6}" y="${y-16.5}" text-anchor="end" font-size="10" font-weight="700" fill="#fff">${BW_GLIFO[b.estado]}</text>${lines.map((l,i)=>`<text x="${cx}" y="${y-3+i*10}" text-anchor="middle" font-size="8.4" fill="#263238">${esc(l)}</text>`).join("")}`;
+    };
+    A.forEach((a,i)=>{
+      const y=ty0(i);
+      o.push(`<path d="M206 ${y} H466 C494 ${y} 494 ${cy} ${cl} ${cy}" fill="none" stroke="#37474f" stroke-width="2" marker-end="url(#czArr2)"/>`);
+      const tl=czWrap(a.t||"(ameaça)",24,3),h=Math.max(46,16+tl.length*13);
+      o.push(`<rect x="16" y="${y-h/2}" width="190" height="${h}" rx="10" fill="#fdecea" stroke="#c0392b" stroke-width="2"/>${tl.map((l,k)=>`<text x="28" y="${y-h/2+19+k*13}" font-size="11.5" fill="#3e1612">${esc(l)}</text>`).join("")}`);
+      const m=a.barreiras.length;a.barreiras.forEach((b,j)=>o.push(barra(b,206+34+(j+.5)*(222/m),y)));
+    });
+    C.forEach((c,i)=>{
+      const y=cy0(i);
+      o.push(`<path d="M${cr} ${cy} C690 ${cy} 690 ${y} 722 ${y} H968" fill="none" stroke="#37474f" stroke-width="2" marker-end="url(#czArr2)"/>`);
+      const tl=czWrap(c.t||"(consequência)",24,3),h=Math.max(52,24+tl.length*13),sv=Number(c.sev)||2,fc=["#fff3e0","#ffe0b2","#ffccbc","#ffab91"][sv-1];
+      o.push(`<rect x="974" y="${y-h/2}" width="190" height="${h}" rx="10" fill="${fc}" stroke="#e67e22" stroke-width="2"/>${tl.map((l,k)=>`<text x="986" y="${y-h/2+19+k*13}" font-size="11.5" fill="#3e2000">${esc(l)}</text>`).join("")}<text x="1158" y="${y+h/2-6}" text-anchor="end" font-size="8.5" font-weight="700" fill="#a04000">${esc((BW_SEV.find(s=>s[0]===String(sv))||[0,""])[1]).toUpperCase()}</text>`);
+      const m=c.barreiras.length;c.barreiras.forEach((b,j)=>o.push(barra(b,722+34+(j+.5)*(212/m),y)));
+    });
+    const cl2=czWrap(D.central||"Evento central",18,4),ch=Math.max(96,cl2.length*15+40);
+    o.push(`<rect x="${cl}" y="${cy-ch/2}" width="140" height="${ch}" rx="14" fill="#003352"/><text x="${cl+70}" y="${cy-ch/2+16}" text-anchor="middle" font-size="9" font-weight="700" fill="#FFB84D" letter-spacing="1">EVENTO CENTRAL</text>${cl2.map((l,k)=>`<text x="${cl+70}" y="${cy-ch/2+36+k*15}" text-anchor="middle" font-size="11.5" fill="#fff">${esc(l)}</text>`).join("")}`);
+    const pl=czWrap(D.perigo||"Perigo",24,2);
+    o.push(`<line x1="${cl+70}" y1="58" x2="${cl+70}" y2="${cy-ch/2}" stroke="#b8860b" stroke-width="2" stroke-dasharray="4 3"/><rect x="${cl-20}" y="12" width="180" height="46" rx="8" fill="#fff8e1" stroke="#f9a825" stroke-width="1.8"/><text x="${cl+70}" y="27" text-anchor="middle" font-size="9" font-weight="700" fill="#8a6100" letter-spacing="1">PERIGO</text>${pl.map((l,k)=>`<text x="${cl+70}" y="${40+k*11}" text-anchor="middle" font-size="10" fill="#3d3000">${esc(l)}</text>`).join("")}`);
+    o.push(`<text x="16" y="${H-10}" font-size="10.5" fill="#78909c">PREVENÇÃO (antes do evento)</text><text x="${W-16}" y="${H-10}" text-anchor="end" font-size="10.5" fill="#78909c">MITIGAÇÃO (depois do evento)</text></svg>`);
+    return o.join("");
+  },
+  resumo(d){
+    const D=d.dados,L=[`Perigo: ${D.perigo||"(vazio)"}`,`Evento central: ${D.central||"(vazio)"}`];
+    const bl=x=>x.barreiras.map(b=>`    - barreira [${(BW_TIPO.find(t=>t[0]===b.tipo)||[0,b.tipo])[1]}, ${b.estado}] ${b.t}${b.esc?" (pode falhar por: "+b.esc+")":""}`).join("\n");
+    D.ameacas.forEach(a=>L.push(`AMEAÇA (id ${a.id}) ${a.t} (evidência: ${a.ev})\n${bl(a)}`));
+    D.consequencias.forEach(c=>L.push(`CONSEQUÊNCIA (id ${c.id}) ${c.t} (gravidade ${c.sev||"?"})\n${bl(c)}`));
+    return L.join("\n");
+  },
+  foco(d){
+    const D=d.dados;if(!D.ameacas.length)return "sem ameaças: proponha ameaças e barreiras de prevenção";
+    const s=D.ameacas.filter(a=>!a.barreiras.length).map(a=>`ameaça sem barreira (id ${a.id}) ${a.t}`).concat(D.consequencias.filter(c=>!c.barreiras.length).map(c=>`consequência sem barreira (id ${c.id}) ${c.t}`));
+    return s.length?s.join("; "):(D.consequencias.length?"":"sem consequências: proponha consequências");
+  },
+  rotuloItem(d,it){
+    if(it.alvo==="ameaca")return "Ameaça";if(it.alvo==="consequencia")return "Consequência";
+    return d.dados.ameacas.some(a=>a.id===it.ref)?"Barreira de prevenção":"Barreira de mitigação";
+  },
+  aplicar(d,it){
+    const D=d.dados,t=czTxtLivre(it.texto).slice(0,200);
+    if(it.alvo==="ameaca"){D.ameacas.push({id:czid(),t,ev:"hipotese",barreiras:[]});return true}
+    if(it.alvo==="consequencia"){D.consequencias.push({id:czid(),t,sev:"2",barreiras:[]});return true}
+    const x=D.ameacas.concat(D.consequencias).find(z=>z.id===it.ref);if(!x)return false;
+    x.barreiras.push({id:czid(),t,tipo:BW_TIPO.some(z=>z[0]===it.tipo)?it.tipo:"eng",estado:"verificar",esc:czTxtLivre(it.detalhe).slice(0,160)});return true;
+  },
+  raizes(d){
+    const R=[],D=d.dados;
+    D.ameacas.concat(D.consequencias).forEach(x=>{
+      const amea=D.ameacas.includes(x),rot=amea?"Ameaça":"Consequência";
+      if(!x.barreiras.length&&czTxtLivre(x.t))R.push({k:x.id,t:`${rot} sem barreira: ${czTxtLivre(x.t)}`,n:"Lacuna"});
+      x.barreiras.forEach(b=>{if((b.estado==="ausente"||b.estado==="degradada")&&czTxtLivre(b.t))R.push({k:b.id,t:`Barreira ${b.estado==="ausente"?"ausente":"degradada"} (${rot.toLowerCase()} "${czTrunc(x.t,40)}"): ${czTxtLivre(b.t)}${b.esc?". Falha por: "+czTxtLivre(b.esc):""}`,n:"Lacuna"})});
+    });
+    return R;
+  },
+  lint(d){
+    const L=[],D=d.dados;
+    if(!czTxtLivre(D.central))L.push({s:"m",t:"Defina o evento central: o momento em que o controle do risco é perdido."});
+    if(!D.ameacas.length)L.push({s:"m",t:"Liste as ameaças: o que pode levar ao evento central."});
+    if(!D.consequencias.length)L.push({s:"m",t:"Liste as consequências possíveis e a gravidade de cada uma."});
+    D.ameacas.forEach(a=>{
+      if(!a.barreiras.length&&czTxtLivre(a.t))L.push({s:"a",t:`A ameaça "${czTrunc(a.t,45)}" não tem nenhuma barreira de prevenção.`});
+      else if(a.barreiras.length&&a.barreiras.every(b=>b.tipo==="adm"||b.tipo==="epi"))L.push({s:"m",t:`A ameaça "${czTrunc(a.t,45)}" depende só de barreiras administrativas ou de EPI. Considere eliminação, substituição ou engenharia.`});
+    });
+    D.consequencias.forEach(c=>{if(!c.barreiras.length&&czTxtLivre(c.t)&&Number(c.sev)>=3)L.push({s:"a",t:`A consequência grave "${czTrunc(c.t,45)}" não tem barreira de mitigação.`})});
+    const B=D.ameacas.concat(D.consequencias).flatMap(x=>x.barreiras),v=B.filter(b=>b.estado==="verificar").length;
+    if(v)L.push({s:"i",t:`${v} barreira(s) com estado "a verificar". Confirme no posto se existem e funcionam antes de concluir.`});
+    if(B.length&&B.every(b=>b.estado==="eficaz"))L.push({s:"m",t:"Todas as barreiras estão como eficazes. Confirme com evidência (observação, teste, registro) e procure fatores que as façam falhar."});
+    return L.slice(0,6);
+  },
+  acao(s,b,r,dis){
+    const D=r.d.dados,l=b.dataset.l,i=Number(b.dataset.i),j=Number(b.dataset.j);
+    const nb=()=>({id:czid(),t:"",tipo:"eng",estado:"verificar",esc:""});
+    if(s==="add"){D[l].push(l==="ameacas"?{id:czid(),t:"",ev:"hipotese",barreiras:[]}:{id:czid(),t:"",sev:"2",barreiras:[]});czRefresh(true);const e=document.querySelector(`[data-cz-f="dados.${l}.${D[l].length-1}.t"]`);if(e)e.focus()}
+    else if(s==="del"){D[l].splice(i,1);czRefresh(true)}
+    else if(s==="addb"){D[l][i].barreiras.push(nb());czRefresh(true);const e=document.querySelector(`[data-cz-f="dados.${l}.${i}.barreiras.${D[l][i].barreiras.length-1}.t"]`);if(e)e.focus()}
+    else if(s==="delb"){D[l][i].barreiras.splice(j,1);czRefresh(true)}
+    else if(s==="sug"){
+      const x=D[l][i];if(czTxtLivre(x.t).length<5)return aviso("Escreva a "+(l==="ameacas"?"ameaça":"consequência")+" antes.");
+      b.disabled=true;
+      czIA("sugerir",{foco:`barreiras ${l==="ameacas"?"de prevenção para a ameaça":"de mitigação para a consequência"} id ${x.id}: "${x.t}"`}).then(jr=>{
+        r.d.ia=r.d.ia||{};r.d.ia.sug={em:new Date().toISOString(),itens:(jr.itens||[]).filter(z=>z&&z.texto).map(z=>Object.assign(z,{alvo:"barreira",ref:x.id})),perguntas:jr.perguntas||[],lim:jr.limitacoes||""};
+        czFlush();b.disabled=false;const ia=$(".cz-ia");if(ia){ia.outerHTML=htmlCzIA(r.d,dis);const q=$(".cz-ia");if(q)q.scrollIntoView({behavior:"smooth",block:"center"})}
+      }).catch(err=>{b.disabled=false;aviso(err.message&&err.message!=="falha"?err.message:"Não foi possível agora.")});
+    }
+  },
+  pos(d){const e=$("#czBwLeg");if(e)e.innerHTML=this.legenda(d)}
+};
+/* FASE 26: método 4 · FRAM (Functional Resonance Analysis Method) */
+const FR_ASP=[
+  {k:"I",n:"Entrada",en:"Input",cor:"#1e88e5",dica:"O que a função transforma ou usa para começar. Vem de outra função."},
+  {k:"O",n:"Saída",en:"Output",cor:"#37474f",dica:"O resultado da função. Alimenta outras funções."},
+  {k:"P",n:"Pré-condição",en:"Precondition",cor:"#8e24aa",dica:"O que precisa ser verdade antes de a função começar."},
+  {k:"R",n:"Recurso",en:"Resource",cor:"#00897b",dica:"O que a função consome ou precisa durante a execução (ferramenta, pessoa, informação)."},
+  {k:"T",n:"Tempo",en:"Time",cor:"#f9a825",dica:"Restrição de prazo, duração ou ordem."},
+  {k:"C",n:"Controle",en:"Control",cor:"#e53935",dica:"O que regula a função: procedimento, regra, supervisão, meta."}
+];
+const FR_VAR=[["","(não avaliada)"],["baixa","Baixa"],["media","Média"],["alta","Alta"]];
+const frN=s=>normB(String(s||"")).replace(/\s+/g," ").trim();
+function frAc(d){ // acoplamentos por texto idêntico entre Saída de uma função e outro aspecto de outra
+  const F=d.dados.funcoes,A=[];
+  F.forEach(f=>(f.O||[]).forEach(o=>{const k=frN(o);if(!k)return;F.forEach(g=>{if(g.id===f.id)return;["I","P","R","T","C"].forEach(a=>{if((g[a]||[]).some(x=>frN(x)===k))A.push({de:f.id,para:g.id,asp:a,txt:o})})})}));
+  return A;
+}
+function frCamadas(d,A){
+  const F=d.dados.funcoes,L={};F.forEach(f=>L[f.id]=0);
+  for(let it=0;it<F.length;it++)A.forEach(c=>{if(L[c.para]<L[c.de]+1&&L[c.de]+1<F.length)L[c.para]=L[c.de]+1});
+  return L;
+}
+function frPropaga(d,A){
+  const F=d.dados.funcoes,src=F.filter(f=>f.var==="alta"||f.var==="media").map(f=>f.id),rec=new Set(),fila=src.slice();
+  while(fila.length){const x=fila.shift();A.filter(c=>c.de===x).forEach(c=>{if(!rec.has(c.para)&&!src.includes(c.para)){rec.add(c.para);fila.push(c.para)}})}
+  return rec;
+}
+const frNome=(d,id)=>{const f=d.dados.funcoes.find(x=>x.id===id);return f?czTrunc(f.n||"(sem nome)",40):"?"};
+CM.fram={
+  meta:{
+    nome:"FRAM",situacao:"Atividade complexa, variável ou com forte componente organizacional",
+    quando:"O trabalho varia de um dia para o outro, depende de várias funções ligadas entre si (pessoas, setores, sistemas, tempo) e o problema nasce da combinação, não de uma causa única.",
+    limite:"Problema simples com poucas causas diretas ou evento com sequência clara. Prefira Ishikawa ou Árvore de causas.",
+    passos:["Liste as <b>funções</b> da atividade (verbos: receber, separar, transportar, montar). Descreva o trabalho como é feito de verdade, não só como está no procedimento.","Para cada função, preencha os 6 aspectos: <b>Entrada, Saída, Pré-condição, Recurso, Tempo e Controle</b>.","Para ligar funções, escreva <b>o mesmo texto</b> na Saída de uma e em um aspecto da outra. O diagrama desenha o acoplamento sozinho.","Avalie a <b>variabilidade</b> de cada função (baixa, média, alta) e veja como ela pode se propagar. Marque os pontos de ação onde amortecer a variabilidade."],
+    cuidado:"o FRAM descreve como o trabalho funciona, inclusive quando dá certo. Não é uma lista de falhas nem de culpados.",
+    raizDef:"Pontos de ação são as funções onde vale amortecer ou monitorar a variabilidade para que ela não se propague pelo sistema.",
+    ajudaIA:"A IA sugere funções e aspectos a partir da sua descrição, padroniza textos para os acoplamentos funcionarem, aponta aspectos vazios e onde a variabilidade pode se propagar."
+  },
+  vazio:()=>({funcoes:[]}),
+  vazioQ:d=>!d.dados.funcoes.length,
+  exemplo:()=>{
+    const F=(n,I,O,P,R,T,C,v,vt,ac)=>({id:czid(),n,desc:"",I:[I],O:[O],P:[P],R:R.split("; "),T:[T],C:[C],var:v||"",varTxt:vt||"",acao:!!ac});
+    return {evento:"Abastecimento de peças na linha de montagem: atrasos recorrentes e dor lombar no operador logístico, com muita variação de um turno para o outro.",dados:{funcoes:[
+      F("Receber ordem de abastecimento","Sinal de baixo estoque no posto","Ordem de abastecimento emitida","Kanban eletrônico disponível","Painel de kanban","Ordem emitida em até 5 min","Procedimento de reposição"),
+      F("Separar peças no almoxarifado","Ordem de abastecimento emitida","Carrinho com peças separadas","Peças disponíveis no estoque","Operador logístico; Leitor de código","Antes de faltar peça no posto","Lista de separação","media","Fila de ordens muda com a pressão da linha"),
+      F("Transportar carrinho até o posto","Carrinho com peças separadas","Carrinho entregue no posto","Corredor livre","Carrinho manual","Antes de acabar o estoque do posto","Rotina de percurso","alta","Corredor com tráfego e obstruções variáveis; o ritmo muda conforme a pressão da linha",true),
+      F("Abastecer o posto de montagem","Carrinho entregue no posto","Posto abastecido","Espaço livre na prateleira do posto","Prateleira do posto","Sem parar a linha","Padrão de abastecimento","media","Posição das caixas muda e exige alcance elevado",true),
+      F("Montar o conjunto","Posto abastecido","Conjunto montado","Operador treinado no modelo","Ferramentas do posto","Ciclo de 90 s","Instrução de montagem","media","Ritmo oscila quando falta peça")]}};
+  },
+  render(d,dis){
+    const F=d.dados.funcoes;
+    return `<div id="czDiag" class="cz-diag">${this.diag(d,false)}</div>
+    <div class="cz-leg">${FR_ASP.map(a=>`<span><i style="background:${a.cor}"></i><b>${a.k}</b> ${a.n}</span>`).join("")}<span><i style="background:#fdecea;border:1px solid #c62828"></i>variabilidade alta</span><span><i style="background:#fff;border:1.5px dashed #e67e22"></i>pode receber variabilidade</span></div>
+    <div class="cz-como" style="border-left-color:var(--laranja);background:#fff8ec"><b>Como ligar duas funções:</b> escreva exatamente o mesmo texto na <b>Saída</b> de uma e em um aspecto (Entrada, Pré-condição, Recurso, Tempo ou Controle) da outra. Um item por linha.</div>
+    ${F.map((f,i)=>this.fn(d,i,f,dis)).join("")}
+    <div class="cz-row"><button type="button" class="btn sec" data-cz-a="fram:add" ${dis}>+ Função</button><button type="button" class="btn" style="background:#6a3fc2" data-cz-a="fram:sug" ${dis}>✨ Sugerir funções e aspectos</button></div>
+    <div id="czFrAc">${this.acopl(d)}</div>`;
+  },
+  fn(d,i,f,dis){
+    const P=`dados.funcoes.${i}`;
+    return `<div class="cz-box" style="border-left:5px solid ${f.var==="alta"?"#c62828":f.var==="media"?"#f9a825":"#01688A"}"><div class="cz-row"><span class="cz-chip">F${i+1}</span><input class="cz-in" data-cz-f="${P}.n" data-cz-live="1" ${dis} value="${esc(f.n)}" placeholder="Função (verbo + objeto)" aria-label="Nome da função"><button type="button" class="cz-x" data-cz-a="fram:del" data-i="${i}" ${dis} aria-label="Remover função">✕</button></div>
+     <div class="grid2" style="margin-top:4px">${FR_ASP.map(a=>`<label class="campo" style="margin-top:8px"><span style="color:${a.cor}">${a.k} · ${a.n}</span> <small class="mut" title="${esc(a.dica)}">(${a.en})</small><textarea class="cz-in" style="min-height:48px" data-fr-arr="${P}.${a.k}" ${dis} placeholder="${esc(a.dica)}">${esc((f[a.k]||[]).join("\n"))}</textarea></label>`).join("")}</div>
+     <div class="grid2" style="margin-top:6px"><label class="campo">Variabilidade da função<select class="cz-mini" style="width:100%;padding:9px" data-cz-f="${P}.var" data-cz-live="1" data-cz-full="1" ${dis}>${sel1(FR_VAR,f.var||"")}</select></label>
+     <label class="campo">Como ela varia (tempo, precisão, intensidade)<input class="cz-in" data-cz-f="${P}.varTxt" ${dis} value="${esc(f.varTxt||"")}" placeholder="Ex.: o ritmo muda conforme a pressão da linha"></label></div>
+     <label style="display:block;margin-top:8px;font-size:.86rem;font-weight:600"><input type="checkbox" data-cz-f="${P}.acao" data-cz-live="1" ${f.acao?"checked":""} ${dis}> <span style="color:#c62828">⚑</span> Ponto de ação (amortecer ou monitorar a variabilidade aqui)</label></div>`;
+  },
+  acopl(d){
+    const A=frAc(d),F=d.dados.funcoes,rec=frPropaga(d,A);
+    const ext=[];F.forEach(f=>["I","P","R","T","C"].forEach(a=>(f[a]||[]).forEach(x=>{if(czTxtLivre(x)&&!A.some(c=>c.para===f.id&&c.asp===a&&frN(c.txt)===frN(x)))ext.push({f,a,x})})));
+    return `<div class="cz-box"><h4>Acoplamentos detectados (${A.length})</h4>${A.length?A.map(c=>{const a=FR_ASP.find(z=>z.k===c.asp);return `<div style="font-size:.86rem;margin:3px 0"><b>${esc(frNome(d,c.de))}</b> <span class="mut">Saída</span> ➜ <span style="color:${a.cor};font-weight:700">${a.n}</span> de <b>${esc(frNome(d,c.para))}</b> <span class="mut">· "${esc(czTrunc(c.txt,50))}"</span></div>`}).join(""):'<p class="mut" style="margin:0">Nenhum ainda. Escreva o mesmo texto na Saída de uma função e em outro aspecto de outra.</p>'}
+     ${rec.size?`<p style="margin:10px 0 0;font-size:.88rem"><b style="color:#d35400">Pode receber variabilidade</b> de funções com variabilidade média ou alta: ${[...rec].map(id=>esc(frNome(d,id))).join(", ")}.</p>`:""}
+     ${ext.length?`<details style="margin-top:8px"><summary class="mut" style="font-size:.84rem">Aspectos que vêm de fora do sistema ou ainda sem ligação (${ext.length})</summary>${ext.slice(0,40).map(e=>`<div style="font-size:.82rem;margin:2px 0">${esc(frNome(d,e.f.id))} · ${FR_ASP.find(z=>z.k===e.a).n}: ${esc(czTrunc(e.x,60))}</div>`).join("")}</details>`:""}</div>`;
+  },
+  diag(d,ro){
+    const F=d.dados.funcoes,A=frAc(d),Ly=frCamadas(d,A),rec=frPropaga(d,A),HW=66,HH=50,DX=250,DY=160;
+    if(!F.length)return `<svg viewBox="0 0 700 120" width="700" height="120" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif"><rect width="700" height="120" fill="#fbfdfe"/><text x="350" y="64" text-anchor="middle" font-size="14" fill="#78909c">Adicione funções para ver o diagrama</text></svg>`;
+    const col={};F.forEach(f=>{const l=Ly[f.id];col[l]=(col[l]||0)+1});
+    const idx={},P={};F.forEach(f=>{const l=Ly[f.id];idx[l]=(idx[l]||0);const nL=col[l];P[f.id]={x:100+l*DX,y:90+idx[l]*DY+(Math.max(...Object.values(col))-nL)*DY/2};idx[l]++});
+    const maxL=Math.max(...Object.values(Ly)),mc=Math.max(...Object.values(col)),W=100+maxL*DX+HW+90,H=90+(mc-1)*DY+HH+80;
+    const port=(f,a)=>{const p=P[f.id];return {I:[p.x-HW,p.y],O:[p.x+HW,p.y],T:[p.x-HW/2,p.y-HH],C:[p.x+HW/2,p.y-HH],P:[p.x-HW/2,p.y+HH],R:[p.x+HW/2,p.y+HH]}[a]};
+    const o=[`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif" role="img" aria-label="Diagrama FRAM"><defs><marker id="czArr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#546e7a"/></marker></defs><rect width="${W}" height="${H}" fill="#fbfdfe"/>`];
+    A.forEach(c=>{
+      const f=F.find(z=>z.id===c.de),g=F.find(z=>z.id===c.para),[sx,sy]=port(f,"O"),[tx,ty]=port(g,c.asp),cor=FR_ASP.find(z=>z.k===c.asp).cor;
+      const ent=c.asp==="T"||c.asp==="C"?[tx,ty-70]:c.asp==="P"||c.asp==="R"?[tx-30,ty+70]:[tx-70,ty];
+      const volta=tx<sx+10;
+      const d1=volta?`M${sx} ${sy} C${sx+90} ${sy-120} ${tx-90} ${ty-130} ${tx} ${ty}`:`M${sx} ${sy} C${sx+80} ${sy} ${ent[0]} ${ent[1]} ${tx} ${ty}`;
+      o.push(`<path d="${d1}" fill="none" stroke="${cor}" stroke-width="2" opacity=".85" marker-end="url(#czArr3)"/>`);
+    });
+    F.forEach((f,i)=>{
+      const p=P[f.id],pts=[[p.x-HW,p.y],[p.x-HW/2,p.y-HH],[p.x+HW/2,p.y-HH],[p.x+HW,p.y],[p.x+HW/2,p.y+HH],[p.x-HW/2,p.y+HH]].map(z=>z.join(",")).join(" ");
+      const fill=f.var==="alta"?"#fdecea":f.var==="media"?"#fff8e1":f.var==="baixa"?"#e8f5e9":"#eef6fa",recb=rec.has(f.id);
+      o.push(`<polygon points="${pts}" fill="${fill}" stroke="${f.var==="alta"?"#c62828":"#003352"}" stroke-width="${f.acao?3.4:2}" ${recb?'stroke-dasharray="6 4" stroke="#e67e22"':""}/>`);
+      czWrap(f.n||"(função)",14,3).forEach((l,k,a)=>o.push(`<text x="${p.x}" y="${p.y-(a.length-1)*6.5+k*13+4}" text-anchor="middle" font-size="11" font-weight="700" fill="#16303d">${esc(l)}</text>`));
+      o.push(`<text x="${p.x-HW+6}" y="${p.y-HH-6}" font-size="10" font-weight="700" fill="#003352">F${i+1}</text>`);
+      if(f.acao)o.push(`<text x="${p.x+HW-4}" y="${p.y+HH+22}" text-anchor="end" font-size="14" fill="#c62828">⚑</text>`);
+      FR_ASP.forEach(a=>{const [x,y]=port(f,a.k),usado=(f[a.k]||[]).some(z=>czTxtLivre(z));o.push(`<circle cx="${x}" cy="${y}" r="8.5" fill="${usado?a.cor:"#fff"}" stroke="${a.cor}" stroke-width="1.6" opacity="${usado?1:.55}"/><text x="${x}" y="${y+3.6}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${usado?"#fff":a.cor}">${a.k}</text>`)});
+    });
+    o.push("</svg>");return o.join("");
+  },
+  resumo(d){
+    const F=d.dados.funcoes,A=frAc(d),L=[];
+    F.forEach((f,i)=>{L.push(`F${i+1} (id ${f.id}) ${f.n}${f.var?` [variabilidade ${f.var}${f.varTxt?": "+f.varTxt:""}]`:""}${f.acao?" [ponto de ação]":""}`);FR_ASP.forEach(a=>{const v=(f[a.k]||[]).filter(czTxtLivre);if(v.length)L.push(`   ${a.n}: ${v.join(" | ")}`)})});
+    if(A.length)L.push("ACOPLAMENTOS: "+A.map(c=>`${frNome(d,c.de)} ➜ ${frNome(d,c.para)} (${FR_ASP.find(z=>z.k===c.asp).n})`).join("; "));
+    return L.join("\n")||"(modelo vazio)";
+  },
+  foco(d){
+    const F=d.dados.funcoes;if(!F.length)return "sem funções: liste as funções principais da atividade descrita";
+    const v=F.filter(f=>FR_ASP.filter(a=>(f[a.k]||[]).some(czTxtLivre)).length<4).map(f=>`função id ${f.id} "${f.n}" com poucos aspectos`);
+    return v.length?v.join("; "):"";
+  },
+  rotuloItem(d,it){
+    if(it.alvo==="funcao")return "Nova função";
+    const a=FR_ASP.find(z=>z.k===it.aspecto);return (a?a.n:"Aspecto")+" · "+frNome(d,it.ref);
+  },
+  aplicar(d,it){
+    const F=d.dados.funcoes;
+    if(it.alvo==="funcao"){
+      const f={id:czid(),n:czTxtLivre(it.texto).slice(0,120),desc:"",I:[],O:[],P:[],R:[],T:[],C:[],var:"",varTxt:"",acao:false},as=it.aspectos&&typeof it.aspectos==="object"?it.aspectos:{};
+      FR_ASP.forEach(a=>{f[a.k]=(Array.isArray(as[a.k])?as[a.k]:[]).map(x=>czTxtLivre(x).slice(0,140)).filter(Boolean).slice(0,4)});
+      F.push(f);return true;
+    }
+    const f=F.find(z=>z.id===it.ref),a=FR_ASP.find(z=>z.k===it.aspecto);if(!f||!a)return false;
+    f[a.k]=(f[a.k]||[]).concat([czTxtLivre(it.texto).slice(0,140)]);return true;
+  },
+  raizes(d){return d.dados.funcoes.filter(f=>f.acao&&czTxtLivre(f.n)).map(f=>{const A=frAc(d),rec=[...new Set(A.filter(c=>c.de===f.id).map(c=>frNome(d,c.para)))];return {k:f.id,t:`Amortecer a variabilidade de "${czTxtLivre(f.n)}"${f.varTxt?" ("+czTxtLivre(f.varTxt)+")":""}${rec.length?". Pode propagar para: "+rec.join(", "):""}`,n:"Ponto de ação"}})},
+  lint(d){
+    const L=[],F=d.dados.funcoes,A=frAc(d);
+    if(!F.length)return [{s:"i",t:"Comece listando as funções da atividade (receber, separar, transportar, montar). Use o exemplo para ver como fica."}];
+    if(F.length<3)L.push({s:"m",t:"Poucas funções. O FRAM é útil quando há várias funções ligadas; confirme se este é o método certo."});
+    F.forEach((f,i)=>{if(!(f.O||[]).some(czTxtLivre))L.push({s:"m",t:`F${i+1} "${czTrunc(f.n,40)}" não tem Saída. Sem saída ela não alimenta nenhuma outra função.`})});
+    if(F.length>1&&!A.length)L.push({s:"m",t:"Nenhum acoplamento detectado. Escreva o mesmo texto na Saída de uma função e em outro aspecto de outra."});
+    const solta=F.filter(f=>F.length>1&&!A.some(c=>c.de===f.id||c.para===f.id));if(solta.length&&A.length)L.push({s:"i",t:"Sem nenhuma ligação: "+solta.map(f=>`"${czTrunc(f.n,30)}"`).join(", ")+"."});
+    const sv=F.filter(f=>!f.var).length;if(sv)L.push({s:"i",t:`${sv} função(ões) sem avaliação de variabilidade. Avalie com quem executa o trabalho.`});
+    if(F.some(f=>f.var==="alta"&&!f.varTxt))L.push({s:"m",t:"Há função com variabilidade alta sem descrever como ela varia."});
+    if(F.some(f=>f.var==="alta"||f.var==="media")&&!F.some(f=>f.acao))L.push({s:"m",t:"Marque ⚑ onde amortecer ou monitorar a variabilidade (ponto de ação)."});
+    return L.slice(0,6);
+  },
+  acao(s,b,r,dis){
+    const F=r.d.dados.funcoes,i=Number(b.dataset.i);
+    if(s==="add"){F.push({id:czid(),n:"",desc:"",I:[],O:[],P:[],R:[],T:[],C:[],var:"",varTxt:"",acao:false});czRefresh(true);const e=document.querySelector(`[data-cz-f="dados.funcoes.${F.length-1}.n"]`);if(e)e.focus()}
+    else if(s==="del"){if(confirm("Remover esta função?")){F.splice(i,1);czRefresh(true)}}
+    else if(s==="sug"){
+      if(czTxtLivre(r.d.evento).length<30&&!F.length)return aviso("Descreva a atividade no campo do evento antes de pedir sugestões.");
+      b.disabled=true;
+      czIA("sugerir",{foco:this.foco(r.d)}).then(j=>{
+        r.d.ia=r.d.ia||{};r.d.ia.sug={em:new Date().toISOString(),itens:(j.itens||[]).filter(z=>z&&z.texto),perguntas:j.perguntas||[],lim:j.limitacoes||""};
+        czFlush();b.disabled=false;const ia=$(".cz-ia");if(ia){ia.outerHTML=htmlCzIA(r.d,dis);const q=$(".cz-ia");if(q)q.scrollIntoView({behavior:"smooth",block:"center"})}
+      }).catch(err=>{b.disabled=false;aviso(err.message&&err.message!=="falha"?err.message:"Não foi possível agora.")});
+    }
+  },
+  pos(d){const e=$("#czFrAc");if(e)e.innerHTML=this.acopl(d)}
+};
+// aspectos como lista (um por linha)
+document.addEventListener("input",e=>{
+  const t=e.target;if(!t.dataset||!t.dataset.frArr||!G.cz.ed||!t.closest("#v-causas"))return;
+  gset(G.cz.ed.d,t.dataset.frArr,t.value.split("\n").map(x=>x.trim()).filter(Boolean));czRefresh(false);
+});
+/* FASE 26: método 5 · HFACS adaptado (Human Factors Analysis and Classification System) */
+const HF_NIV=[
+  {k:"N4",n:"Influências organizacionais",cor:"#4a148c",fundo:"#f3e5f5",dica:"Decisões da alta gestão sobre recursos, cultura e processos."},
+  {k:"N3",n:"Supervisão e gestão da operação",cor:"#1a5276",fundo:"#e8f1f9",dica:"Como o trabalho é planejado, supervisionado e corrigido."},
+  {k:"N2",n:"Pré-condições do trabalho",cor:"#117a65",fundo:"#e3f5f1",dica:"Condições do ambiente, da pessoa e da equipe no momento."},
+  {k:"N1",n:"Atos e decisões no posto",cor:"#a04000",fundo:"#fdeee0",dica:"O que foi feito ou decidido no ponto de trabalho."}
+];
+const HF_CAT=[
+  {k:"org_recursos",n:"Gestão de recursos",nv:"N4",dica:"Pessoal, orçamento, equipamentos e projeto do posto."},
+  {k:"org_clima",n:"Clima e cultura",nv:"N4",dica:"Metas, pressão por produção, comunicação, o que a empresa premia ou tolera."},
+  {k:"org_processo",n:"Processos organizacionais",nv:"N4",dica:"Procedimentos, gestão de mudança, análise de riscos, auditoria."},
+  {k:"sup_inadequada",n:"Supervisão inadequada",nv:"N3",dica:"Orientação, acompanhamento e treinamento insuficientes."},
+  {k:"sup_plano",n:"Planejamento inadequado",nv:"N3",dica:"Escala, carga, rodízio, ritmo, equipe mal dimensionada."},
+  {k:"sup_corrigir",n:"Falha em corrigir problema conhecido",nv:"N3",dica:"Risco ou desvio já sabido e não tratado."},
+  {k:"sup_violacao",n:"Tolerância a desvios",nv:"N3",dica:"Supervisão que aceita ou induz o descumprimento de regras."},
+  {k:"pre_ambiente",n:"Ambiente físico e tecnológico",nv:"N2",dica:"Posto, interface, ferramenta, iluminação, ruído, layout."},
+  {k:"pre_estado",n:"Estado do trabalhador",nv:"N2",dica:"Fadiga, estresse, carga de trabalho, limitações físicas no momento."},
+  {k:"pre_equipe",n:"Coordenação e comunicação",nv:"N2",dica:"Passagem de turno, ajuda, comunicação entre pessoas e setores."},
+  {k:"pre_prontidao",n:"Prontidão e treinamento",nv:"N2",dica:"Aptidão, experiência e treinamento para aquela tarefa."},
+  {k:"ato_execucao",n:"Erro de execução",nv:"N1",dica:"Falha de habilidade ou atenção ao executar o passo."},
+  {k:"ato_decisao",n:"Erro de decisão",nv:"N1",dica:"Escolha que parecia razoável com a informação disponível."},
+  {k:"ato_percepcao",n:"Erro de percepção",nv:"N1",dica:"Perceber ou interpretar mal uma informação ou situação."},
+  {k:"ato_rotineiro",n:"Desvio rotineiro",nv:"N1",dica:"Prática comum e tolerada que foge da regra."},
+  {k:"ato_excepcional",n:"Desvio excepcional",nv:"N1",dica:"Desvio isolado, fora do padrão do grupo."}
+];
+const hfCat=k=>HF_CAT.find(c=>c.k===k),hfNv=k=>{const c=hfCat(k);return c?HF_NIV.find(n=>n.k===c.nv):null};
+const hfIdxNv=cat=>{const c=hfCat(cat);return c?HF_NIV.findIndex(n=>n.k===c.nv):-1};
+function hfAcima(d,cat){const i=hfIdxNv(cat);return d.dados.ach.filter(a=>hfIdxNv(a.cat)>=0&&hfIdxNv(a.cat)<i)}
+CM.hfacs={
+  meta:{
+    nome:"HFACS adaptado",situacao:"Evento com forte componente de fatores humanos",
+    quando:"O evento envolve decisões, atos ou erros no ponto de trabalho e você quer entender as condições da supervisão e da organização que os tornaram prováveis.",
+    limite:"Problema puramente físico de posto sem componente humano relevante, ou quando já há uma sequência de fatos clara (prefira Árvore de causas).",
+    passos:["Descreva o evento. Liste os <b>atos e decisões</b> no posto (nível inferior) como fatos, sem julgar.","Para cada ato, pergunte <b>\"o que tornou isso provável?\"</b> e registre as <b>pré-condições</b> (ambiente, estado do trabalhador, equipe, treinamento).","Suba mais um nível: o que na <b>supervisão e no planejamento</b> permitiu essas pré-condições? E o que na <b>organização</b> (recursos, cultura, processos) está por trás?","Ligue cada fator ao nível acima que o originou (\"originado por\"). Marque ⚑ os fatores principais para agir."],
+    cuidado:"o HFACS classifica condições do sistema. Ele não serve para apontar culpados. Um ato sem fator acima ainda não foi explicado.",
+    raizDef:"Fatores principais são os de nível mais alto que, se corrigidos, tornam o ato improvável (supervisão e organização têm mais alcance que o ato isolado).",
+    ajudaIA:"A IA classifica o que você descreveu nas categorias do HFACS, propõe fatores de pré-condição, supervisão e organização para cada ato e critica linguagem que culpa a pessoa."
+  },
+  vazio:()=>({ach:[]}),
+  vazioQ:d=>!d.dados.ach.length,
+  exemplo:()=>{
+    const I={};const A=(cat,t,ev,de,raiz)=>{const id=czid();I[t]=id;return {id,cat,t,ev,de:de?I[de]:"",raiz:!!raiz}};
+    const o1=A("org_recursos","Layout do armazém aprovado sem estudo de manobra e sem verba para sinalização","relatado","",true);
+    const o2=A("org_processo","A gestão de mudança do layout não incluiu análise de riscos de circulação","relatado","",true);
+    const s1=A("sup_plano","Escala com horas extras seguidas para cobrir ausências","relatado");
+    const s2=A("sup_corrigir","Colisões leves na coluna do corredor registradas e não tratadas","observado");
+    const p1=A("pre_ambiente","Corredor de 2,6 m com iluminação reduzida e coluna sem sinalização","medido");
+    const p2=A("pre_estado","Turno de 11 horas com meta de expedição alta; fadiga relatada","relatado");
+    const p3=A("pre_prontidao","Treinamento em corredor estreito feito há mais de três anos","relatado");
+    const a1=A("ato_percepcao","Operador não percebeu a altura do garfo ao manobrar no corredor estreito","observado");
+    const a2=A("ato_rotineiro","Manobra com o garfo elevado é prática comum no turno","relatado");
+    o1.de="";s1.de=o2.id;s2.de=o2.id;p1.de=o1.id;p2.de=s1.id;p3.de=s2.id;a1.de=p1.id;a2.de=p2.id;
+    return {evento:"Operador de empilhadeira atingiu a estrutura do porta-palete ao manobrar no corredor estreito; caixas caíram e o operador teve contusão no ombro.",dados:{ach:[o1,o2,s1,s2,p1,p2,p3,a1,a2]}};
+  },
+  render(d,dis){
+    return `<div id="czDiag" class="cz-diag">${this.diag(d,false)}</div>
+    <div class="cz-leg">${EVID.map(e=>`<span><i style="background:${EVCOR[e[0]]}"></i>${e[1]}</span>`).join("")}<span>Setas: do fator de cima que originou o de baixo</span><span><b style="color:#c62828">⚑</b> fator principal</span></div>
+    <div class="cz-como" style="border-left-color:var(--laranja);background:#fff8ec">Comece pelo que foi <b>feito no posto</b> (nível 1, embaixo) e vá subindo, perguntando <b>"o que tornou isso provável?"</b>. Descreva condições, não culpados.</div>
+    ${HF_NIV.slice().reverse().map(n=>this.nivel(d,n,dis)).join("")}`;
+  },
+  nivel(d,n,dis){
+    const cats=HF_CAT.filter(c=>c.nv===n.k),tot=d.dados.ach.filter(a=>hfCat(a.cat)&&hfCat(a.cat).nv===n.k).length,num=4-HF_NIV.findIndex(z=>z.k===n.k);
+    return `<div class="cz-box" style="border-left:6px solid ${n.cor};background:${n.fundo}22"><div class="cz-row" style="justify-content:space-between"><h4 style="margin:0;color:${n.cor}">Nível ${num} · ${n.n} <small class="mut">(${tot})</small></h4><button type="button" class="btn peq" style="background:#6a3fc2" data-cz-a="hfacs:sug" data-nv="${n.k}" ${dis}>✨ Sugerir deste nível</button></div><small class="mut">${n.dica}</small>
+     ${cats.map(c=>`<div style="margin-top:10px"><b style="font-size:.9rem;color:${n.cor}">${c.n}</b> <small class="mut">${c.dica}</small>${d.dados.ach.map((a,i)=>({a,i})).filter(x=>x.a.cat===c.k).map(x=>this.ach(d,x.i,x.a,dis)).join("")}<div style="margin-top:5px"><button type="button" class="btn peq sec" data-cz-a="hfacs:add" data-cat="${c.k}" ${dis}>+ Achado</button></div></div>`).join("")}</div>`;
+  },
+  ach(d,i,a,dis){
+    const P=`dados.ach.${i}`,ac=hfAcima(d,a.cat),nivA=hfIdxNv(a.cat);
+    return `<div style="border:1px solid var(--bd,#dfe6ea);border-radius:10px;padding:7px 8px;margin:6px 0;background:var(--card,#fff)"><div class="cz-row"><input class="cz-in" data-cz-f="${P}.t" data-cz-live="1" ${dis} value="${esc(a.t)}" placeholder="Fato ou condição observável (sem culpar)" aria-label="Achado">${czSelEv(P+".ev",a.ev,dis)}<button type="button" class="cz-x" data-cz-a="hfacs:del" data-i="${i}" ${dis} aria-label="Remover achado">✕</button></div>
+     <div class="cz-row" style="margin-top:5px">${nivA>0?`<select class="cz-mini" style="max-width:100%" data-cz-f="${P}.de" data-cz-live="1" ${dis} aria-label="Originado por"><option value="">Originado por… (nível acima)</option>${ac.map(z=>`<option value="${z.id}" ${a.de===z.id?"selected":""}>${esc(hfNv(z.cat).k+" · "+czTrunc(z.t||"(vazio)",50))}</option>`).join("")}</select>`:""}
+     <label style="font-size:.82rem;font-weight:600"><input type="checkbox" data-cz-f="${P}.raiz" data-cz-live="1" ${a.raiz?"checked":""} ${dis}> <span style="color:#c62828">⚑</span> Fator principal</label></div></div>`;
+  },
+  diag(d,ro){
+    const W=1130,X0=150,ach=d.dados.ach,gap=46,pos={},o=[];
+    const rows=HF_NIV.map(n=>{const cats=HF_CAT.filter(c=>c.nv===n.k),mx=Math.max(1,...cats.map(c=>Math.min(3,ach.filter(a=>a.cat===c.k).length)));return {n,cats,h:38+mx*54+10}});
+    let y=10;rows.forEach(r=>{r.y=y;y+=r.h+gap});const H=y-gap+12;
+    o.push(`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif" role="img" aria-label="Diagrama HFACS"><defs><marker id="czArr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#37474f"/></marker></defs><rect width="${W}" height="${H}" fill="#fbfdfe"/>`);
+    rows.forEach((r,ri)=>{
+      const n=r.n,cw=(W-X0-10)/r.cats.length;
+      o.push(`<rect x="8" y="${r.y}" width="132" height="${r.h}" rx="10" fill="${n.cor}"/>`);
+      czWrap(n.n,16,4).forEach((l,k,a)=>o.push(`<text x="74" y="${r.y+r.h/2-(a.length-1)*8+k*16+4}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">${esc(l)}</text>`));
+      o.push(`<text x="18" y="${r.y+16}" font-size="10" font-weight="700" fill="#FFD9A0">NÍVEL ${4-ri}</text>`);
+      r.cats.forEach((c,ci)=>{
+        const bx=X0+ci*cw,bw=cw-8,its=ach.filter(a=>a.cat===c.k);
+        o.push(`<rect x="${bx}" y="${r.y}" width="${bw}" height="${r.h}" rx="10" fill="${n.fundo}" stroke="${n.cor}" stroke-width="1.4"/><text x="${bx+10}" y="${r.y+17}" font-size="11" font-weight="700" fill="${n.cor}">${esc(czTrunc(c.n,Math.floor(bw/6.2)))}</text>`);
+        its.slice(0,3).forEach((a,k)=>{
+          const cy=r.y+26+k*54,cx=bx+8,w=bw-16;pos[a.id]={x:cx+w/2,t:cy,b:cy+46};
+          const ln=czWrap(a.t||"(vazio)",Math.max(10,Math.floor((w-22)/5.3)),3);
+          o.push(`<rect x="${cx}" y="${cy}" width="${w}" height="46" rx="7" fill="#fff" stroke="${a.raiz?"#c62828":"#b0bec5"}" stroke-width="${a.raiz?2.4:1}"/><circle cx="${cx+9}" cy="${cy+9}" r="3.8" fill="${EVCOR[a.ev]||EVCOR.hipotese}"/>${ln.map((l,q)=>`<text x="${cx+17}" y="${cy+13+q*11.5}" font-size="9.6" fill="#1b2a33">${esc(l)}</text>`).join("")}${a.raiz?`<text x="${cx+w-5}" y="${cy+14}" text-anchor="end" font-size="12" fill="#c62828">⚑</text>`:""}`);
+        });
+        if(its.length>3)o.push(`<text x="${bx+bw-8}" y="${r.y+17}" text-anchor="end" font-size="9.5" fill="#78909c">+${its.length-3}</text>`);
+      });
+    });
+    ach.forEach(a=>{const p=pos[a.id],q=a.de&&pos[a.de];if(!p||!q)return;
+      const y1=q.b,y2=p.t;if(y2<=y1)return;
+      o.push(`<path d="M${q.x} ${y1} C${q.x} ${y1+gap*.9} ${p.x} ${y2-gap*.9} ${p.x} ${y2-1}" fill="none" stroke="#37474f" stroke-width="1.8" opacity=".75" marker-end="url(#czArr4)"/>`)});
+    o.push("</svg>");return o.join("");
+  },
+  resumo(d){
+    const A=d.dados.ach,L=[];
+    HF_NIV.forEach(n=>{const f=A.filter(a=>hfCat(a.cat)&&hfCat(a.cat).nv===n.k);if(f.length){L.push(n.n.toUpperCase());f.forEach(a=>{const de=a.de&&A.find(z=>z.id===a.de);L.push(`  - [${hfCat(a.cat).n}] (id ${a.id}) ${a.t} (evidência: ${a.ev})${de?` — originado por: ${czTrunc(de.t,60)}`:""}${a.raiz?" [fator principal]":""}`)})}});
+    return L.join("\n")||"(modelo vazio)";
+  },
+  foco(d){
+    const A=d.dados.ach;if(!A.length)return "modelo vazio: classifique o evento descrito nas categorias e proponha fatores";
+    const s=A.filter(a=>hfIdxNv(a.cat)===3&&!a.de).map(a=>`ato sem fator acima (id ${a.id}) "${a.t}"`);
+    return s.length?s.join("; "):"";
+  },
+  rotuloItem(d,it){const c=hfCat(it.alvo);return c?(hfNv(it.alvo).k+" · "+c.n):"Categoria"},
+  aplicar(d,it){
+    const c=hfCat(it.alvo);if(!c)return false;
+    const de=it.ref&&d.dados.ach.find(z=>z.id===it.ref&&hfIdxNv(z.cat)<hfIdxNv(it.alvo));
+    d.dados.ach.push({id:czid(),cat:c.k,t:czTxtLivre(it.texto).slice(0,220),ev:EVC[it.evidencia]?it.evidencia:"hipotese",de:de?de.id:"",raiz:false});return true;
+  },
+  raizes(d){return d.dados.ach.filter(a=>a.raiz&&czTxtLivre(a.t)&&hfCat(a.cat)).map(a=>({k:a.id,t:czTxtLivre(a.t),n:hfNv(a.cat).k+" · "+hfCat(a.cat).n}))},
+  lint(d){
+    const L=[],A=d.dados.ach;
+    if(!A.length)return [{s:"i",t:"Comece pelos atos e decisões observados no posto (nível 1) e pergunte para cima: o que tornou isso provável?"}];
+    const at=A.filter(a=>hfIdxNv(a.cat)===3),alto=A.filter(a=>hfIdxNv(a.cat)<=1);
+    if(at.length&&!alto.length)L.push({s:"m",t:"A análise parou nos atos e pré-condições. Falta olhar a supervisão e a organização: o que permitiu essas condições?"});
+    at.filter(a=>!a.de).forEach(a=>L.push({s:"i",t:`O ato "${czTrunc(a.t,50)}" ainda não foi explicado: ligue-o a uma pré-condição ("originado por").`}));
+    A.filter(a=>hfIdxNv(a.cat)===2&&!a.de&&alto.length).forEach(a=>L.push({s:"i",t:`A pré-condição "${czTrunc(a.t,50)}" não está ligada a um fator de supervisão ou organização.`}));
+    if(A.some(a=>a.cat==="ato_rotineiro"))L.push({s:"i",t:"Há um desvio rotineiro. Prática comum costuma ser sinal de tempo, ferramenta ou meta incompatíveis com a regra. Pergunte por que ela é tolerada ou necessária."});
+    if(A.every(a=>a.ev==="hipotese"))L.push({s:"m",t:"Todos os achados são hipóteses. Confirme com registros, observação e conversa com quem estava no posto."});
+    if(!A.some(a=>a.raiz))L.push({s:"m",t:"Marque ⚑ os fatores principais para agir (geralmente de supervisão ou organização)."});
+    return L.slice(0,6);
+  },
+  acao(s,b,r,dis){
+    const A=r.d.dados.ach;
+    if(s==="add"){A.push({id:czid(),cat:b.dataset.cat,t:"",ev:"hipotese",de:"",raiz:false});czRefresh(true);const e=document.querySelector(`[data-cz-f="dados.ach.${A.length-1}.t"]`);if(e)e.focus()}
+    else if(s==="del"){const i=Number(b.dataset.i),id=A[i].id;A.splice(i,1);A.forEach(a=>{if(a.de===id)a.de=""});czRefresh(true)}
+    else if(s==="sug"){
+      if(czTxtLivre(r.d.evento).length<30&&!A.length)return aviso("Descreva o evento antes de pedir sugestões.");
+      const n=HF_NIV.find(z=>z.k===b.dataset.nv);b.disabled=true;
+      czIA("sugerir",{foco:`sugerir fatores do ${n.n} (categorias: ${HF_CAT.filter(c=>c.nv===n.k).map(c=>c.k+" = "+c.n).join("; ")}); ${this.foco(r.d)}`}).then(j=>{
+        r.d.ia=r.d.ia||{};r.d.ia.sug={em:new Date().toISOString(),itens:(j.itens||[]).filter(z=>z&&z.texto),perguntas:j.perguntas||[],lim:j.limitacoes||""};
+        czFlush();b.disabled=false;const ia=$(".cz-ia");if(ia){ia.outerHTML=htmlCzIA(r.d,dis);const q=$(".cz-ia");if(q)q.scrollIntoView({behavior:"smooth",block:"center"})}
+      }).catch(err=>{b.disabled=false;aviso(err.message&&err.message!=="falha"?err.message:"Não foi possível agora.")});
+    }
+  }
+};
 /* =====================================================================
    INÍCIO
    ===================================================================== */
