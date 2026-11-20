@@ -1806,6 +1806,7 @@ function msgErro(j,status){
   if(/rate limit|too many|security purposes/i.test(t)||status===429)return "Muitas tentativas. Aguarde um minuto e tente de novo.";
   if(/same password/i.test(t))return "A nova senha precisa ser diferente da atual.";
   if(/valid email|invalid format/i.test(t))return "E-mail inválido.";
+  if(/convite|database error (saving|creating) new user/i.test(t))return "Código de convite inválido, expirado ou esgotado. Peça um código ao responsável.";
   if(/signups not allowed/i.test(t))return "Criação de contas desativada neste projeto.";
   return t||"Não foi possível concluir. Tente novamente.";
 }
@@ -1903,7 +1904,7 @@ function htmlAuth(msg,tipo){
   const aviso_=msg?`<div class="${tipo==="ok"?"auth-ok":"alerta"}" role="alert">${esc(msg)}</div>`:"";
   let form="";
   if(authModo==="entrar")form=`<form data-auth="entrar"><label class="campo">E-mail<input type="email" name="email" autocomplete="username" required></label><label class="campo">Senha<input type="password" name="senha" autocomplete="current-password" required></label><button class="btn" style="width:100%;margin-top:16px">Entrar</button><p style="text-align:center;margin:12px 0 0"><a href="#" data-acao="auth-tab" data-m="esqueci">Esqueci a senha</a></p></form>`;
-  if(authModo==="criar")form=`<form data-auth="criar"><label class="campo">Nome completo<input name="nome" autocomplete="name" required></label><label class="campo">E-mail<input type="email" name="email" autocomplete="username" required></label><label class="campo">Senha (mín. 8 caracteres)<input type="password" name="senha" minlength="8" autocomplete="new-password" required></label><button class="btn" style="width:100%;margin-top:16px">Criar conta</button><p class="mut" style="font-size:.8rem">Você receberá um e-mail para confirmar a conta.</p></form>`;
+  if(authModo==="criar")form=`<form data-auth="criar"><label class="campo">Nome completo<input name="nome" autocomplete="name" required></label><label class="campo">E-mail<input type="email" name="email" autocomplete="username" required></label><label class="campo">Senha (mín. 8 caracteres)<input type="password" name="senha" minlength="8" autocomplete="new-password" required></label><label class="campo">Código de convite<input name="codigo" autocomplete="off" autocapitalize="characters" placeholder="Fornecido pelo responsável" required></label><button class="btn" style="width:100%;margin-top:16px">Criar conta</button><p class="mut" style="font-size:.8rem">Você receberá um e-mail para confirmar a conta.</p></form>`;
   if(authModo==="esqueci")form=`<form data-auth="esqueci"><p class="mut">Informe seu e-mail e enviaremos um link para criar uma nova senha.</p><label class="campo">E-mail<input type="email" name="email" autocomplete="username" required></label><button class="btn" style="width:100%;margin-top:16px">Enviar link</button><p style="text-align:center;margin:12px 0 0"><a href="#" data-acao="auth-tab" data-m="entrar">Voltar para Entrar</a></p></form>`;
   if(authModo==="nova")form=`<form data-auth="nova"><p class="mut">Defina sua nova senha.</p><label class="campo">Nova senha (mín. 8 caracteres)<input type="password" name="senha" minlength="8" autocomplete="new-password" required></label><button class="btn" style="width:100%;margin-top:16px">Salvar nova senha</button></form>`;
   return `<div class="auth-card"><div class="auth-logo"><img src="icon.svg" width="64" height="64" alt="" style="border-radius:16px"><h1>ErgoContexto</h1><span>Triagem ergonômica e fatores humanos</span></div>${authModo==="entrar"||authModo==="criar"?`<div class="auth-tabs">${tabs}</div>`:""}${aviso_}${form}<p class="mut" style="font-size:.74rem;text-align:center;margin:16px 0 0">Seus dados de avaliação ficam na sua conta e, se você entrar numa equipe, são visíveis aos membros dela.</p></div>`;
@@ -1923,7 +1924,7 @@ async function enviarAuth(form){
       const j=await sbReq("/auth/v1/token?grant_type=password",{method:"POST",body:{email:d.email.trim(),password:d.senha}});
       gravarSessao(sessaoDe(j));fecharAuth();await aposLogin();
     }else if(tipo==="criar"){
-      const j=await sbReq("/auth/v1/signup",{method:"POST",body:{email:d.email.trim(),password:d.senha,data:{nome:d.nome.trim()},...{}}});
+      const j=await sbReq("/auth/v1/signup",{method:"POST",body:{email:d.email.trim(),password:d.senha,data:{nome:d.nome.trim(),codigo:(d.codigo||"").trim()}}});
       if(j&&j.access_token){gravarSessao(sessaoDe(j));fecharAuth();await aposLogin()}
       else mostrarAuth("entrar","Conta criada! Enviamos um e-mail de confirmação. Clique no link e depois entre aqui.","ok");
     }else if(tipo==="esqueci"){
