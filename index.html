@@ -7073,8 +7073,8 @@ renderAcoes=function(){
 // ---------- editor do plano ----------
 function htmlPlanoEd(){
   const {d,id}=G.ed,P={id,d},A=acoesDoPlano(P),pr=progPlano(P);
-  const origens=regOf("aep").concat(regOf("aet"),regOf("dem")).filter(r=>!r.excluido).map(r=>[r.id,r.tipo.toUpperCase()+" "+(r.d.numero||"(pendente)")+(r.d.postoId?" · "+caminho(r.d.postoId):"")]);
-  const livres=regOf("acao").filter(a=>!a.excluido&&a.d.planoId!==id).map(a=>[a.id,(a.d.numero||"(pendente)")+" · "+String(a.d.acao||a.d.problema||"").slice(0,50)]);
+  const origens=aepsVivas().concat(aetsVivas(),regOf("dem")).filter(r=>!r.excluido).map(r=>[r.id,r.tipo.toUpperCase()+" "+(r.d.numero||"(pendente)")+(r.d.postoId?" · "+caminho(r.d.postoId):"")]);
+  const livres=regOf("acao").filter(a=>!a.excluido&&a.d.status!=="cancelada"&&a.d.planoId!==id).map(a=>[a.id,(a.d.numero||"(pendente)")+" · "+String(a.d.acao||a.d.problema||"").slice(0,50)]);
   const T=tarefasPlano(P);
   return `<div class="card no-print"><button class="btn sec peq" data-g-acao="ed-voltar">← Plano de ação</button><h2 style="margin-top:12px">Plano ${esc(d.numero||"(número após sincronizar)")} <span class="bd ${stPlano(P)==="Atrasado"?"n3":stPlano(P)==="Concluído"?"n0":"nd"}">${stPlano(P)}</span></h2>
   ${I("titulo","Título do plano","","text")}${T_("objetivo","Objetivo (que condição de trabalho este plano quer mudar)",2)}
@@ -7870,7 +7870,7 @@ function htmlCzLista(){
   const cartoes=CZ_ORDEM.map(k=>{const m=CM[k].meta;return `<button type="button" class="cz-m" data-cz-a="escolher" data-m="${k}"><span class="ic">${icoM(k)}</span><span><span class="sit">${esc(m.situacao)}</span><b>${esc(m.nome)}${m.tag?` <span class="cz-tag ${k==="fram"?"esp":k==="ishikawa"?"pad":""}">${esc(m.tag)}</span>`:""}</b><small class="mut">${esc(m.quando)}</small></span><span class="go">Começar →</span></button>`}).join("");
   const chips=[["todos","Todas ("+todas.length+")"]].concat(CZ_ORDEM.filter(k=>todas.some(r=>r.d.metodo===k)).map(k=>[k,CM[k].meta.curto+" ("+todas.filter(r=>r.d.metodo===k).length+")"]));
   const lst=L.length?L.map(r=>{const d=r.d,M=CM[d.metodo];const o=d.origemId&&regGet(d.origemId);const n=M?M.raizes(d).length:0;
-    return `<div class="sug"><span><span class="chp">${esc(M?M.meta.curto:d.metodo)}</span> <b>${esc(d.numero||"(pendente)")}</b> · ${esc(d.titulo||"(sem título)")}<br><small class="mut">${d.status==="concluida"?"Concluída":"Em andamento"} · ${n} determinante(s) principal(is)${o?" · origem "+esc(o.d.numero||o.tipo):""} · ${esc(dataBR((d.data||"")))}</small></span><button type="button" class="btn peq sec" data-cz-a="abrir" data-id="${esc(r.id)}">Abrir</button></div>`}).join(""):`<p class="mut">Nenhuma análise ainda. Escolha um método acima para começar.</p>`;
+    return `<div class="sug"><span><span class="chp">${esc(M?M.meta.curto:d.metodo)}</span> <b>${esc(d.numero||"(pendente)")}</b> · ${esc(d.titulo||"(sem título)")}<br><small class="mut">${d.status==="concluida"?"Concluída":"Em andamento"} · ${n} determinante(s) principal(is)${o?" · origem "+esc(o.d.numero||o.tipo):""} · ${esc(dataBR((d.data||"")))}</small></span><button type="button" class="btn peq sec" data-cz-a="abrir" data-id="${esc(r.id)}">Abrir</button><button type="button" class="btn peq sec" style="margin-left:6px;color:#c62828" data-cz-a="excluir" data-id="${esc(r.id)}" aria-label="Excluir análise">Excluir</button></div>`}).join(""):`<p class="mut">Nenhuma análise ainda. Escolha um método acima para começar.</p>`;
   return `<div class="cz-hero"><h2>Determinantes e fatores contribuintes</h2><p>Depois da AEP ou da AET, entenda <b>por que</b> a situação de trabalho produz o problema, com método, evidências e ações ligadas aos determinantes. O método padrão é a análise de determinantes ergonômicos.</p></div>
   <div class="card"><h3 style="margin-top:0">Escolha o método</h3><p class="mut" style="margin:-4px 0 10px;font-size:.88rem">Use a análise de determinantes sempre que não houver motivo claro para outro método. Os 5 Porquês entram dentro dela, como aprofundamento opcional de cada determinante.</p><div class="cz-met">${cartoes}</div>
   <div class="cz-box" style="margin-top:14px"><h4>Não sabe qual método usar?</h4><p class="mut" style="margin:0 0 8px;font-size:.88rem">Descreva a situação em poucas linhas. A IA indica o método mais adequado e explica por quê. Você decide.</p>
@@ -7891,7 +7891,8 @@ function htmlCzNovo(){
 }
 function origensCz(){
   const f=(t,r)=>regOf(t).filter(x=>!x.excluido).map(x=>[x.id,r+" "+(x.d.numero||"(pendente)")+(x.d.titulo?" · "+String(x.d.titulo).slice(0,40):x.d.motivo?" · "+String(x.d.motivo).slice(0,40):"")]);
-  return f("dem","Demanda").concat(f("aep","AEP"),f("aet","AET"));
+  const v=(a,r)=>a().map(x=>[x.id,r+" "+(x.d.numero||"(pendente)")+(x.d.titulo?" · "+String(x.d.titulo).slice(0,40):x.d.motivo?" · "+String(x.d.motivo).slice(0,40):"")]);
+  return f("dem","Demanda").concat(v(aepsVivas,"AEP"),v(aetsVivas,"AET"));
 }
 
 // ---------- tela: editor ----------
@@ -7918,7 +7919,7 @@ function htmlCzIA(d,dis){
 function htmlCzEd(){
   const r=G.cz.ed,d=r.d,M=CM[d.metodo],dis=czDis();
   const o=d.origemId&&regGet(d.origemId);
-  const cab=`<div class="card"><div class="linha" style="justify-content:space-between"><button type="button" class="btn sec peq" data-cz-a="voltar">← Análises</button><span><span class="chp b">${esc(M.meta.nome)}</span> <span class="bd ${d.status==="concluida"?"n0":"n1"}">${d.status==="concluida"?"Concluída":"Em andamento"}</span></span></div>
+  const cab=`<div class="card"><div class="linha" style="justify-content:space-between"><button type="button" class="btn sec peq" data-cz-a="voltar">← Análises</button><span><span class="chp b">${esc(M.meta.nome)}</span> <span class="bd ${d.status==="concluida"?"n0":"n1"}">${d.status==="concluida"?"Concluída":"Em andamento"}</span></span><button type="button" class="btn sec peq" style="color:#c62828" data-cz-a="excluir" data-id="${esc(r.id)}">Excluir análise</button></div>
    <p class="mut" style="margin:10px 0 0;font-size:.84rem">${esc(d.numero||"(número definido ao sincronizar)")} · Salvo automaticamente neste aparelho</p>
    <label class="campo">Título<input class="cz-in" data-cz-f="titulo" ${dis} value="${esc(d.titulo)}"></label>
    <details style="margin-top:10px"><summary><b>Dados da análise</b> <small class="mut">posto, origem, responsável</small></summary>
@@ -7985,6 +7986,14 @@ document.addEventListener("click",async e=>{
   if(k.includes(":")){const [m,s]=k.split(":");if(r&&CM[m]&&CM[m].acao)CM[m].acao(s,b,r,dis);return}
   if(k==="escolher"){G.cz.novo={metodo:b.dataset.m};renderCausas();window.scrollTo(0,0)}
   else if(k==="voltar"){czFlush();G.cz.ed=null;G.cz.novo=null;renderCausas();window.scrollTo(0,0)}
+  else if(k==="excluir"){
+    const x=regGet(b.dataset.id);if(!x)return;
+    const n=regOf("acao").filter(a=>a.d.origemId===x.id).length;
+    if(!confirm(`Excluir a análise ${x.d.numero||""} ${x.d.titulo?"“"+x.d.titulo+"”":""}?`+(n?`\n\n${n} ação(ões) criada(s) a partir dela continuam no plano de ação, sem origem.`:""))) return;
+    if(G.cz.ed&&G.cz.ed.id===x.id){G.cz.ed=null;G.cz.novo=null}
+    regOf("acao").filter(a=>a.d.origemId===x.id).forEach(a=>{a.d.origemId="";a.d.origemItem="";regGravar(a)});
+    regExcluir(x.id);renderCausas();window.scrollTo(0,0);aviso("Análise excluída.");
+  }
   else if(k==="abrir")czAbrir(b.dataset.id);
   else if(k==="filtro"){G.cz.f=b.dataset.f;renderCausas()}
   else if(k==="criar"){
@@ -8132,6 +8141,7 @@ irPara=function(v){
     czFlush();
     $$(".view").forEach(s=>s.classList.toggle("on",s.id==="v-causas"));
     $$("#nav button").forEach(b=>b.classList.remove("on"));
+    try{const b=barraInicio();b.style.display="flex";$("#barraTit").textContent="Determinantes"}catch(e){}
     renderCausas();window.scrollTo(0,0);return;
   }
   if(G.cz&&(G.cz.ed||G.cz.novo)){czFlush();G.cz.ed=null;G.cz.novo=null}
