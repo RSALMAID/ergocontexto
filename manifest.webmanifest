@@ -1,7 +1,7 @@
 {
-  "name": "ErgoContexto — Triagem ergonômica e fatores humanos",
+  "name": "ErgoContexto — Gestão ergonômica e AET",
   "short_name": "ErgoContexto",
-  "description": "Triagem ergonômica e de fatores humanos por domínio, com plano de ação e relatório.",
+  "description": "Sistema de gestão ergonômica e de fatores humanos: triagem, AEP, AET, plano de ação e indicadores.",
   "lang": "pt-BR",
   "start_url": "./index.html",
   "scope": "./",

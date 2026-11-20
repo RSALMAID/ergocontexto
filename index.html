@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff"><meta name="color-scheme" content="light">
-<title>ErgoContexto — Triagem ergonômica e fatores humanos</title>
+<title>ErgoContexto — Gestão ergonômica e AET</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -386,6 +386,7 @@ h4{color:var(--verde)}
       <button data-v="historico">Histórico</button>
       <button data-v="dash">Dashboard</button>
       <button data-v="relat">Relatórios</button>
+      <button data-v="busca">Buscar</button>
       <button data-v="painel">Painel</button>
       <button data-v="sobre">Sobre o método</button>
       <button data-v="conta" id="navConta" style="display:none">Conta</button>
@@ -406,6 +407,7 @@ h4{color:var(--verde)}
   <section id="v-cadastros" class="view"></section>
   <section id="v-dash" class="view"></section>
   <section id="v-relat" class="view"></section>
+  <section id="v-busca" class="view"></section>
   <section id="v-historico" class="view"></section>
   <section id="v-painel" class="view"></section>
   <section id="v-sobre" class="view sobre"></section>
@@ -1096,7 +1098,7 @@ function htmlContexto(){
   return `
   ${typeof htmlVinculoTriagem==="function"?htmlVinculoTriagem():""}
   <div class="card">
-    <div class="aviso">⚠️ Ferramenta de <b>triagem</b> ergonômica e de fatores humanos. Não substitui análise ergonômica formal (AET), avaliação especializada nem medições quantitativas.</div>
+    <div class="aviso">O ErgoContexto é um sistema para a empresa <b>gerir a ergonomia e os fatores humanos, da triagem à AET</b> (Análise Ergonômica do Trabalho), com plano de ação e acompanhamento. Esta tela é a <b>triagem de campo</b>: mostra onde olhar primeiro e qual o próximo passo. Os resultados apoiam o responsável técnico e não substituem o julgamento dele, nem as medições quantitativas quando forem necessárias.</div>
     <h2 style="margin-top:14px">Contexto da avaliação</h2>
     <div class="grid2">
       <div><label class="campo">Unidade<input ${bind("ctx.unidade")}></label></div>
@@ -1411,7 +1413,7 @@ function relatorioHtml(av){
   <h3>Plano de ação</h3>
   ${acoes?`<div><table class="resp"><thead><tr><th>Ação</th><th>Domínio</th><th>Tipo de controle</th><th>Responsável</th><th>Prazo</th><th>Prior.</th><th>Status</th></tr></thead><tbody>${acoes}</tbody></table></div>`:"<p>Nenhuma ação registrada.</p>"}
   <div class="assin"><div>Avaliador</div><div>Responsável da área</div></div>
-  <p style="margin-top:18px"><small>Triagem baseada em critérios simplificados, inspirada em métodos reconhecidos. Não constitui AET, laudo ergonômico, avaliação quantitativa ou avaliação especializada, e não declara conformidade legal. Modelo v${VERSAO_MODELO}. Gerado em ${esc(fmtDH(av.atualizadoEm))}.</small></p>
+  <p style="margin-top:18px"><small>Triagem baseada em critérios simplificados, inspirada em métodos reconhecidos. Este relatório de triagem não é uma AET nem um laudo; a AET é registrada no módulo próprio, sob responsabilidade do responsável técnico. Não declara conformidade legal. Modelo v${VERSAO_MODELO}. Gerado em ${esc(fmtDH(av.atualizadoEm))}.</small></p>
   </div>`;
 }
 function renderResultado(){
@@ -1769,7 +1771,7 @@ function renderSobre(){
   $("#v-sobre").innerHTML=`
   <div class="sobre-grid">
   <div class="card full"><h2>Sobre o método</h2>
-    <p>O ErgoContexto é uma ferramenta de <b>triagem</b>: identifica onde olhar primeiro e qual o próximo passo. Não constitui AET, laudo ergonômico, avaliação quantitativa ou avaliação especializada, e não declara conformidade legal.</p>
+    <p>O ErgoContexto é um sistema de <b>gestão ergonômica e de fatores humanos</b> para a empresa: cadastros, demandas, triagem de campo, AEP, <b>AET</b>, plano de ação, verificação de eficácia, inventário de riscos e indicadores. A triagem mostra onde olhar primeiro; a AET é conduzida e assinada pelo responsável técnico, e o sistema organiza, calcula, registra e dá rastreabilidade. O sistema não declara conformidade legal: essa conclusão é do responsável técnico.</p>
     <h3>Por que dois lados, em 5 domínios?</h3>
     <p>Ergonomia e fatores humanos respondem a perguntas diferentes. A <b>ergonomia</b> pergunta o que a atividade exige do corpo e da mente e se isso pode causar adoecimento. Os <b>fatores humanos</b> perguntam o que, no sistema, torna o desempenho confiável ou propenso a erro. Por isso o resultado é um perfil de 5 domínios; o índice geral resume, mas não esconde o domínio crítico.</p>
     <table><thead><tr><th>Domínio</th><th>Grupo</th><th>Referências</th></tr></thead><tbody>
@@ -2267,7 +2269,7 @@ function renderCadastros(){
       return `<div class="sug"><span><b>${esc(x.nome)}</b>${x.pai?`<br><small>${esc(caminho(x.pai))}</small>`:""}${ex?`<br><small>${esc(ex)}</small>`:""}</span><span class="linha">${t==="posto"?`<button class="btn sec peq" data-g-acao="hist-posto" data-id="${r.id}">Histórico</button>`:""}<button class="btn sec peq" data-g-acao="cad-edit" data-id="${r.id}">Editar</button><button class="btn sec peq" data-g-acao="cad-del" data-id="${r.id}">Excluir</button></span></div>`}).join("")||`<p class="mut">Nada cadastrado aqui ainda.</p>`;
     corpo=`${form}<div class="card"><div class="linha" style="justify-content:space-between"><h3 style="margin:0">${def.rot}</h3>${ed?"":`<button class="btn peq" data-g-acao="cad-novo">+ Novo</button>`}</div>${lin}</div>`;
   }
-  el.innerHTML=`<div class="card"><h2>Cadastros</h2><p class="mut">Base única do sistema. Toda avaliação deve ficar vinculada a uma <b>situação real de trabalho</b> (posto, equipamento e atividade), e não só ao nome do cargo. Ordem sugerida: planta → área → posto → atividade → função/GSTS.</p><div class="subtabs">${abas}</div></div>${corpo}`;
+  el.innerHTML=`<div class="card"><h2>Cadastros</h2><p class="mut">Base única do sistema. Toda avaliação deve ficar vinculada a uma <b>situação real de trabalho</b> (posto, equipamento e atividade), e não só ao nome do cargo. Ordem sugerida: planta → área → posto → atividade → função/GSTS (Grupo de Situações de Trabalho Similares).</p><div class="subtabs">${abas}</div></div>${corpo}`;
 }
 function salvarCad(f){
   const def=CAD[G.cadTab],ed=G.cadEd,fd=new FormData(f),d={tc:G.cadTab};
@@ -3154,8 +3156,8 @@ htmlClasse=function(c,dis){
    - cruza o inventário com postos/atividades e com as AEPs
    - exporta CSV (PGR, Power BI) de AEPs, ações e demandas
    ===================================================================== */
-const INV_CAMPOS=[["unidade","Unidade / planta"],["area","Área"],["local","Local / posto / equipamento"],["atividade","Atividade / processo"],["funcao","Função / cargo / GHE"],["tipoRisco","Tipo de risco (físico, químico, ergonômico…)"],["perigo","Perigo / fator de risco"],["descricao","Descrição / fonte geradora"],["nivel","Classificação / nível de risco"],["medidas","Medidas de controle existentes"],["resp","Responsável"],["expostos","Nº de expostos"]];
-const INV_DICA={unidade:/unidade|planta|site|fabrica|empresa/,area:/^area|setor|gerencia|departamento|coordenacao/,local:/local|posto|equipamento|maquina|tag|instalacao/,atividade:/atividade|processo|tarefa|operacao/,funcao:/funcao|cargo|ghe|gse|gts|ocupacao/,tipoRisco:/tipo.*risco|grupo.*risco|categoria|natureza|classe.*risco/,perigo:/perigo|fator.*risco|agente|risco(?!.*nivel)|exposicao/,descricao:/descricao|fonte|causa|observ/,nivel:/nivel|classificacao|grau|severidade|prioridade|avaliacao.*risco/,medidas:/medida|controle|epc|epi|barreira/,resp:/responsavel|gestor|dono/,expostos:/exposto|trabalhador|numero.*pessoa|colaborador|qtd|quantidade/};
+const INV_CAMPOS=[["unidade","Unidade / planta"],["area","Área"],["local","Local / posto / equipamento"],["atividade","Atividade / processo"],["funcao","Função / cargo / GSTS"],["tipoRisco","Tipo de risco (físico, químico, ergonômico…)"],["perigo","Perigo / fator de risco"],["descricao","Descrição / fonte geradora"],["nivel","Classificação / nível de risco"],["medidas","Medidas de controle existentes"],["resp","Responsável"],["expostos","Nº de expostos"]];
+const INV_DICA={unidade:/unidade|planta|site|fabrica|empresa/,area:/^area|setor|gerencia|departamento|coordenacao/,local:/local|posto|equipamento|maquina|tag|instalacao/,atividade:/atividade|processo|tarefa|operacao/,funcao:/funcao|cargo|gsts|ghe|gse|gts|ocupacao/,tipoRisco:/tipo.*risco|grupo.*risco|categoria|natureza|classe.*risco/,perigo:/perigo|fator.*risco|agente|risco(?!.*nivel)|exposicao/,descricao:/descricao|fonte|causa|observ/,nivel:/nivel|classificacao|grau|severidade|prioridade|avaliacao.*risco/,medidas:/medida|controle|epc|epi|barreira/,resp:/responsavel|gestor|dono/,expostos:/exposto|trabalhador|numero.*pessoa|colaborador|qtd|quantidade/};
 const INV_MAX=5000;
 G.inv={etapa:"lista",arq:null,mapa:{},soErgo:true,loteId:null,busca:"",filtro:"todos"};
 
@@ -3409,7 +3411,7 @@ const SEV_ROT=["1 - Leve","2 - Moderada","3 - Significativa","4 - Grave","5 - Mu
 const FATORES=["Postura forçada ou inadequada","Postura estática prolongada","Movimentos repetitivos","Esforço físico excessivo","Levantamento manual de cargas","Transporte manual de cargas","Empurrar ou puxar cargas","Alcance ou acesso inadequado","Iluminação inadequada","Desconforto térmico","Ruído interferente","Vibração","Espaço de trabalho inadequado","Atenção sustentada","Excesso de informações","Informações insuficientes ou conflitantes","Decisões complexas ou sob pressão","Sobrecarga de memória","Interfaces, comandos ou alarmes inadequados","Interrupções frequentes","Ritmo de trabalho excessivo","Pressão por prazos ou metas","Jornada ou escala inadequada","Pausas insuficientes","Baixa autonomia","Equipe ou recursos insuficientes","Monotonia ou baixa variedade de tarefas","Comunicação ou coordenação deficiente","Divergência entre tarefa prescrita e atividade real","Procedimento inexistente, inadequado ou desatualizado","Improvisações ou adaptações frequentes","Variabilidade operacional não prevista","Dependência excessiva da atenção ou memória","Barreiras insuficientes contra erros","Falhas de equipamentos, sistemas ou alarmes","Manutenção ou confiabilidade inadequada"];
 const MOD=[
  ["area","Área / setor","t",20],["local","Posto / local de trabalho","t",26],
- ["atividade","Atividade / processo","t",28],["funcao","Função / GHE","t",20],["tipoRisco","Tipo de risco","t",14],
+ ["atividade","Atividade / processo","t",28],["funcao","Função / GSTS","t",20],["tipoRisco","Tipo de risco","t",14],
  ["perigo","Fator de risco ergonômico","s",38],["descricao","Descrição / fonte geradora","a",40],["expostos","Nº de expostos","n",11],
  ["exposicao","Exposição","s",16],["prob","Probabilidade","n",13],["sev","Severidade","n",13],
  ["nivel","Nível de risco","s",12],["medidas","Medidas de controle existentes","a",36],["recomend","Medidas recomendadas","a",36],
@@ -3512,6 +3514,7 @@ const nomeArq=s=>norm(s).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0
 
 /* ---------- critérios de preenchimento ---------- */
 const CRIT_BLOCO=[
+ ["GSTS (Função / GSTS)","Grupo de Situações de Trabalho Similares: conjunto de postos, atividades ou funções expostos aos mesmos fatores, de forma semelhante, e que por isso podem ser avaliados em conjunto. Informe o nome do grupo; se a empresa ainda não definiu os grupos, informe a função."],
  ["Como preencher","Uma linha por perigo ergonômico em cada posto ou atividade. Descreva a situação de trabalho, nunca o trabalhador."],
  ["Nº de expostos","Quantidade de trabalhadores na situação de trabalho. Não escreva nomes."],
  ["Exposição","Eventual: esporádica, menos de 1 vez por turno ou até cerca de 10% da jornada. Intermitente: algumas vezes por turno, cerca de 10 a 30%. Frequente: repetida, cerca de 30 a 60%. Contínua: acima de cerca de 60% da jornada ou ciclo contínuo."],
@@ -3591,7 +3594,7 @@ function desenharLinha(){
   const pt=pontosInv(v);
   el.innerHTML=`<div class="modal-fundo" data-ir-fechar="1"></div><div class="modal-caixa" role="dialog" aria-modal="true"><button type="button" class="modal-x" data-ir-fechar="1" aria-label="Fechar">×</button>
   <h2>${G.inv.row.i==null?"Nova linha do inventário":"Editar linha"}</h2><p class="mut" style="font-size:.86rem">Uma linha por perigo ergonômico em cada posto/atividade. Descreva a situação de trabalho, sem nome de trabalhador. Use <b>Salvar e adicionar próxima linha</b> (ou Ctrl+Enter) para ir preenchendo em sequência no mesmo inventário.</p>
-  <h4>Onde</h4><div class="grid2">${t("area","Área / setor")}${t("local","Posto / local de trabalho")}${t("atividade","Atividade / processo")}${t("funcao","Função / GHE")}${t("expostos","Nº de expostos",'inputmode="numeric"')}</div>
+  <h4>Onde</h4><div class="grid2">${t("area","Área / setor")}${t("local","Posto / local de trabalho")}${t("atividade","Atividade / processo")}${t("funcao","Função / GSTS")}${t("expostos","Nº de expostos",'inputmode="numeric"')}</div>
   <h4>Risco</h4><div class="grid2">${t("tipoRisco","Tipo de risco")}<label class="campo">Fator de risco ergonômico<select data-ir="perigo"><option value="">(selecione)</option>${sel1(v.perigo&&!FATORES.includes(v.perigo)?[...FATORES,v.perigo]:FATORES,v.perigo||"")}</select></label></div>
   ${a("descricao","Descrição / fonte geradora","O que acontece na tarefa e por que gera risco")}
   <div class="grid3">${s("exposicao","Exposição",EXPO_OP)}${s("prob","Probabilidade",PROB_ROT.map((x,k)=>[String(k+1),x]))}${s("sev","Severidade",SEV_ROT.map((x,k)=>[String(k+1),x]))}</div>
@@ -4453,6 +4456,76 @@ htmlClasse=function(c,dis){
   const h=_htmlClasse17(c,dis);
   return dis?h:h.replace('data-mt-abrir="si">Calcular Strain Index</button>','data-mt-abrir="si">Calcular Strain Index</button><button type="button" class="btn sec peq" data-mt-abrir="tlx">Calcular NASA-TLX</button>');
 };
+/* =====================================================================
+   FASE 11: BUSCA GLOBAL (TAG, local, número, texto) E DITADO POR VOZ
+   ===================================================================== */
+const normB=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+function textoReg(o,acc,prof){
+  if(prof>4||o==null)return acc;
+  if(typeof o==="string"){if(o.length<600)acc.push(o)}
+  else if(typeof o==="number")acc.push(String(o));
+  else if(Array.isArray(o))o.slice(0,60).forEach(x=>textoReg(x,acc,prof+1));
+  else if(typeof o==="object")Object.keys(o).forEach(k=>{if(!["evid","hist","f","aprov","mini"].includes(k))textoReg(o[k],acc,prof+1)});
+  return acc;
+}
+const ROT_TIPO={cad:"Cadastro",dem:"Demanda",aep:"AEP",aet:"AET",acao:"Ação",inv:"Inventário"};
+function buscar(q){
+  const toks=normB(q).split(/\s+/).filter(Boolean);if(!toks.length)return [];
+  const out=[];
+  regOf("cad").concat(regOf("dem"),regOf("aep"),regOf("aet"),regOf("acao")).forEach(r=>{
+    const d=r.d,cam=d.postoId?caminho(d.postoId):(r.tipo==="cad"&&d.pai?caminho(d.pai):"");
+    const hay=normB(textoReg(d,[],0).join(" ")+" "+cam);
+    if(!toks.every(t=>hay.includes(t)))return;
+    let tit,ac;
+    if(r.tipo==="cad"){tit=(CAD[d.tc]?CAD[d.tc].um[0].toUpperCase()+CAD[d.tc].um.slice(1):"Cadastro")+": "+(d.nome||"");ac=d.tc==="posto"?["hist-posto",r.id]:null}
+    else{tit=(d.numero||ROT_TIPO[r.tipo])+" · "+((d.acao||d.motivo||d.problema||"").slice(0,80));ac=r.tipo==="dem"?["abrir-dem",r.id]:r.tipo==="acao"?["ac-abrir",r.id]:["abrir-reg",r.id]}
+    out.push({tipo:ROT_TIPO[r.tipo],tit,sub:[d.tag&&"TAG "+d.tag,d.local,cam].filter(Boolean).join(" · "),ac});
+  });
+  regOf("inv").forEach(r=>(r.d.linhas||[]).forEach(l=>{
+    const hay=normB([l.area,l.local,l.atividade,l.funcao,l.perigo,l.descricao].join(" "));
+    if(toks.every(t=>hay.includes(t)))out.push({tipo:"Inventário",tit:(l.local||l.area||"")+" · "+(l.perigo||""),sub:[r.d.nome,l.area,l.atividade,l.nivel].filter(Boolean).join(" · "),ir:"inventario"});
+  }));
+  return out;
+}
+function renderBusca(){
+  const el=$("#v-busca");if(!el)return;
+  const q=G.busca||"";
+  el.innerHTML=`<div class="card"><h2>Buscar</h2><p class="mut">Procure por TAG, nome do posto, área, atividade, número de AEP, AET, ação ou demanda, ou por qualquer palavra dos registros.</p>
+  <input id="buscaQ" type="search" value="${esc(q)}" placeholder="Ex.: BB-02, bobinadeira, AEP-2026-0003" autocomplete="off" style="width:100%"></div><div id="buscaRes"></div>`;
+  desenharBusca();
+}
+function desenharBusca(){
+  const box=$("#buscaRes");if(!box)return;
+  const q=(G.busca||"").trim();
+  if(q.length<2){box.innerHTML="";return}
+  const R=buscar(q),max=60;
+  box.innerHTML=`<div class="card"><h3>${R.length} resultado(s)${R.length>max?" (mostrando "+max+")":""}</h3>${R.slice(0,max).map(x=>`<div class="sug"><span><span class="bd nd">${esc(x.tipo)}</span> <b>${esc(x.tit)}</b>${x.sub?`<br><small>${esc(x.sub)}</small>`:""}</span>${x.ac?`<button class="btn sec peq" data-g-acao="${x.ac[0]}" data-id="${x.ac[1]}">Abrir</button>`:x.ir?`<button class="btn sec peq" data-busca-ir="${x.ir}">Abrir</button>`:""}</div>`).join("")||`<p class="mut">Nada encontrado.</p>`}</div>`;
+}
+document.addEventListener("input",e=>{if(e.target.id==="buscaQ"){G.busca=e.target.value;desenharBusca()}});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-busca-ir]");if(b)irPara(b.dataset.buscaIr)});
+const _irPara18=irPara;
+irPara=function(v){_irPara18(v);if(v==="busca")renderBusca()};
+
+/* ---------- ditado por voz (reconhecimento de fala do navegador) ---------- */
+(function(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
+  let alvo=null,rec=null,ativo=false;
+  const btn=document.createElement("button");btn.type="button";btn.id="micBtn";btn.className="no-print";btn.setAttribute("aria-label","Ditar por voz");btn.title="Ditar por voz";btn.textContent="🎤";btn.style.cssText="display:none;position:fixed;right:14px;bottom:70px;z-index:60;width:48px;height:48px;border-radius:50%;border:2px solid #FF9900;background:#fff;font-size:1.3rem;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer";
+  document.body.appendChild(btn);
+  const parar=()=>{ativo=false;btn.style.background="#fff";btn.style.borderColor="#FF9900";try{rec&&rec.stop()}catch(e){}};
+  document.addEventListener("focusin",e=>{const t=e.target;if(t.tagName==="TEXTAREA"&&!t.disabled&&!t.readOnly){alvo=t;btn.style.display="block"}else if(t!==btn&&t.tagName!=="TEXTAREA"){btn.style.display="none";parar()}});
+  btn.addEventListener("mousedown",e=>e.preventDefault());
+  btn.addEventListener("click",()=>{
+    if(!alvo)return;
+    if(ativo){parar();return}
+    rec=new SR();rec.lang="pt-BR";rec.continuous=true;rec.interimResults=false;
+    rec.onresult=ev=>{let t="";for(let i=ev.resultIndex;i<ev.results.length;i++)if(ev.results[i].isFinal)t+=ev.results[i][0].transcript;
+      if(t&&alvo){const sep=alvo.value&&!/\s$/.test(alvo.value)?" ":"";alvo.value+=sep+t.trim();alvo.dispatchEvent(new Event("input",{bubbles:true}))}};
+    rec.onend=()=>{if(ativo){try{rec.start()}catch(e){parar()}}};
+    rec.onerror=ev=>{if(ev.error==="not-allowed"||ev.error==="service-not-allowed"){aviso("Permita o microfone no navegador para ditar.");parar()}};
+    try{rec.start();ativo=true;btn.style.background="#FF3300";btn.style.borderColor="#FF3300"}catch(e){aviso("Não foi possível iniciar o ditado.")}
+  });
+})();
 /* =====================================================================
    INÍCIO
    ===================================================================== */
