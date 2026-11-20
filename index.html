@@ -358,6 +358,7 @@ details.sub>summary{cursor:pointer;font-weight:600;padding:6px 0}
       <button data-v="inventario">Inventário</button>
       <button data-v="cadastros">Cadastros</button>
       <button data-v="historico">Histórico</button>
+      <button data-v="dash">Dashboard</button>
       <button data-v="painel">Painel</button>
       <button data-v="sobre">Sobre o método</button>
       <button data-v="conta" id="navConta" style="display:none">Conta</button>
@@ -376,6 +377,7 @@ details.sub>summary{cursor:pointer;font-weight:600;padding:6px 0}
   <section id="v-alertas" class="view"></section>
   <section id="v-inventario" class="view"></section>
   <section id="v-cadastros" class="view"></section>
+  <section id="v-dash" class="view"></section>
   <section id="v-historico" class="view"></section>
   <section id="v-painel" class="view"></section>
   <section id="v-sobre" class="view sobre"></section>
@@ -2176,7 +2178,7 @@ async function abrirEvidencia(i){
 }
 function htmlEvid(bloqueado){
   const d=G.ed.d,ev=d.evid||[];
-  return `<div class="evid">${ev.map((e,i)=>`<div class="evi">${e.mini?`<img src="${esc(e.mini)}" alt="">`:`<div class="pdf">PDF</div>`}<input data-g="evid.${i}.legenda" value="${esc(e.legenda||"")}" placeholder="Legenda (antes/depois, ponto marcado…)" ${bloqueado?"disabled":""}><small>${esc(e.nome)}${e.local?" · só neste aparelho":""}</small><span class="linha"><button type="button" class="btn sec peq" data-g-acao="evid-abrir" data-i="${i}">Abrir</button>${bloqueado?"":`<button type="button" class="btn sec peq" data-g-acao="evid-rm" data-i="${i}">Remover</button>`}</span></div>`).join("")||`<p class="mut">Nenhuma evidência anexada.</p>`}</div>
+  return `<div class="evid">${ev.map((e,i)=>`<div class="evi">${e.mini?`<img src="${esc(e.mini)}" alt="">`:`<div class="pdf">PDF</div>`}<input data-g="evid.${i}.legenda" value="${esc(e.legenda||"")}" placeholder="Legenda (antes/depois, ponto marcado…)" ${bloqueado?"disabled":""}><small>${esc(e.nome)}${e.fila?" · aguardando envio (offline)":e.local?" · só neste aparelho":""}</small><span class="linha"><button type="button" class="btn sec peq" data-g-acao="evid-abrir" data-i="${i}">Abrir</button>${bloqueado?"":`<button type="button" class="btn sec peq" data-g-acao="evid-rm" data-i="${i}">Remover</button>`}</span></div>`).join("")||`<p class="mut">Nenhuma evidência anexada.</p>`}</div>
   ${bloqueado?"":`<label class="btn sec peq" style="margin-top:8px">📷 Adicionar foto ou PDF<input type="file" id="evidIn" accept="image/*,application/pdf" capture="environment" hidden multiple></label><small class="mut"> Fotos são reduzidas antes do envio. Evite rostos identificáveis.</small>`}`;
 }
 
@@ -3644,6 +3646,373 @@ document.addEventListener("click",e=>{
   }
 },true);
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&G.inv.row)fecharLinha()});
+/* =====================================================================
+   FASE 6A: QR CODE POR POSTO
+   - gerador de QR Code próprio (modo byte, correção M, versões 1 a 10)
+   - etiquetas imprimíveis por posto; o QR abre o histórico do posto
+   ===================================================================== */
+const QR_M={ // versão: [codewords de dados em blocos [n,dados]..., ec por bloco, alinhamento]
+ 1:{b:[[1,16]],ec:10,al:[]},2:{b:[[1,28]],ec:16,al:[6,18]},3:{b:[[1,44]],ec:26,al:[6,22]},4:{b:[[2,32]],ec:18,al:[6,26]},
+ 5:{b:[[2,43]],ec:24,al:[6,30]},6:{b:[[4,27]],ec:16,al:[6,34]},7:{b:[[4,31]],ec:18,al:[6,22,38]},
+ 8:{b:[[2,38],[2,39]],ec:22,al:[6,24,42]},9:{b:[[3,36],[2,37]],ec:22,al:[6,26,46]},10:{b:[[4,43],[1,44]],ec:26,al:[6,28,50]}};
+const GF_E=new Array(512),GF_L=new Array(256);
+(()=>{let x=1;for(let i=0;i<255;i++){GF_E[i]=x;GF_L[x]=i;x<<=1;if(x&256)x^=0x11D}for(let i=255;i<512;i++)GF_E[i]=GF_E[i-255]})();
+const gfMul=(a,b)=>a&&b?GF_E[GF_L[a]+GF_L[b]]:0;
+function rsResto(dados,n){
+  let g=[1];
+  for(let i=0;i<n;i++){const ng=new Array(g.length+1).fill(0);g.forEach((c,j)=>{ng[j]^=c;ng[j+1]^=gfMul(c,GF_E[i])});g=ng}
+  const r=new Array(n).fill(0);
+  dados.forEach(d=>{const f=d^r.shift();r.push(0);if(f)for(let i=0;i<n;i++)r[i]^=gfMul(g[i+1],f)});
+  return r;
+}
+function qrGerar(texto){
+  const bytes=[...new TextEncoder().encode(texto)];
+  let v=0;
+  for(let k=1;k<=10;k++){const cap=QR_M[k].b.reduce((s,x)=>s+x[0]*x[1],0)*8,lb=k<10?8:16;if(4+lb+8*bytes.length<=cap){v=k;break}}
+  if(!v)throw new Error("Texto longo demais para o QR Code.");
+  const Q=QR_M[v],tot=Q.b.reduce((s,x)=>s+x[0]*x[1],0),bits=[];
+  const put=(val,n)=>{for(let i=n-1;i>=0;i--)bits.push((val>>i)&1)};
+  put(4,4);put(bytes.length,v<10?8:16);bytes.forEach(b=>put(b,8));
+  put(0,Math.min(4,tot*8-bits.length));while(bits.length%8)bits.push(0);
+  const cw=[];for(let i=0;i<bits.length;i+=8)cw.push(parseInt(bits.slice(i,i+8).join(""),2));
+  for(let p=0;cw.length<tot;p++)cw.push(p%2?0x11:0xEC);
+  // blocos
+  const blocos=[];let o=0;Q.b.forEach(([n,d])=>{for(let i=0;i<n;i++){blocos.push(cw.slice(o,o+d));o+=d}});
+  const ecs=blocos.map(b=>rsResto(b,Q.ec)),final=[],maxD=Math.max(...blocos.map(b=>b.length));
+  for(let i=0;i<maxD;i++)blocos.forEach(b=>{if(i<b.length)final.push(b[i])});
+  for(let i=0;i<Q.ec;i++)ecs.forEach(e=>final.push(e[i]));
+  const fb=[];final.forEach(b=>{for(let i=7;i>=0;i--)fb.push((b>>i)&1)});
+  const N=17+4*v,M=[...Array(N)].map(()=>new Array(N).fill(0)),F=[...Array(N)].map(()=>new Array(N).fill(false));
+  const set=(x,y,val)=>{if(x>=0&&y>=0&&x<N&&y<N){M[y][x]=val?1:0;F[y][x]=true}};
+  const finder=(cx,cy)=>{for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){const d=Math.max(Math.abs(dx),Math.abs(dy));set(cx+dx,cy+dy,d!==2&&d!==4)}};
+  finder(3,3);finder(N-4,3);finder(3,N-4);
+  for(let i=0;i<N;i++){if(!F[6][i])set(i,6,i%2===0);if(!F[i][6])set(6,i,i%2===0)}
+  const al=Q.al;
+  al.forEach((cy,i)=>al.forEach((cx,j)=>{
+    if((i===0&&j===0)||(i===0&&j===al.length-1)||(i===al.length-1&&j===0))return;
+    for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)set(cx+dx,cy+dy,Math.max(Math.abs(dx),Math.abs(dy))!==1);
+  }));
+  const reservar=()=>{for(let i=0;i<9;i++){F[8][i]=true;F[i][8]=true}for(let i=0;i<8;i++){F[8][N-1-i]=true;F[N-1-i][8]=true}};
+  reservar();set(8,N-8,true);
+  if(v>=7){for(let i=0;i<6;i++)for(let j=0;j<3;j++){F[i][N-11+j]=true;F[N-11+j][i]=true}}
+  // dados em zigue-zague
+  const pos=[];let up=true;
+  for(let x=N-1;x>0;x-=2){if(x===6)x--;for(let k=0;k<N;k++){const y=up?N-1-k:k;for(let c=0;c<2;c++){const xx=x-c;if(!F[y][xx])pos.push([xx,y])}}up=!up}
+  const mascaras=[(x,y)=>(x+y)%2===0,(x,y)=>y%2===0,(x,y)=>x%3===0,(x,y)=>(x+y)%3===0,(x,y)=>(Math.floor(y/2)+Math.floor(x/3))%2===0,(x,y)=>(x*y)%2+(x*y)%3===0,(x,y)=>((x*y)%2+(x*y)%3)%2===0,(x,y)=>((x+y)%2+(x*y)%3)%2===0];
+  const bch=(val,gen,nb,bitsTot)=>{let r=val<<nb;for(let i=bitsTot-1;i>=nb;i--)if((r>>i)&1)r^=gen<<(i-nb);return (val<<nb)|r};
+  function montar(m){
+    const R=M.map(l=>l.slice());
+    pos.forEach(([x,y],i)=>{let b=fb[i]||0;if(mascaras[m](x,y))b^=1;R[y][x]=b});
+    const fmt=bch(m,0x537,10,15)^0x5412; // nível M = 00
+    const g=(i)=>(fmt>>i)&1;
+    for(let i=0;i<=5;i++)R[i][8]=g(i);R[7][8]=g(6);R[8][8]=g(7);R[8][7]=g(8);for(let i=9;i<15;i++)R[8][14-i]=g(i);
+    for(let i=0;i<8;i++)R[8][N-1-i]=g(i);for(let i=8;i<15;i++)R[N-15+i][8]=g(i);R[N-8][8]=1;
+    if(v>=7){const vi=bch(v,0x1F25,12,18);for(let i=0;i<18;i++){const b=(vi>>i)&1,a=N-11+i%3,c=Math.floor(i/3);R[c][a]=b;R[a][c]=b}}
+    return R;
+  }
+  function penal(R){
+    let p=0;
+    for(let t=0;t<2;t++){
+      for(let a=0;a<N;a++){
+        let run=1;
+        for(let b=1;b<N;b++){const cur=t?R[b][a]:R[a][b],prev=t?R[b-1][a]:R[a][b-1];if(cur===prev){run++;if(run===5)p+=3;else if(run>5)p++}else run=1}
+        for(let b=0;b+10<N;b++){const s=[];for(let k=0;k<11;k++)s.push(t?R[b+k][a]:R[a][b+k]);const j=s.join("");if(j==="10111010000"||j==="00001011101")p+=40}
+      }
+    }
+    for(let y=0;y<N-1;y++)for(let x=0;x<N-1;x++){const c=R[y][x];if(c===R[y][x+1]&&c===R[y+1][x]&&c===R[y+1][x+1])p+=3}
+    const esc=R.reduce((s,l)=>s+l.reduce((a,b)=>a+b,0),0),pct=esc*100/(N*N);p+=Math.floor(Math.abs(pct-50)/5)*10;
+    return p;
+  }
+  let melhor=null,mp=1e9;
+  for(let m=0;m<8;m++){const R=montar(m),p=penal(R);if(p<mp){mp=p;melhor=R}}
+  return melhor;
+}
+function qrSvg(texto,px){
+  const R=qrGerar(texto),N=R.length,q=4;let d="";
+  R.forEach((l,y)=>l.forEach((c,x)=>{if(c)d+=`M${x+q},${y+q}h1v1h-1z`}));
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${N+2*q} ${N+2*q}" width="${px}" height="${px}" shape-rendering="crispEdges" role="img" aria-label="QR Code"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+}
+
+/* ---------- etiquetas por posto ---------- */
+const CH_QRBASE="ergocontexto_qrbase";
+const qrBase=()=>{let b=localStorage.getItem(CH_QRBASE);if(!b){b=location.origin+location.pathname.replace(/[^\/]*$/,"");if(!/^https?:/.test(b))b="https://www.ergocontexto.dev/"}return b.replace(/\/*$/,"/")};
+const qrLink=id=>qrBase()+"#posto="+encodeURIComponent(id);
+function abrirEtiquetas(ids){
+  const postos=regOf("cad").filter(r=>r.d.tc==="posto"&&(!ids||ids.includes(r.id))).sort((a,b)=>a.d.nome.localeCompare(b.d.nome));
+  let el=$("#qrFolha");if(!el){el=document.createElement("div");el.id="qrFolha";document.body.appendChild(el)}
+  if(!postos.length){aviso("Cadastre postos primeiro (Cadastros > Postos).");return}
+  el.innerHTML=`<div class="qr-fundo no-print"></div><div class="qr-caixa"><div class="qr-barra no-print"><b>${postos.length} etiqueta(s)</b><span class="linha"><button class="btn verde" data-qr="imprimir">🖨 Imprimir / salvar PDF</button><button class="btn sec" data-qr="fechar">Fechar</button></span></div>
+  <div class="qr-grade">${postos.map(r=>`<div class="qr-et">${qrSvg(qrLink(r.id),150)}<div><b>${esc(r.d.nome)}</b><br><small>${esc(caminho(r.id))}${r.d.tag?" · TAG "+esc(r.d.tag):""}</small><br><small>Escaneie para abrir o histórico do posto no ErgoContexto</small></div></div>`).join("")}</div></div>`;
+  document.body.classList.add("qr-aberto");
+}
+function fecharEtiquetas(){const el=$("#qrFolha");if(el)el.remove();document.body.classList.remove("qr-aberto")}
+(()=>{const s=document.createElement("style");s.textContent=`
+#qrFolha .qr-fundo{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60}
+#qrFolha .qr-caixa{position:fixed;z-index:61;left:50%;top:50%;transform:translate(-50%,-50%);width:min(900px,95vw);max-height:92vh;overflow:auto;background:var(--card);border-radius:16px;padding:18px}
+.qr-barra{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.qr-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.qr-et{display:flex;gap:10px;align-items:center;border:1px dashed var(--bd);border-radius:10px;padding:10px;background:#fff;color:#000;break-inside:avoid}
+.qr-et svg{flex:none;width:130px;height:130px}.qr-et small{color:#444}
+@media print{body.qr-aberto>*:not(#qrFolha){display:none!important}
+ #qrFolha .qr-caixa{position:static;transform:none;width:auto;max-height:none;overflow:visible;padding:0;background:#fff}
+ .qr-grade{grid-template-columns:repeat(2,1fr);gap:8px}.qr-et{border:1px solid #000}}`;document.head.appendChild(s)})();
+
+/* cartão em Cadastros > Postos */
+const _renderCad12=renderCadastros;
+renderCadastros=function(){
+  _renderCad12();
+  const el=$("#v-cadastros");if(!el||G.cadTab!=="posto"||G.hist||G.cadEd)return;
+  el.insertAdjacentHTML("beforeend",`<div class="card"><h3>QR Code dos postos</h3><p class="mut">Imprima uma etiqueta por posto. Quem escanear com o celular abre o histórico do posto e pode registrar demanda ou AEP ali mesmo (precisa entrar na conta).</p>
+  <label class="campo">Endereço do app nos QR Codes<input id="qrBaseIn" value="${esc(qrBase())}"></label><small class="mut">Use o endereço definitivo (ex.: https://www.ergocontexto.dev/). Se mudar depois, as etiquetas já impressas deixam de funcionar.</small>
+  <div class="linha" style="margin-top:10px"><button class="btn verde" data-qr="todas">Gerar etiquetas de todos os postos</button></div></div>`);
+};
+const _hist12=htmlHistPosto;
+htmlHistPosto=function(id){
+  const h=_hist12(id);if(!h)return h;
+  return `<div class="card"><h3>Registrar neste posto</h3><div class="linha"><button class="btn verde" data-qr="nova-dem" data-id="${id}">＋ Nova demanda</button><button class="btn sec" data-qr="nova-aep" data-id="${id}">＋ Nova AEP</button><button class="btn sec" data-qr="etiqueta" data-id="${id}">QR Code deste posto</button></div></div>`+h;
+};
+document.addEventListener("change",e=>{if(e.target.id==="qrBaseIn"){let v=e.target.value.trim();if(/^https?:\/\/[^\s]+$/.test(v)){localStorage.setItem(CH_QRBASE,v.replace(/\/*$/,"/"))}else aviso("Endereço inválido. Comece com https://")}});
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-qr]");if(!b)return;
+  switch(b.dataset.qr){
+    case "todas":abrirEtiquetas();break;
+    case "etiqueta":abrirEtiquetas([b.dataset.id]);break;
+    case "imprimir":window.print();break;
+    case "fechar":fecharEtiquetas();break;
+    case "nova-dem":{const n=novaDemanda();n.d.postoId=b.dataset.id;n.d.origem="QR Code do posto";G.ed=n;irPara("demandas");break}
+    case "nova-aep":criarRegNoPosto(b.dataset.id);break;
+  }
+});
+function criarRegNoPosto(postoId){
+  const r=novoReg("aep","");delete r.novo;r.d.postoId=postoId;regGravar(r);
+  G.ed={id:r.id,tipo:"aep",d:JSON.parse(JSON.stringify(r.d))};G.rel=false;irPara("demandas");
+}
+
+/* abertura pelo QR: #posto=ID */
+const T0=Date.now();let qrPend=null;
+function lerHashPosto(){const m=location.hash.match(/^#posto=([^&]+)/);if(m){try{qrPend=decodeURIComponent(m[1])}catch(e){qrPend=null}}}
+function tentarQr(){
+  if(!qrPend)return;
+  if(SB_ON&&!sessao)return; // aguarda o login
+  const p=regGet(qrPend);
+  if(!p){if(Date.now()-T0>15000&&(REG.length||!SB_ON)){aviso("Posto do QR Code não encontrado neste aparelho. Sincronize e escaneie de novo.");qrPend=null}return}
+  qrPend=null;G.hist=p.id;G.cadTab="posto";irPara("cadastros");history.replaceState(null,"",location.pathname+location.search);
+}
+window.addEventListener("hashchange",()=>{lerHashPosto();tentarQr()});
+lerHashPosto();
+const _sincReg12=sincronizarReg;
+sincronizarReg=async function(m){const r=await _sincReg12(m);tentarQr();return r};
+setTimeout(tentarQr,600);setInterval(tentarQr,2500);
+/* =====================================================================
+   FASE 6B: MODO OFFLINE COM FILA DE FOTOS
+   - fotos tiradas sem internet ficam guardadas no aparelho (IndexedDB)
+   - quando a conexão volta, são enviadas ao Storage e vinculadas ao registro
+   - indicador de conexão e de fotos pendentes
+   ===================================================================== */
+const IDB_NOME="ergocontexto_fila",IDB_ST="fotos";
+function idbAbrir(){return new Promise((ok,err)=>{if(!window.indexedDB){err(new Error("sem IndexedDB"));return}const r=indexedDB.open(IDB_NOME,1);r.onupgradeneeded=()=>r.result.createObjectStore(IDB_ST,{keyPath:"id"});r.onsuccess=()=>ok(r.result);r.onerror=()=>err(r.error)})}
+async function idbOp(modo,fn){const db=await idbAbrir();return new Promise((ok,err)=>{const t=db.transaction(IDB_ST,modo),q=fn(t.objectStore(IDB_ST));t.oncomplete=()=>{db.close();ok(q&&q.result)};t.onerror=()=>{db.close();err(t.error)};t.onabort=()=>{db.close();err(t.error)}})}
+const filaAdd=item=>idbOp("readwrite",s=>s.put(item));
+const filaDel=id=>idbOp("readwrite",s=>s.delete(id));
+const filaTodos=()=>idbOp("readonly",s=>s.getAll()).then(x=>x||[]);
+let filaN=0,fluxando=false;
+
+async function enviarStorage(path,blob,token){
+  return fetch(`${SB_URL}/storage/v1/object/evidencias/${path}`,{method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+token,"Content-Type":blob.type},body:blob});
+}
+anexarEvidencia=async function(file,regId){
+  const eh=/^image\//.test(file.type);
+  if(!eh&&file.type!=="application/pdf")throw new Error("Use foto (JPG/PNG) ou PDF.");
+  if(file.size>15e6)throw new Error("Arquivo grande demais (máx. 15 MB).");
+  let blob=file,mini="";
+  if(eh){const c=await comprimirImagem(file,1400,.72);blob=c.blob;const m=await comprimirImagem(file,200,.6);mini=m.url}
+  if(blob.size>5242880)throw new Error("Arquivo maior que 5 MB depois de comprimir.");
+  const ev={nome:file.name,tipo:blob.type,mini,em:Date.now(),por:(autorAtual()||{}).nome||"",legenda:""};
+  if(!(SB_ON&&sessao)){ev.local=true;return ev}
+  const pasta=(perfil&&perfil.equipe_id)||sessao.user.id,ext=eh?"jpg":"pdf";
+  const path=`${pasta}/${regId}/${Date.now()}-${Math.random().toString(36).slice(2,6)}.${ext}`;
+  const enfileirar=async()=>{
+    const id="F"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    try{await filaAdd({id,regId,path,blob,tipo:blob.type,em:Date.now()})}
+    catch(e){throw new Error("Sem internet e sem espaço para guardar a foto no aparelho. Tente de novo com conexão.")}
+    ev.fila=id;atualizarPill();return ev;
+  };
+  if(!navigator.onLine)return enfileirar();
+  const t=await tokenValido();if(!t)throw new Error("Sessão expirada. Entre de novo.");
+  let r;
+  try{r=await enviarStorage(path,blob,t)}catch(e){return enfileirar()} // queda de rede no meio do envio
+  if(!r.ok){
+    if(r.status>=500||r.status===408||r.status===429)return enfileirar();
+    let j={};try{j=await r.json()}catch(e){}throw new Error(j.message||j.error||"Falha no envio ("+r.status+")");
+  }
+  ev.path=path;return ev;
+};
+function vincularEnviada(item){
+  let achou=false;
+  const marca=lista=>{(lista||[]).forEach(e=>{if(e.fila===item.id){e.path=item.path;delete e.fila;achou=true}})};
+  REG.forEach(r=>{if(r.d&&r.d.evid&&r.d.evid.some(e=>e.fila===item.id)){marca(r.d.evid);regGravar(r)}});
+  if(G.ed&&G.ed.d)marca(G.ed.d.evid);
+  return achou;
+}
+async function enviarFila(manual){
+  if(fluxando||!SB_ON||!sessao||!navigator.onLine)return;
+  fluxando=true;let enviadas=0,falhas=0;
+  try{
+    const itens=await filaTodos();
+    for(const it of itens){
+      const t=await tokenValido();if(!t)break;
+      let r;try{r=await enviarStorage(it.path,it.blob,t)}catch(e){break}
+      if(r.ok||r.status===409){vincularEnviada(it);await filaDel(it.id);enviadas++}
+      else if(r.status===401||r.status>=500||r.status===408||r.status===429)break;
+      else{falhas++;if(r.status===400||r.status===403||r.status===413){await filaDel(it.id);vincularEnviada({...it,path:""})}}
+    }
+  }catch(e){}
+  fluxando=false;
+  await atualizarPill();
+  if(enviadas){aviso(enviadas+(enviadas>1?" fotos enviadas":" foto enviada")+" ao servidor.");try{await sincronizarReg()}catch(e){}if(typeof reRender==="function"&&G.ed)reRender()}
+  else if(manual&&!falhas&&!filaN)aviso("Nada pendente.");
+  if(falhas)aviso(falhas+" foto(s) recusada(s) pelo servidor e removidas da fila.");
+}
+async function atualizarPill(){
+  try{filaN=(await filaTodos()).length}catch(e){filaN=0}
+  let el=$("#filaPill");
+  const off=!navigator.onLine,txt=off?"Sem internet · trabalhando offline"+(filaN?" · "+filaN+" foto(s) na fila":""):filaN?filaN+" foto(s) aguardando envio · tocar para enviar":"";
+  if(!txt){if(el)el.remove();return}
+  if(!el){el=document.createElement("button");el.id="filaPill";el.type="button";el.className="no-print";document.body.appendChild(el)}
+  el.textContent=txt;el.dataset.off=off?"1":"";
+}
+(()=>{const s=document.createElement("style");s.textContent=`#filaPill{position:fixed;left:12px;bottom:12px;z-index:70;border:0;border-radius:99px;padding:9px 14px;font:600 .82rem inherit;background:#004F3D;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;max-width:calc(100vw - 24px)}#filaPill[data-off="1"]{background:#7a3300}`;document.head.appendChild(s)})();
+document.addEventListener("click",e=>{if(e.target.id==="filaPill")enviarFila(true)});
+window.addEventListener("online",()=>{atualizarPill();setTimeout(()=>enviarFila(),800)});
+window.addEventListener("offline",atualizarPill);
+setInterval(()=>enviarFila(),45000);
+setTimeout(()=>{atualizarPill();enviarFila()},1500);
+const _sinc13=sincronizar;
+sincronizar=async function(m){const r=await _sinc13(m);enviarFila();return r};
+/* =====================================================================
+   FASE 6C: DASHBOARD GERENCIAL + PACOTE PARA POWER BI
+   - indicadores e gráficos (SVG/HTML, sem biblioteca) com tooltip
+   - filtros de período e de inventário
+   - pacote ZIP com CSVs para Power BI; impressão em PDF
+   ===================================================================== */
+G.dash={meses:"12",inv:"todos"};
+const MESES_ABR=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const ISO_MES=t=>{const d=new Date(t);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};
+function periodoMin(){const n=Number(G.dash.meses);if(!n)return 0;const d=new Date();d.setMonth(d.getMonth()-n);return d.getTime()}
+function dadosDash(){
+  const min=periodoMin(),noPer=r=>!min||(r.criadoEm||r.atualizadoEm||0)>=min;
+  const aeps=regOf("aep").filter(noPer),acoes=regOf("acao").filter(noPer),dems=regOf("dem").filter(noPer);
+  const lotes=regOf("inv").filter(r=>G.dash.inv==="todos"||r.id===G.dash.inv);
+  const linhas=[];lotes.forEach(r=>r.d.linhas.forEach(l=>{if(ehErgo(r.d,l))linhas.push(l)}));
+  return {aeps,acoes,dems,lotes,linhas};
+}
+function barras(itens,opc){ // itens:[{rot,v,cor,tip}]
+  const max=Math.max(1,...itens.map(i=>i.v));
+  return `<div class="dbar">${itens.map(i=>`<div class="dl" data-tip="${esc(i.tip||i.rot+": "+i.v)}"><span class="dr">${esc(i.rot)}</span><span class="dt"><i style="width:${Math.max(i.v?2:0,100*i.v/max)}%;background:${i.cor||"var(--verde2)"}"></i></span><b>${i.v}</b></div>`).join("")}</div>`;
+}
+function matrizRisco(linhas){
+  const C=[...Array(5)].map(()=>new Array(5).fill(0));let sem=0;
+  linhas.forEach(l=>{const p=parseInt(l.prob),s=parseInt(l.sev);if(p>=1&&p<=5&&s>=1&&s<=5)C[p-1][s-1]++;else sem++});
+  const zc=pt=>pt<=4?"n0":pt<=9?"n1":pt<=16?"n2":"n3",zr=pt=>nivelInv(pt);
+  let h=`<div class="dmx"><div class="dmy">Probabilidade</div><div class="dmg"><span></span>${[1,2,3,4,5].map(s=>`<span class="dmh">S${s}</span>`).join("")}`;
+  for(let p=5;p>=1;p--){h+=`<span class="dmh">P${p}</span>`;for(let s=1;s<=5;s++){const n=C[p-1][s-1],pt=p*s;h+=`<span class="dmc ${zc(pt)}${n?"":" vz"}" data-tip="P${p} × S${s} = ${pt} (${zr(pt)}): ${n} linha(s)"><b>${n||""}</b><small>${pt}</small></span>`}}
+  return h+`</div><div class="dmx2">Severidade →</div></div><small class="mut">Cor = zona de risco (Baixo ≤4, Médio 5–9, Alto 10–16, Crítico ≥17). Linhas sem probabilidade/severidade: ${sem}.</small>`;
+}
+function linhaMensal(aeps,acoes,nm){
+  const meses=[];const d=new Date();d.setDate(1);for(let i=nm-1;i>=0;i--){const x=new Date(d.getFullYear(),d.getMonth()-i,1);meses.push(x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0"))}
+  const a={},c={};meses.forEach(m=>{a[m]=0;c[m]=0});
+  aeps.forEach(r=>{const m=ISO_MES(r.criadoEm||r.atualizadoEm);if(m in a)a[m]++});
+  acoes.forEach(r=>{if(r.d.status==="concluida"||r.d.status==="eficaz"){const t=r.d.dataReal?new Date(r.d.dataReal+"T12:00:00").getTime():r.atualizadoEm,m=ISO_MES(t);if(m in c)c[m]++}});
+  const W=640,H=200,pl=30,pb=26,pt=12,max=Math.max(3,...meses.map(m=>Math.max(a[m],c[m])));
+  const X=i=>pl+(W-pl-10)*(meses.length===1?.5:i/(meses.length-1)),Y=v=>pt+(H-pt-pb)*(1-v/max);
+  const path=o=>meses.map((m,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(o[m]).toFixed(1)).join("");
+  const grade=[0,.5,1].map(f=>{const v=Math.round(max*f);return `<line x1="${pl}" x2="${W-10}" y1="${Y(v)}" y2="${Y(v)}" class="dgr"/><text x="${pl-5}" y="${Y(v)+4}" text-anchor="end" class="dax">${v}</text>`}).join("");
+  const rot=meses.map((m,i)=>(i%Math.ceil(meses.length/8)===0||i===meses.length-1)?`<text x="${X(i)}" y="${H-8}" text-anchor="middle" class="dax">${MESES_ABR[Number(m.slice(5))-1]}${m.slice(2,4)!==String(new Date().getFullYear()).slice(2)?"/"+m.slice(2,4):""}</text>`:"").join("");
+  const hit=meses.map((m,i)=>`<rect x="${X(i)-((W-pl)/meses.length)/2}" y="0" width="${(W-pl)/meses.length}" height="${H-pb}" fill="transparent" data-tip="${MESES_ABR[Number(m.slice(5))-1]}/${m.slice(0,4)}: ${a[m]} AEP(s) criada(s) · ${c[m]} ação(ões) concluída(s)"/>`).join("");
+  const pts=(o,cl)=>meses.map((m,i)=>`<circle cx="${X(i)}" cy="${Y(o[m])}" r="3.5" class="${cl}"/>`).join("");
+  return `<div class="dleg"><span><i class="s1"></i> AEPs criadas</span><span><i class="s2"></i> Ações concluídas</span></div>
+  <svg viewBox="0 0 ${W} ${H}" class="dsvg" role="img" aria-label="Evolução mensal de AEPs criadas e ações concluídas">${grade}${rot}<path d="${path(a)}" class="dl1"/><path d="${path(c)}" class="dl2"/>${pts(a,"dp1")}${pts(c,"dp2")}${hit}</svg>
+  <details class="dtab"><summary>Ver como tabela</summary><table class="tab"><tr><th>Mês</th><th>AEPs criadas</th><th>Ações concluídas</th></tr>${meses.map(m=>`<tr><td>${m}</td><td>${a[m]}</td><td>${c[m]}</td></tr>`).join("")}</table></details>`;
+}
+function renderDash(){
+  const el=$("#v-dash");if(!el)return;
+  const D=dadosDash(),F=G.dash;
+  const cls=[0,0,0,0,0];D.aeps.forEach(r=>{const c=aepClasse(r.d);cls[c.nivel<0?4:c.nivel]++});
+  const aprov=D.aeps.filter(r=>r.d.status==="aprovada").length;
+  const ac=k=>D.acoes.filter(r=>r.d.status===k).length;
+  const abertas=D.acoes.filter(r=>ABERTA_AC(r.d.status)),atr=abertas.filter(r=>diasAtraso(r.d)>0);
+  const conc=ac("concluida")+ac("eficaz"),efic=conc?Math.round(100*ac("eficaz")/conc):null;
+  const demAb=D.dems.filter(r=>!["encerrada","cancelada","aep","aet"].includes(r.d.status)).length;
+  let cob=null;if(D.linhas.length){const c=D.linhas.filter(l=>invStatus(l).s!=="sem").length;cob=Math.round(100*c/D.linhas.length)}
+  const esc4=[["Até 7 dias",1,7],["8 a 15 dias",8,15],["16 a 30 dias",16,30],["Mais de 30 dias",31,1e9]].map(([rot,a,b])=>({rot,v:atr.filter(r=>{const n=diasAtraso(r.d);return n>=a&&n<=b}).length,cor:"var(--n2)"}));
+  const area={};D.linhas.forEach(l=>{const n=l.nivel||nivelInv(pontosInv(l));if(n==="Alto"||n==="Crítico"){const k=l.area||l.unidade||"Sem área informada";(area[k]=area[k]||{Alto:0,"Crítico":0})[n]++}});
+  const topArea=Object.entries(area).sort((a,b)=>(b[1].Alto+b[1]["Crítico"])-(a[1].Alto+a[1]["Crítico"])).slice(0,8).map(([k,x])=>({rot:k,v:x.Alto+x["Crítico"],cor:x["Crítico"]?"var(--n3)":"var(--n2)",tip:`${k}: ${x["Crítico"]} crítico(s), ${x.Alto} alto(s)`}));
+  const nm=Number(F.meses)||12;
+  const kpi=(v,r,cor)=>`<div><b ${cor?`style="color:${cor}"`:""}>${v}</b><small>${r}</small></div>`;
+  el.innerHTML=`<div class="card dash"><div class="linha" style="justify-content:space-between;flex-wrap:wrap"><h2 style="margin:0">Dashboard</h2><span class="linha no-print"><button class="btn sec peq" data-dash="pbi">⬇ Pacote Power BI (.zip)</button><button class="btn sec peq" data-dash="imprimir">🖨 Imprimir / PDF</button></span></div>
+  <div class="grid2 no-print" style="margin-top:10px"><label class="campo">Período (registros criados)<select id="dashMeses">${sel1([["3","Últimos 3 meses"],["6","Últimos 6 meses"],["12","Últimos 12 meses"],["0","Todo o período"]],F.meses)}</select></label>
+  <label class="campo">Inventário<select id="dashInv">${sel1([["todos","Todos os inventários"],...regOf("inv").map(r=>[r.id,r.d.nome])],F.inv)}</select></label></div>
+  <div class="kpis" style="margin-top:12px">${kpi(D.aeps.length,"AEPs ("+aprov+" aprovadas)")}${kpi(abertas.length,"ações abertas")}${kpi(atr.length,"ações atrasadas",atr.length?"var(--n3)":"")}${kpi(efic==null?"–":efic+"%","eficácia confirmada")}${kpi(demAb,"demandas abertas")}${kpi(cob==null?"–":cob+"%","cobertura do inventário")}</div>
+  <small class="mut">Eficácia = ações eficazes ÷ (concluídas + eficazes). Cobertura = linhas ergonômicas do inventário com AEP vinculada.</small></div>
+  <div class="grid2 dash">
+  <div class="card"><h3>AEPs por classificação</h3>${barras([["Adequado","var(--n0)"],["Atenção","var(--n1)"],["Alto","var(--n2)"],["Crítico","var(--n3)"],["Sem classificação","var(--mut)"]].map(([rot,cor],i)=>({rot,v:cls[i],cor})))}</div>
+  <div class="card"><h3>Ações por situação</h3>${barras(ST_ACAO.map(([k,r])=>({rot:r.replace(/ \(.*\)/,""),v:ac(k)})))}</div>
+  <div class="card"><h3>Ações atrasadas por tempo de atraso</h3>${atr.length?barras(esc4):`<p class="mut">Nenhuma ação atrasada no período.</p>`}<small class="mut">Quanto maior o atraso, mais alto o nível de escalonamento.</small></div>
+  <div class="card"><h3>Riscos altos e críticos por área</h3>${topArea.length?barras(topArea):`<p class="mut">${D.linhas.length?"Nenhum risco alto ou crítico no inventário selecionado.":"Crie ou importe um inventário para ver este gráfico."}</p>`}</div>
+  </div>
+  <div class="card dash"><h3>Matriz de risco do inventário (${D.linhas.length} linhas)</h3>${D.linhas.length?matrizRisco(D.linhas):`<p class="mut">Sem linhas de inventário.</p>`}</div>
+  <div class="card dash"><h3>Evolução mensal</h3>${linhaMensal(D.aeps,D.acoes,nm)}</div>
+  <div id="dTip" class="no-print" hidden></div>`;
+}
+/* ---------- pacote Power BI ---------- */
+function pacotePowerBI(){
+  const caps=[],orig=csvBaixar;
+  csvBaixar=(nome,cab,linhas)=>{caps.push([nome,cab,linhas])};
+  try{exportar("aep");exportar("acao");exportar("dem")}finally{csvBaixar=orig}
+  const L=[];let cab=null;
+  regOf("inv").forEach(r=>{const a=abaInventario(r.d);cab=a.cab;a.linhas.forEach(l=>L.push([r.d.nome,...l]))});
+  if(cab)caps.push(["inventario",["Inventário",...cab],L]);
+  const q=v=>{v=v==null?"":String(v);if(/^[=+\-@]/.test(v)&&!/^-?\d+([.,]\d+)?$/.test(v))v="'"+v;return /[";\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const arqs=caps.map(([n,c,l])=>[n+".csv","﻿"+[c,...l].map(x=>x.map(q).join(";")).join("\r\n")]);
+  if(!arqs.length||arqs.every(a=>a[1].split("\n").length<2)){aviso("Ainda não há dados para exportar.");return}
+  arqs.push(["LEIA-ME.txt",`Pacote de dados do ErgoContexto (${dataBR(hojeISO())})\r\n\r\nArquivos CSV com separador ponto e vírgula, codificação UTF-8.\r\nNo Power BI: Obter dados > Texto/CSV (ou Pasta), delimitador ponto e vírgula, origem do arquivo UTF-8.\r\n\r\ninventario-ergonomico-aep.csv: um registro por fator avaliado em cada AEP.\r\nplano-de-acao.csv: plano de ação.\r\ndemandas.csv: demandas e triagem.\r\ninventario.csv: linhas dos inventários de risco ergonômico.\r\n\r\nRelacionamentos sugeridos: coluna Local (inventario-ergonomico-aep, plano-de-acao) com Posto / local de trabalho (inventario); coluna Ação/AEP/Demanda para ligar o plano de ação às AEPs e demandas.\r\nOs dados são por situação de trabalho, nunca por trabalhador.\r\n`]);
+  baixarBlob(zipCriar(arqs),"ergocontexto-powerbi-"+hojeISO()+".zip");aviso("Pacote gerado com "+(arqs.length-1)+" arquivos CSV.");
+}
+/* ---------- estilo, tooltip e eventos ---------- */
+(()=>{const s=document.createElement("style");s.textContent=`
+.dash{--s1:#2a78d6;--s2:#eb6834}
+@media (prefers-color-scheme:dark){.dash{--s1:#3987e5;--s2:#d95926}}
+.dbar{display:grid;gap:8px}.dl{display:grid;grid-template-columns:minmax(90px,38%) 1fr 34px;gap:8px;align-items:center;font-size:.88rem}
+.dl .dt{height:12px;background:var(--soft);border-radius:6px;overflow:hidden}.dl .dt i{display:block;height:100%;border-radius:0 6px 6px 0}.dl b{text-align:right}.dl:hover .dt i{filter:brightness(1.12)}
+.dmx{display:grid;grid-template-columns:22px 1fr;gap:6px;max-width:520px}.dmy{writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font-size:.8rem;color:var(--mut)}
+.dmg{display:grid;grid-template-columns:34px repeat(5,1fr);gap:3px}.dmh{font-size:.78rem;color:var(--mut);display:flex;align-items:center;justify-content:center}
+.dmc{aspect-ratio:1.3;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;cursor:default}.dmc b{font-size:1rem}.dmc small{font-size:.65rem;opacity:.7}
+.dmc.n0{background:var(--n0b);color:var(--n0t)}.dmc.n1{background:var(--n1b);color:var(--n1t)}.dmc.n2{background:var(--n2b);color:var(--n2t)}.dmc.n3{background:var(--n3b);color:var(--n3t)}
+.dmc.vz{opacity:.45}.dmc:not(.vz){outline:2px solid currentColor;outline-offset:-2px}.dmx2{grid-column:2;text-align:center;font-size:.8rem;color:var(--mut)}
+.dsvg{width:100%;height:auto;max-height:280px}.dgr{stroke:var(--bd);stroke-width:1}.dax{fill:var(--mut);font-size:11px}
+.dl1{fill:none;stroke:var(--s1);stroke-width:2}.dl2{fill:none;stroke:var(--s2);stroke-width:2}.dp1{fill:var(--s1);stroke:var(--card);stroke-width:2}.dp2{fill:var(--s2);stroke:var(--card);stroke-width:2}
+.dleg{display:flex;gap:16px;font-size:.85rem;margin-bottom:6px}.dleg i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:4px}.dleg i.s1{background:var(--s1)}.dleg i.s2{background:var(--s2)}
+.dtab{margin-top:8px}
+#dTip{position:fixed;z-index:80;pointer-events:none;background:#14231f;color:#fff;font-size:.82rem;padding:6px 10px;border-radius:8px;max-width:260px;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+@media print{#v-dash .grid2{grid-template-columns:1fr 1fr}#v-dash .card{break-inside:avoid;margin-bottom:10px;border:1px solid #ccc;padding:10px}}`;document.head.appendChild(s)})();
+function dica(e){
+  const t=e.target.closest&&e.target.closest("#v-dash [data-tip]"),tip=$("#dTip");if(!tip)return;
+  if(!t){tip.hidden=true;return}
+  tip.textContent=t.dataset.tip;tip.hidden=false;
+  const x=Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8),y=e.clientY+16>innerHeight-50?e.clientY-tip.offsetHeight-12:e.clientY+16;
+  tip.style.left=Math.max(6,x)+"px";tip.style.top=y+"px";
+}
+document.addEventListener("mousemove",dica);document.addEventListener("click",dica);
+document.addEventListener("change",e=>{
+  if(e.target.id==="dashMeses"){G.dash.meses=e.target.value;renderDash()}
+  if(e.target.id==="dashInv"){G.dash.inv=e.target.value;renderDash()}
+});
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-dash]");if(!b)return;
+  if(b.dataset.dash==="pbi")pacotePowerBI();else if(b.dataset.dash==="imprimir")window.print();
+});
+const _irPara14=irPara;
+irPara=function(v){_irPara14(v);if(v==="dash")renderDash()};
 /* =====================================================================
    INÍCIO
    ===================================================================== */
