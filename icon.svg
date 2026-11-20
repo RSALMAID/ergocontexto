@@ -1,9 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#004F3D"/><stop offset="1" stop-color="#007A5E"/></linearGradient></defs>
-  <rect width="512" height="512" fill="url(#g)"/>
-  <rect y="448" width="512" height="64" fill="#E46F2A"/>
-  <g transform="translate(96 40) scale(5)" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="32" cy="14" r="6" fill="#fff"/>
-    <path d="M32 22v18m0 0-10 14m10-14 10 14M20 30l12-4 12 4"/>
-  </g>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00a67e"/><stop offset="1" stop-color="#003b2e"/></linearGradient>
+<radialGradient id="glow" cx=".3" cy=".2" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<radialGradient id="sph" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff"/><stop offset=".6" stop-color="#d7ece5"/><stop offset="1" stop-color="#8fbfb0"/></radialGradient>
+<radialGradient id="org" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#ffb27a"/><stop offset=".6" stop-color="#f0762c"/><stop offset="1" stop-color="#b94d12"/></radialGradient>
+<linearGradient id="limb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8fbfb0"/><stop offset=".4" stop-color="#fff"/><stop offset="1" stop-color="#a9d0c4"/></linearGradient>
+<filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#00251c" flood-opacity=".45"/></filter>
+</defs>
+<rect width="512" height="512" rx="112" fill="url(#bg)"/>
+<rect width="512" height="512" rx="112" fill="url(#glow)"/>
+<ellipse cx="256" cy="438" rx="120" ry="18" fill="#00251c" opacity=".35"/>
+<g filter="url(#sh)" stroke-linecap="round" fill="none">
+<path d="M236 330 L226 420" stroke="#6fa595" stroke-width="30"/>
+<path d="M276 330 L292 418" stroke="url(#limb)" stroke-width="32"/>
+<path d="M292 418 L322 424" stroke="url(#limb)" stroke-width="22"/>
+<path d="M226 420 L198 426" stroke="#6fa595" stroke-width="22"/>
+<path d="M254 328 L282 214" stroke="url(#limb)" stroke-width="68"/>
+<path d="M268 232 L322 276 L378 262" stroke="#6fa595" stroke-width="26"/>
+<path d="M282 228 L336 290 L394 282" stroke="url(#limb)" stroke-width="28"/>
+</g>
+<circle cx="256" cy="334" r="34" fill="url(#sph)"/>
+<circle cx="336" cy="290" r="17" fill="url(#sph)"/>
+<circle cx="288" cy="226" r="26" fill="url(#sph)"/>
+<circle cx="316" cy="168" r="44" fill="url(#sph)"/>
+<rect x="388" y="248" width="62" height="52" rx="10" fill="url(#org)"/>
+<path d="M388 248 L402 234 L464 234 L450 248 Z" fill="#ffc79b"/>
+<path d="M450 248 L464 234 L464 286 L450 300 Z" fill="#b94d12"/>
 </svg>
