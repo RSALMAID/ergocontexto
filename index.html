@@ -385,6 +385,7 @@ h4{color:var(--verde)}
       <button data-v="cadastros">Cadastros</button>
       <button data-v="historico">Histórico</button>
       <button data-v="dash">Dashboard</button>
+      <button data-v="relat">Relatórios</button>
       <button data-v="painel">Painel</button>
       <button data-v="sobre">Sobre o método</button>
       <button data-v="conta" id="navConta" style="display:none">Conta</button>
@@ -404,6 +405,7 @@ h4{color:var(--verde)}
   <section id="v-inventario" class="view"></section>
   <section id="v-cadastros" class="view"></section>
   <section id="v-dash" class="view"></section>
+  <section id="v-relat" class="view"></section>
   <section id="v-historico" class="view"></section>
   <section id="v-painel" class="view"></section>
   <section id="v-sobre" class="view sobre"></section>
@@ -4057,6 +4059,142 @@ document.addEventListener("click",e=>{
 });
 const _irPara14=irPara;
 irPara=function(v){_irPara14(v);if(v==="dash")renderDash()};
+/* =====================================================================
+   FASE 8: RELATÓRIOS, INDICADORES EXTRAS, ALERTAS NOVOS, CAPACITAÇÃO
+   DE AVALIADORES, VALIDADE DE APROVAÇÃO E BACKUP INTEGRAL
+   ===================================================================== */
+// ---------- cadastro de avaliadores (capacitação) ----------
+CAD.avaliador={rot:"Avaliadores",um:"avaliador",pai:[],campos:[["nome","Nome *"],["cargo","Cargo / função"],["capacitacao","Capacitação (curso, instituição)"],["validade","Validade da capacitação",{tipo:"date"}]]};
+if(!CAD_ORD.includes("avaliador"))CAD_ORD.push("avaliador");
+const VALIDADE_MESES=12;
+const stAc=s=>(ST_ACAO.find(x=>x[0]===s)||[0,s||""])[1];
+const somaMeses=(iso,n)=>{const d=new Date(iso+"T12:00:00");d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,10)};
+
+// ---------- alertas adicionais ----------
+const _calcAlertas15=calcAlertas;
+calcAlertas=function(){
+  const A=_calcAlertas15(),hj=hojeISO(),push=(sev,tipo,txt,ac)=>A.push({sev,tipo,txt,ac});
+  // avaliador sem capacitação vigente
+  regOf("cad").filter(r=>r.d.tc==="avaliador").forEach(r=>{
+    const v=r.d.validade;
+    if(!v)push(2,"Avaliador sem capacitação vigente",`${r.d.nome}: sem validade de capacitação informada.`,null);
+    else if(v<hj)push(1,"Avaliador sem capacitação vigente",`${r.d.nome}: capacitação vencida em ${dataBR(v)}.`,null);
+    else if(diasEntre(hj,v)<=60)push(2,"Avaliador sem capacitação vigente",`${r.d.nome}: capacitação vence em ${diasEntre(hj,v)} dia(s).`,null);
+  });
+  // documento próximo da revisão (aprovado há quase 12 meses)
+  regOf("aep").concat(regOf("aet")).forEach(r=>{
+    const d=r.d;if(d.status!=="aprovada"||!d.aprov||!d.aprov.em)return;
+    const val=somaMeses(d.aprov.em,VALIDADE_MESES),dd=diasEntre(hj,val);
+    if(dd<0)push(1,"Documento vencido para revisão",`${d.numero||r.tipo.toUpperCase()}: validade de ${VALIDADE_MESES} meses venceu em ${dataBR(val)}.`,["abrir-reg",r.id]);
+    else if(dd<=60)push(2,"Documento próximo da revisão",`${d.numero||r.tipo.toUpperCase()}: revisão em ${dd} dia(s) (${dataBR(val)}).`,["abrir-reg",r.id]);
+  });
+  // atividades e postos sem nenhuma avaliação
+  const avalPosto=new Set(),avalAtiv=new Set();
+  regOf("aep").concat(regOf("aet")).forEach(r=>{if(r.d.postoId)avalPosto.add(r.d.postoId);if(r.d.atividadeId)avalAtiv.add(r.d.atividadeId)});
+  lista.forEach(a=>{if(a.ctx){if(a.ctx.postoId)avalPosto.add(a.ctx.postoId);if(a.ctx.atividadeId)avalAtiv.add(a.ctx.atividadeId)}});
+  const sp=regOf("cad").filter(r=>r.d.tc==="posto"&&!avalPosto.has(r.id));
+  if(sp.length)push(2,"Postos sem avaliação",`${sp.length} posto(s) cadastrado(s) sem nenhuma avaliação: ${sp.slice(0,4).map(r=>r.d.nome).join(", ")}${sp.length>4?"…":""}.`,null);
+  const sa=regOf("cad").filter(r=>r.d.tc==="atividade"&&!avalAtiv.has(r.id));
+  if(sa.length)push(2,"Atividades sem avaliação",`${sa.length} atividade(s) cadastrada(s) sem avaliação: ${sa.slice(0,4).map(r=>r.d.nome).join(", ")}${sa.length>4?"…":""}.`,null);
+  // AET aberta há mais de 90 dias
+  regOf("aet").forEach(r=>{const d=r.d;if(d.status==="aprovada")return;const ini=new Date(r.criadoEm||r.atualizadoEm||Date.now()).toISOString().slice(0,10);
+    if(diasEntre(ini,hj)>90)push(2,"AET em andamento há muito tempo",`${d.numero||"AET"}: aberta há ${diasEntre(ini,hj)} dias.`,["abrir-reg",r.id])});
+  return A.sort((a,b)=>a.sev-b.sev);
+};
+
+// ---------- indicadores extras no dashboard ----------
+const _renderDash15=renderDash;
+renderDash=function(){
+  _renderDash15();
+  const el=$("#v-dash");if(!el)return;
+  const {aeps,acoes}=dadosDash(),aets=regOf("aet");
+  const aprov=aeps.filter(r=>r.d.status==="aprovada"&&r.d.aprov&&r.d.aprov.em&&r.criadoEm);
+  const prazos=aprov.map(r=>Math.max(0,diasEntre(new Date(r.criadoEm).toISOString().slice(0,10),r.d.aprov.em)));
+  const medio=prazos.length?Math.round(prazos.reduce((a,b)=>a+b,0)/prazos.length):null;
+  const aetAnd=aets.filter(r=>r.d.status!=="aprovada").length;
+  const semEv=aeps.filter(r=>!(r.d.evid||[]).length).length;
+  const rein={};aeps.forEach(r=>{if(aepClasse(r.d).nivel>=2&&r.d.postoId)rein[r.d.postoId]=(rein[r.d.postoId]||0)+1});
+  const reinc=Object.keys(rein).filter(k=>rein[k]>=2).length;
+  const rk={};aeps.forEach(r=>aepClasse(r.d).cats.forEach(c=>c.itens.forEach(i=>{rk[i.t]=(rk[i.t]||0)+1})));
+  const top=Object.keys(rk).map(k=>({rot:k,v:rk[k],tip:k+": "+rk[k]+" avaliação(ões) em Alto/Crítico"})).sort((a,b)=>b.v-a.v).slice(0,8);
+  const efetiv=acoes.filter(a=>a.d.status==="concluida"||a.d.status==="eficaz"||(a.d.ef&&a.d.ef.decisao)).length;
+  const eficazes=acoes.filter(a=>a.d.ef&&a.d.ef.decisao==="Encerrar como eficaz").length;
+  const kp=(n,r)=>`<div class="kpi"><b>${n}</b><small>${r}</small></div>`;
+  const div=document.createElement("div");div.className="card";
+  div.innerHTML=`<h3>Indicadores de processo e resultado</h3><div class="kpis">${kp(medio==null?"—":medio+" d","Prazo médio até aprovar a AEP")}${kp(aetAnd,"AETs em andamento")}${kp(reinc,"Postos com reincidência (2+ avaliações Alto/Crítico)")}${kp(semEv,"Avaliações sem evidência")}${kp(eficazes+"/"+(efetiv||0),"Ações encerradas como eficazes")}</div>
+  <h3 style="margin-top:14px">Ranking de fatores mais frequentes (Alto/Crítico)</h3>${top.length?barras(top):`<p class="mut">Sem dados ainda.</p>`}`;
+  el.appendChild(div);
+};
+
+// ---------- tela de relatórios ----------
+const nvTxt=n=>n<0?"Dados insuficientes":NIV_F[n];
+function relCab(tit,sub){return `<div class="rel-cab"><h2>${esc(tit)}</h2><p class="mut">${esc(sub||"")} · Emitido em ${dataBR(hojeISO())} por ${esc((autorAtual()||{}).nome||"usuário local")}</p></div>`}
+function relTab(cab,linhas){return `<table class="tab"><tr>${cab.map(c=>`<th>${esc(c)}</th>`).join("")}</tr>${linhas.map(l=>`<tr>${l.map(c=>`<td>${esc(c)}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${cab.length}">Sem registros.</td></tr>`}</table>`}
+const nomePosto15=id=>id?caminho(id):"";
+function relExecutivo(){
+  const aeps=regOf("aep").filter(r=>!aepVazia(r)),aets=regOf("aet"),ac=regOf("acao"),dem=regOf("dem");
+  const cont=[0,0,0,0,0];aeps.forEach(r=>cont[aepClasse(r.d).nivel+1]++);
+  const venc=ac.filter(a=>diasAtraso(a.d)>0).length,abertas=ac.filter(a=>ABERTA_AC(a.d.status)).length;
+  const crit=aeps.filter(r=>aepClasse(r.d).nivel===3);
+  const al=calcAlertas().filter(a=>a.sev===0);
+  return relCab("Resumo executivo de ergonomia","Visão consolidada para liderança")+
+  `<div class="kpis"><div class="kpi"><b>${aeps.length}</b><small>AEPs</small></div><div class="kpi"><b>${aets.length}</b><small>AETs</small></div><div class="kpi"><b>${dem.length}</b><small>Demandas</small></div><div class="kpi"><b style="color:#FF3300">${cont[4]}</b><small>AEPs críticas</small></div><div class="kpi"><b>${abertas}</b><small>Ações abertas</small></div><div class="kpi"><b style="color:#FF3300">${venc}</b><small>Ações vencidas</small></div></div>
+  <h3>Distribuição das AEPs por classificação</h3>${relTab(["Classificação","Quantidade"],[["Dados insuficientes",cont[0]],["Adequado",cont[1]],["Atenção",cont[2]],["Alto",cont[3]],["Crítico",cont[4]]])}
+  <h3>Situações críticas</h3>${relTab(["Registro","Local","Medida provisória"],crit.map(r=>[r.d.numero||"AEP",nomePosto15(r.d.postoId),r.d.provisoria||"—"]))}
+  <h3>Alertas críticos em aberto</h3>${relTab(["Tipo","Descrição"],al.map(a=>[a.tipo,a.txt]))}
+  <h3>Ações vencidas</h3>${relTab(["Ação","Responsável","Prazo","Atraso (dias)"],ac.filter(a=>diasAtraso(a.d)>0).map(a=>[a.d.numero||"",(a.d.acao||"").slice(0,80)+" — "+(a.d.responsavel||""),dataBR(a.d.prazo),diasAtraso(a.d)]))}`;
+}
+function relArea(id){
+  const sub=new Set([id]);let mudou=true;while(mudou){mudou=false;regOf("cad").forEach(r=>{if(r.d.pai&&sub.has(r.d.pai)&&!sub.has(r.id)){sub.add(r.id);mudou=true}})}
+  const aeps=regOf("aep").filter(r=>!aepVazia(r)&&sub.has(r.d.postoId)),ac=regOf("acao").filter(a=>sub.has(a.d.postoId));
+  return relCab("Relatório da área: "+caminho(id),"AEPs e ações vinculadas à área e seus postos")+
+  `<h3>Avaliações (AEP)</h3>${relTab(["Número","Posto","Data","Status","Classificação"],aeps.map(r=>[r.d.numero||"(sem nº)",nomePosto15(r.d.postoId),dataBR(r.d.data),STATUS_REG[r.d.status]||r.d.status,nvTxt(aepClasse(r.d).nivel)]))}
+  <h3>Plano de ação</h3>${relTab(["Número","Ação","Responsável","Prazo","Status"],ac.map(a=>[a.d.numero||"",a.d.acao||"",a.d.responsavel||"",dataBR(a.d.prazo),(stAc(a.d.status))]))}`;
+}
+function relAuditoria(){
+  const regs=regOf("aep").concat(regOf("aet")).filter(r=>!aepVazia(r));
+  return relCab("Relatório para auditoria","Rastreabilidade: número, versão, aprovação, evidências e histórico")+
+  relTab(["Número","Tipo","Local","Status","Versão","Aprovado por","Aprovação","Validade","Evidências","Alterações de status"],regs.map(r=>{const d=r.d;return [d.numero||"(sem nº)",r.tipo.toUpperCase(),nomePosto15(d.postoId),STATUS_REG[d.status]||d.status,"v"+(d.versao||1),d.aprov?d.aprov.por:"—",d.aprov?dataBR(d.aprov.em):"—",d.aprov?dataBR(somaMeses(d.aprov.em,VALIDADE_MESES)):"—",(d.evid||[]).length,(d.hist||[]).length]}))+
+  `<h3>Ações e eficácia</h3>`+relTab(["Número","Ação","Status","Evidências","Eficácia verificada"],regOf("acao").map(a=>[a.d.numero||"",(a.d.acao||"").slice(0,70),stAc(a.d.status),(a.d.evid||[]).length,a.d.ef&&a.d.ef.decisao?a.d.ef.decisao:"—"]));
+}
+function relEficacia(){
+  const ac=regOf("acao").filter(a=>a.d.ef&&(a.d.ef.decisao||a.d.ef.comparacao));
+  return relCab("Comparação antes e depois / termo de eficácia","Ações com verificação de eficácia registrada")+
+  (ac.map(a=>{const e=a.d.ef;return `<div class="card" style="box-shadow:none;border:1px solid var(--bd)"><h3>${esc(a.d.numero||"Ação")} · ${esc((a.d.acao||"").slice(0,90))}</h3><p class="mut">${esc(nomePosto15(a.d.postoId))}</p>
+  <p><b>Comparação da exposição:</b> ${esc(e.comparacao||"—")}</p><p><b>Confirmação dos trabalhadores:</b> ${esc(e.trabalhadores||"—")} · <b>Risco residual:</b> ${esc(e.residual||"—")}</p><p><b>Efeitos indesejados:</b> ${esc(e.efeitos||"—")}</p><p><b>Decisão:</b> ${esc(e.decisao||"—")} · Nova observação em ${dataBR(e.reaval)||"—"}</p>
+  <p style="margin-top:22px">_______________________________<br><small>Responsável pela verificação</small></p></div>`}).join("")||`<p class="mut">Nenhuma ação com eficácia registrada ainda.</p>`);
+}
+function relPGR(){
+  const l=[];regOf("inv").forEach(r=>r.d.linhas.forEach(x=>{if(ehErgo(r.d,x))l.push([r.d.nome||"",x.area,x.local,x.atividade,x.funcao,x.perigo,x.nivel,x.medidas,x.resp,x.prazo,x.situacao])}));
+  regOf("aep").filter(r=>!aepVazia(r)).forEach(r=>{const c=aepClasse(r.d);l.push([r.d.numero||"AEP",nomePosto15(r.d.postoId),"","","",c.motivos[0]||"",nvTxt(c.nivel),r.d.provisoria||"","","",STATUS_REG[r.d.status]])});
+  return l;
+}
+function backupIntegral(){
+  const dados={sistema:"ErgoContexto",geradoEm:new Date().toISOString(),versao:1,registros:REG,avaliacoes:lista};
+  baixarBlob(new Blob([JSON.stringify(dados,null,1)],{type:"application/json"}),"ergocontexto-backup-"+hojeISO()+".json");
+}
+function renderRelat(){
+  const el=$("#v-relat");if(!el)return;
+  const areas=regOf("cad").filter(r=>r.d.tc==="area").sort((a,b)=>caminho(a.id).localeCompare(caminho(b.id),"pt"));
+  el.innerHTML=`<div class="card no-print"><h2>Relatórios</h2><p class="mut">Gere o relatório na tela e use <b>Imprimir / salvar PDF</b>. Para auditoria, cada registro mostra número, versão, aprovador e validade (${VALIDADE_MESES} meses).</p>
+  <div class="linha"><button class="btn" data-rel="exec">Resumo executivo</button><button class="btn" data-rel="aud">Auditoria</button><button class="btn" data-rel="ef">Antes/depois e eficácia</button></div>
+  <div class="linha" style="margin-top:10px"><select id="relArea"><option value="">Escolha uma área…</option>${areas.map(a=>`<option value="${a.id}">${esc(caminho(a.id))}</option>`).join("")}</select><button class="btn sec" data-rel="area">Relatório da área</button></div>
+  <h3 style="margin-top:16px">Dados</h3><div class="linha"><button class="btn sec" data-rel="pgr">Dados para o PGR (CSV)</button><button class="btn sec" data-rel="backup">Exportação integral (backup JSON)</button></div></div>
+  <div class="card" id="relSaida" style="display:none"></div>`;
+}
+function mostrarRel(h){const s=$("#relSaida");s.style.display="";s.innerHTML=`<div class="linha no-print" style="justify-content:flex-end"><button class="btn peq" data-rel="print">Imprimir / salvar PDF</button></div>`+h;s.scrollIntoView({behavior:"smooth"})}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-rel]");if(!b)return;const k=b.dataset.rel;
+  if(k==="exec")mostrarRel(relExecutivo());
+  else if(k==="aud")mostrarRel(relAuditoria());
+  else if(k==="ef")mostrarRel(relEficacia());
+  else if(k==="area"){const id=$("#relArea").value;if(!id){aviso("Escolha uma área.");return}mostrarRel(relArea(id))}
+  else if(k==="pgr")csvBaixar("dados-pgr-ergonomia",["Origem","Área / posto","Local","Atividade","Função","Perigo / condição","Nível","Medidas","Responsável","Prazo","Situação"],relPGR());
+  else if(k==="backup")backupIntegral();
+  else if(k==="print")window.print();
+});
+const _irPara15=irPara;
+irPara=function(v){_irPara15(v);if(v==="relat")renderRelat()};
 /* =====================================================================
    INÍCIO
    ===================================================================== */
