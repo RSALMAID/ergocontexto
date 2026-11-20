@@ -4904,6 +4904,267 @@ document.addEventListener("change",e=>{
 const _irPara20=irPara;
 irPara=function(v){_irPara20(v);if(v==="docs")renderDocs()};
 /* =====================================================================
+   FASE 13: saúde ocupacional consolidada (anonimizada), trilha de acesso,
+   retenção documental, matriz de responsabilidades, marcação sobre foto,
+   casos semelhantes, lições aprendidas e resumo de alertas.
+   ===================================================================== */
+const RETENCAO_ANOS=20; // NR-1, item 1.5.7.3.3.1: histórico do inventário e do plano de ação, mínimo de 20 anos (conferir no texto da norma)
+const CELULA_MIN=3;      // contagens de 1 a 2 são suprimidas (anonimização de células pequenas)
+const sup=n=>{const v=Number(n);if(!isFinite(v)||String(n).trim()==="")return "—";return v>0&&v<CELULA_MIN?"< "+CELULA_MIN:String(v)};
+// ---------- saúde ocupacional consolidada ----------
+CAD.saude={rot:"Saúde ocupacional (consolidado)",um:"indicador de saúde",pai:["gsts","area"],campos:[
+ ["nome","Grupo e período (ex.: GSTS Bobinadeira, 3º tri 2026) *"],["expostos","Nº de trabalhadores no grupo",{tipo:"number"}],
+ ["queixas","Nº de trabalhadores com queixa osteomuscular",{tipo:"number"}],["regiao","Região do corpo com mais queixas",{op:REGIOES.map(r=>r[0])}],
+ ["afast","Nº de afastamentos relacionados",{tipo:"number"}],["dias","Dias de afastamento (soma)",{tipo:"number"}],
+ ["restr","Nº de trabalhadores com restrição",{tipo:"number"}],["enc","Nº de encaminhamentos ao serviço de saúde",{tipo:"number"}],
+ ["reinc","Nº de reincidências",{tipo:"number"}],["retorno","Nº de retornos ao trabalho no período",{tipo:"number"}],
+ ["pcmso","Indicação técnica do PCMSO",{op:["Sim","Não"]}],["tend","Tendência",{op:["Melhora","Estável","Agravamento"]}],
+ ["aprof","Precisa de aprofundamento",{op:["Sim","Não"]}],["obs","Observação (somente dados do grupo, sem nome, diagnóstico ou medicamento)"]]};
+if(!CAD_ORD.includes("saude"))CAD_ORD.push("saude");
+const podeSaude=()=>!!(perfil&&["admin","aprovador","revisor"].includes(perfil.papel))||!perfil;
+const RX_CLINICO=/\b[A-TV-Z]\d{2}(\.\d{1,2})?\b|\bCID\b|diagn[oó]stic|medicament|rem[eé]dio|atestado|laudo m[eé]dico|prontu[aá]rio|\bCPF\b|\bmatr[ií]cula\b/;
+const _regGravar21=regGravar;
+regGravar=function(r,agora){
+  if(r&&r.tipo==="cad"&&r.d&&r.d.tc==="saude"){
+    const t=[r.d.nome,r.d.obs].join(" ");
+    if(RX_CLINICO.test(t)){aviso("Este indicador não aceita diagnóstico, CID, medicamento, matrícula ou dado individual. Registre apenas números do grupo.");return}
+    if(!podeSaude()){aviso("Seu perfil não registra indicadores de saúde ocupacional.");return}
+  }
+  return _regGravar21(r,agora);
+};
+const _renderCad21=renderCadastros;
+renderCadastros=function(){
+  const i=CAD_ORD.indexOf("saude");
+  if(i>=0&&!podeSaude()){CAD_ORD.splice(i,1);if(G.cadTab==="saude")G.cadTab="planta";try{_renderCad21()}finally{CAD_ORD.push("saude")}}
+  else _renderCad21();
+};
+function saudeLinhas(){return regOf("cad").filter(r=>r.d.tc==="saude"&&podeSaude())}
+function relSaude(){
+  const L=saudeLinhas();
+  const lin=L.map(r=>{const d=r.d,x=Number(d.expostos);return [d.nome||"",d.pai?caminho(d.pai):"",sup(d.expostos),sup(d.queixas),d.regiao||"",sup(d.afast),sup(d.dias),sup(d.restr),sup(d.enc),sup(d.reinc),sup(d.retorno),d.pcmso||"",d.tend||"",d.aprof||""]});
+  const agrav=L.filter(r=>r.d.tend==="Agravamento"||r.d.aprof==="Sim"||r.d.pcmso==="Sim");
+  return relCab("Saúde ocupacional: indicadores consolidados","Dados agregados por grupo. Sem diagnóstico, nome ou dado individual")+
+  `<p class="mut" style="font-size:.86rem">Contagens de 1 a ${CELULA_MIN-1} aparecem como "< ${CELULA_MIN}" para impedir a identificação de pessoas. O dado clínico fica no serviço de saúde; aqui entra só o indicador de prevenção.</p>`+
+  relTab(["Grupo e período","Local","Trabalhadores","Com queixa","Região mais citada","Afastamentos","Dias","Restrições","Encaminh.","Reincid.","Retornos","PCMSO","Tendência","Aprofundar"],lin)+
+  (agrav.length?`<h3>Pedem atenção (agravamento, indicação do PCMSO ou aprofundamento)</h3>`+relTab(["Grupo","Motivo"],agrav.map(r=>[r.d.nome||"",[r.d.tend==="Agravamento"?"tendência de agravamento":"",r.d.pcmso==="Sim"?"indicação técnica do PCMSO":"",r.d.aprof==="Sim"?"necessita aprofundamento":""].filter(Boolean).join("; ")])):"");
+}
+// ---------- trilha de acesso ----------
+const CH_ACESSO="ergo_acessos";
+function logAcesso(acao,detalhe){
+  try{
+    const L=JSON.parse(localStorage.getItem(CH_ACESSO)||"[]"),a=autorAtual()||{};
+    L.push({em:new Date().toISOString(),por:a.nome||"usuário local",acao,detalhe});
+    localStorage.setItem(CH_ACESSO,JSON.stringify(L.slice(-500)));
+  }catch(e){}
+  if(typeof SB_ON!=="undefined"&&SB_ON&&sessao&&navigator.onLine)sbA("/rest/v1/rpc/registrar_acesso",{method:"POST",body:{p_acao:acao,p_detalhe:detalhe}}).catch(()=>{});
+}
+const nomeReg=id=>{const r=regGet(id);if(!r)return id;const d=r.d;return (d.numero||(ROT_TIPO[r.tipo]||r.tipo))+(d.titulo?" · "+d.titulo:"")};
+document.addEventListener("click",e=>{
+  const g=e.target.closest("[data-g-acao]");
+  if(g&&["abrir-reg","abrir-dem","ac-abrir"].includes(g.dataset.gAcao)&&g.dataset.id)logAcesso("abriu",nomeReg(g.dataset.id));
+  const m=e.target.closest("[data-med=abrir],[data-dc=abrir]");if(m)logAcesso("abriu",nomeReg(m.dataset.id));
+  const p=e.target.closest("[data-med=imprimir],[data-dc=imprimir]");if(p&&(G.me||G.dc))logAcesso("imprimiu",nomeReg((G.dc||G.me).id));
+},true);
+async function relTrilha(){
+  let L=[],fonte="deste aparelho";
+  if(SB_ON&&sessao&&perfil&&perfil.papel==="admin"){
+    try{const r=await sbA("/rest/v1/auditoria?select=em,acao,detalhe,autor&order=em.desc&limit=300");L=r.map(x=>({em:x.em,por:(membros||[]).find(m=>m.id===x.autor)?.nome||"",acao:x.acao,detalhe:x.detalhe}));fonte="do servidor (equipe)"}catch(e){}
+  }
+  if(!L.length)L=JSON.parse(localStorage.getItem(CH_ACESSO)||"[]").reverse();
+  return relCab("Trilha de acesso","Registros "+fonte+": quem abriu, imprimiu ou alterou papéis")+relTab(["Data e hora","Pessoa","Ação","Registro"],L.map(x=>[String(x.em||"").replace("T"," ").slice(0,16),x.por||"",x.acao||"",x.detalhe||""]));
+}
+// ---------- retenção documental ----------
+const _regExcluir21=regExcluir;
+regExcluir=function(id){
+  const r=regGet(id);
+  if(r&&r.d&&(["aprovada","eficaz"].includes(r.d.status)||r.d.aprov)){aviso("Registro aprovado ou eficaz está sob retenção documental ("+RETENCAO_ANOS+" anos) e não pode ser excluído. Para corrigir, o administrador reabre e cria nova versão.");return}
+  return _regExcluir21(id);
+};
+// ---------- matriz de responsabilidades ----------
+function relMatriz(){
+  const P=["admin","aprovador","revisor","avaliador","leitor"],S="Sim",N="—";
+  const M=[["Criar e editar registros em rascunho",S,S,S,S,N],["Registrar revisão (segunda pessoa)",S,S,S,N,N],["Aprovar, emitir e assinar integridade",S,S,N,N,N],["Reabrir registro aprovado",S,N,N,N,N],["Alterar o papel de colegas",S,N,N,N,N],["Ver e lançar saúde ocupacional consolidada",S,S,S,N,N],["Ver a trilha de acesso do servidor",S,N,N,N,N],["Excluir registro em rascunho",S,S,S,S,N],["Excluir registro aprovado (bloqueado por retenção)",N,N,N,N,N]];
+  return relCab("Matriz de responsabilidades","Quem pode fazer o quê, conforme os perfis do sistema")+relTab(["Ação",...P.map(p=>PAPEIS[p])],M)+`<p class="mut" style="font-size:.84rem">Com mais de uma pessoa na equipe, a aprovação exige revisão feita por pessoa diferente do autor (regra dos quatro olhos). Retenção documental: ${RETENCAO_ANOS} anos.</p>`;
+}
+// ---------- casos semelhantes e lições aprendidas ----------
+const STOP=new Set("de da do das dos a o e em para com por um uma que na no nas nos ao as os se ou mais menos muito sem sobre entre ser foi".split(" "));
+const toks21=o=>new Set(normB(textoReg(o,[],0).join(" ")).split(/[^a-z0-9]+/).filter(w=>w.length>3&&!STOP.has(w)));
+function relSemelhantes(id){
+  const base=regGet(id);if(!base)return "<p>Escolha um registro.</p>";
+  const A=toks21({a:base.d.acao,p:base.d.problema,c:base.d.causa,m:base.d.motivo,x:base.d.f&&JSON.stringify(base.d.f).length<0?"":"",s:base.d.sec,o:base.d.obs,at:base.d.atividade,pos:base.d.postoId?caminho(base.d.postoId):""});
+  const out=[];
+  regOf("aep").concat(regOf("aet"),regOf("acao"),regOf("dem")).forEach(r=>{
+    if(r.id===id)return;
+    const B=toks21({a:r.d.acao,p:r.d.problema,c:r.d.causa,m:r.d.motivo,s:r.d.sec,o:r.d.obs,at:r.d.atividade,pos:r.d.postoId?caminho(r.d.postoId):""});
+    const comum=[...A].filter(w=>B.has(w));if(comum.length<2)return;
+    out.push({r,pt:comum.length/Math.sqrt(A.size*B.size||1),comum});
+  });
+  out.sort((a,b)=>b.pt-a.pt);
+  return relCab("Casos semelhantes","Base: "+nomeReg(id))+`<p class="mut" style="font-size:.86rem">Comparação por termos em comum. É um apoio à busca: a decisão sobre a semelhança é do avaliador. A coluna "Termos em comum" mostra os dados que sustentaram a sugestão.</p>`+
+   relTab(["Registro","Tipo","Local","Termos em comum"],out.slice(0,8).map(x=>[nomeReg(x.r.id),ROT_TIPO[x.r.tipo]||x.r.tipo,x.r.d.postoId?caminho(x.r.d.postoId):"",x.comum.slice(0,8).join(", ")]));
+}
+function relLicoes(){
+  const L=regOf("acao").filter(r=>r.d.status==="eficaz"),H={};
+  L.forEach(r=>{const k=r.d.hier||"Sem hierarquia informada";(H[k]=H[k]||[]).push(r)});
+  return relCab("Lições aprendidas","Ações encerradas como eficazes, agrupadas pelo tipo de solução")+(L.length?Object.keys(H).map(k=>`<h3>${esc(k)} (${H[k].length})</h3>`+relTab(["Ação","Problema","Causa","Local","Risco residual"],H[k].map(r=>[(r.d.numero||"")+" · "+(r.d.acao||""),r.d.problema||"",r.d.causa||"",r.d.postoId?caminho(r.d.postoId):(r.d.area||""),(r.d.ef||{}).residual||""]))).join(""):`<p class="mut">Ainda não há ações eficazes. Elas aparecem aqui quando a verificação de eficácia for aprovada.</p>`);
+}
+// ---------- resumo de alertas ----------
+function textoAlertas(){
+  const A=calcAlertas().sort((a,b)=>a.sev-b.sev),S=["CRÍTICO","ATENÇÃO","AVISO"];
+  return "ErgoContexto: resumo de alertas ("+dataBR(hojeISO())+")\n\n"+(A.length?A.map(a=>"["+(S[a.sev]||"AVISO")+"] "+a.tipo+": "+a.txt).join("\n"):"Sem alertas no momento.");
+}
+// ---------- Relatórios: botões e ações ----------
+const _renderRelat21=renderRelat;
+renderRelat=function(){
+  _renderRelat21();
+  const sec=$("#v-relat");if(!sec)return;
+  const ops=regOf("aep").concat(regOf("aet"),regOf("acao")).map(r=>[r.id,nomeReg(r.id)]);
+  sec.insertAdjacentHTML("beforeend",`<div class="card no-print"><h3>Governança e aprendizado</h3><div class="linha">
+   ${podeSaude()?`<button class="btn sec" data-rel="saude">Saúde ocupacional consolidada</button>`:""}<button class="btn sec" data-rel="matriz">Matriz de responsabilidades</button>${perfil&&perfil.papel==="admin"||!perfil?`<button class="btn sec" data-rel="trilha">Trilha de acesso</button>`:""}<button class="btn sec" data-rel="licoes">Lições aprendidas</button></div>
+   <div class="linha" style="margin-top:10px"><select id="relSemel"><option value="">Casos semelhantes a…</option>${sel1(ops,"")}</select><button class="btn sec" data-rel="semel">Buscar casos semelhantes</button></div>
+   <div class="linha" style="margin-top:10px"><button class="btn sec" data-rel="email">Enviar resumo de alertas por e-mail</button><button class="btn sec" data-rel="notif">Ativar aviso do navegador</button></div>
+   <p class="mut" style="font-size:.82rem">O e-mail abre no seu programa de e-mail com o resumo pronto. O envio automático sem abrir o app depende de um serviço de e-mail no servidor, ainda não configurado.</p></div>`);
+};
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-rel]");if(!b)return;const k=b.dataset.rel;
+  if(k==="saude")mostrarRel(relSaude());
+  else if(k==="matriz")mostrarRel(relMatriz());
+  else if(k==="trilha")mostrarRel(await relTrilha());
+  else if(k==="licoes")mostrarRel(relLicoes());
+  else if(k==="semel"){const id=$("#relSemel").value;if(!id){aviso("Escolha o registro de referência.");return}mostrarRel(relSemelhantes(id))}
+  else if(k==="email"){location.href="mailto:?subject="+encodeURIComponent("ErgoContexto: resumo de alertas")+"&body="+encodeURIComponent(textoAlertas()).slice(0,1800)}
+  else if(k==="notif"){
+    if(!("Notification" in window)){aviso("Este navegador não oferece avisos.");return}
+    const p=await Notification.requestPermission();
+    if(p==="granted"){localStorage.setItem("ergo_notif","1");avisarCriticos();aviso("Aviso do navegador ativado neste aparelho.")}else aviso("Permissão negada.");
+  }
+});
+function avisarCriticos(){
+  try{
+    if(localStorage.getItem("ergo_notif")!=="1"||!("Notification" in window)||Notification.permission!=="granted")return;
+    const n=calcAlertas().filter(a=>a.sev===0).length;if(!n)return;
+    const hoje=hojeISO();if(localStorage.getItem("ergo_notif_dia")===hoje)return;localStorage.setItem("ergo_notif_dia",hoje);
+    new Notification("ErgoContexto",{body:n+" alerta(s) crítico(s) pendente(s).",tag:"ergo-crit"});
+  }catch(e){}
+}
+setTimeout(avisarCriticos,2500);
+// ---------- marcação sobre a foto ----------
+const _abrirEv21=abrirEvidencia;
+abrirEvidencia=async function(i){
+  const ev=G.ed&&G.ed.d.evid&&G.ed.d.evid[i];if(!ev)return;
+  if(!/^image\//.test(ev.tipo||"image/jpeg")&&ev.tipo)return _abrirEv21(i);
+  let src=ev.miniOrig||ev.mini;
+  if(ev.path){try{
+    const t=await tokenValido(),r=await fetch(`${SB_URL}/storage/v1/object/sign/evidencias/${ev.path}`,{method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+t,"Content-Type":"application/json"},body:JSON.stringify({expiresIn:600})});
+    const j=await r.json();if(r.ok&&j.signedURL){const f=await fetch(SB_URL+"/storage/v1"+j.signedURL);if(f.ok)src=URL.createObjectURL(await f.blob())}
+  }catch(e){}}
+  if(!src){return _abrirEv21(i)}
+  logAcesso("abriu evidência",nomeReg(G.ed.id)+" · "+(ev.nome||""));
+  abrirMarcador(i,src);
+};
+function abrirMarcador(i,src){
+  const ev=G.ed.d.evid[i],lock=travado(G.ed.d);
+  let m=$("#marcaModal");if(m)m.remove();m=document.createElement("div");m.id="marcaModal";
+  m.innerHTML=`<div class="modal-fundo" data-mk="fechar"></div><div class="modal-caixa" role="dialog" aria-modal="true" style="max-width:760px"><button type="button" class="modal-x" data-mk="fechar" aria-label="Fechar">×</button>
+  <h2>${esc(ev.nome||"Foto")}</h2>${lock?`<p class="mut">Registro bloqueado: as marcações são só para consulta.</p>`:`<div class="linha" style="margin-bottom:8px"><button type="button" class="btn sec peq" data-mk="t-seta">Seta</button><button type="button" class="btn sec peq" data-mk="t-circ">Círculo</button><button type="button" class="btn sec peq" data-mk="t-txt">Texto</button><button type="button" class="btn sec peq" data-mk="desf">Desfazer</button><button type="button" class="btn sec peq" data-mk="limpa">Limpar</button><span class="mut" id="mkTool" style="font-size:.84rem"></span></div>`}
+  <div style="position:relative;line-height:0"><img id="mkImg" src="${esc(src)}" style="width:100%;height:auto;display:block" alt="${esc(ev.legenda||"foto")}"><canvas id="mkCv" style="position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none"></canvas></div>
+  ${lock?"":`<div class="linha" style="margin-top:10px"><button type="button" class="btn" data-mk="salvar">Salvar marcações</button></div><p class="mut" style="font-size:.82rem">A foto original não é alterada. As marcações ficam guardadas à parte e aparecem na miniatura e no relatório.</p>`}</div>`;
+  document.body.appendChild(m);
+  const img=$("#mkImg"),cv=$("#mkCv"),cx=cv.getContext("2d");let marcas=JSON.parse(JSON.stringify(ev.marcas||[])),tool="seta",ini=null,atual=null;
+  m._i=i;m._marcas=()=>marcas;m._set=t=>{tool=t;$("#mkTool")&&($("#mkTool").textContent="Ferramenta: "+({seta:"seta",circ:"círculo",txt:"texto"}[t]))};m._desf=()=>{marcas.pop();des()};m._limpa=()=>{marcas=[];des()};
+  if(!lock)m._set("seta");
+  const des=()=>{cv.width=img.clientWidth||600;cv.height=img.clientHeight||400;desenharMarcas(cx,[...marcas,...(atual?[atual]:[])],cv.width,cv.height)};
+  img.onload=des;if(img.complete)des();window.addEventListener("resize",des);
+  const pos=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]};
+  if(!lock){
+    cv.addEventListener("pointerdown",e=>{const [x,y]=pos(e);if(tool==="txt"){const t=prompt("Texto da marcação");if(t){marcas.push({t:"x",x,y,txt:t.slice(0,60)});des()}return}ini=[x,y];cv.setPointerCapture(e.pointerId)});
+    cv.addEventListener("pointermove",e=>{if(!ini)return;const [x,y]=pos(e);atual={t:tool==="circ"?"c":"a",x:ini[0],y:ini[1],x2:x,y2:y};des()});
+    const fim=()=>{if(ini&&atual&&Math.hypot(atual.x2-atual.x,atual.y2-atual.y)>0.01)marcas.push(atual);ini=null;atual=null;des()};
+    cv.addEventListener("pointerup",fim);cv.addEventListener("pointercancel",()=>{ini=null;atual=null;des()});
+  }
+}
+function desenharMarcas(cx,marcas,W,H){
+  cx.clearRect(0,0,W,H);cx.lineWidth=Math.max(2,W/180);cx.strokeStyle="#FF3300";cx.fillStyle="#FF3300";cx.lineCap="round";cx.font="bold "+Math.max(12,Math.round(W/28))+"px Arial";
+  marcas.forEach(k=>{
+    if(k.t==="a"){const x1=k.x*W,y1=k.y*H,x2=k.x2*W,y2=k.y2*H,a=Math.atan2(y2-y1,x2-x1),h=Math.max(10,W/30);cx.beginPath();cx.moveTo(x1,y1);cx.lineTo(x2,y2);cx.stroke();cx.beginPath();cx.moveTo(x2,y2);cx.lineTo(x2-h*Math.cos(a-.4),y2-h*Math.sin(a-.4));cx.lineTo(x2-h*Math.cos(a+.4),y2-h*Math.sin(a+.4));cx.closePath();cx.fill()}
+    else if(k.t==="c"){const cxm=(k.x+k.x2)/2*W,cym=(k.y+k.y2)/2*H;cx.beginPath();cx.ellipse(cxm,cym,Math.abs(k.x2-k.x)/2*W+1,Math.abs(k.y2-k.y)/2*H+1,0,0,Math.PI*2);cx.stroke()}
+    else if(k.t==="x"){const t=k.txt,w=cx.measureText(t).width;cx.fillStyle="rgba(255,255,255,.85)";cx.fillRect(k.x*W-3,k.y*H-parseInt(cx.font.match(/\d+/)[0])-1,w+6,parseInt(cx.font.match(/\d+/)[0])+6);cx.fillStyle="#FF3300";cx.fillText(t,k.x*W,k.y*H)}
+  });
+}
+document.addEventListener("click",async e=>{
+  const s=e.target.closest("[data-mk]");if(!s)return;const m=$("#marcaModal");if(!m)return;const k=s.dataset.mk;
+  if(k==="fechar"){m.remove();return}
+  if(k==="t-seta")m._set("seta");else if(k==="t-circ")m._set("circ");else if(k==="t-txt")m._set("txt");
+  else if(k==="desf")m._desf();else if(k==="limpa")m._limpa();
+  else if(k==="salvar"){
+    const ev=G.ed.d.evid[m._i],marcas=m._marcas();ev.miniOrig=ev.miniOrig||ev.mini;ev.marcas=marcas;
+    if(marcas.length&&ev.miniOrig){
+      const im=new Image();await new Promise(r=>{im.onload=r;im.src=ev.miniOrig});
+      const c=document.createElement("canvas");c.width=im.width;c.height=im.height;const x=c.getContext("2d");x.drawImage(im,0,0);desenharMarcas(x,marcas,c.width,c.height);ev.mini=c.toDataURL("image/jpeg",.8);
+    }else if(ev.miniOrig)ev.mini=ev.miniOrig;
+    if(G.ed.tipo!=="dem")gravarEd();m.remove();reRender();aviso("Marcações salvas.");
+  }
+});
+// busca: inclui medições e documentos e oculta saúde ocupacional de quem não pode ver
+ROT_TIPO.med="Medição";ROT_TIPO.doc="Documento";
+const _buscar21=buscar;
+buscar=function(q){
+  let out=_buscar21(q).filter(x=>!(x.tit&&/^Indicador de saúde/.test(x.tit)&&!podeSaude()));
+  const toks=normB(q).split(/\s+/).filter(Boolean);
+  regOf("med").concat(regOf("doc")).forEach(r=>{
+    const hay=normB(textoReg(r.d,[],0).join(" ")+" "+(r.d.postoId?caminho(r.d.postoId):""));
+    if(toks.every(t=>hay.includes(t)))out.push({tipo:ROT_TIPO[r.tipo],tit:(r.d.numero||ROT_TIPO[r.tipo])+" · "+(r.tipo==="med"?(AG[r.d.agente]||AG.outro).rot:r.d.titulo||""),sub:r.d.postoId?caminho(r.d.postoId):"",ir:r.tipo==="med"?"medicoes":"docs"});
+  });
+  return out;
+};
+/* =====================================================================
+   FASE 13 (final): LGPD (Lei 13.709/2018)
+   Aviso de privacidade, controlador e encarregado, registro das operações de
+   tratamento (art. 37), direitos do titular (art. 18), exportação dos meus dados,
+   termo de consentimento para imagem e áudio e registro de incidente (art. 48).
+   O texto é um modelo técnico: a definição de base legal e a revisão final são do
+   controlador e do jurídico da organização.
+   ===================================================================== */
+CAD.privacidade={rot:"Controlador e encarregado (LGPD)",um:"dados do controlador",pai:[],campos:[["nome","Razão social do controlador *"],["cnpj","CNPJ"],["encarregado","Encarregado pelo tratamento de dados (nome)"],["contato","Contato do encarregado (e-mail) *"]]};
+if(!CAD_ORD.includes("privacidade"))CAD_ORD.push("privacidade");
+TIPOS_DOC.consent={rot:"Termo de consentimento para imagem e áudio",secoes:["Finalidade","Dados coletados e forma de uso","Prazo de guarda","Direitos do participante","Declaração de consentimento"]};
+TIPOS_DOC.incidente={rot:"Registro de incidente de segurança de dados",secoes:["Descrição do incidente e data de ciência","Natureza e categorias dos dados afetados","Titulares envolvidos (quantidade, sem identificação)","Riscos e medidas adotadas","Comunicação à ANPD e aos titulares (art. 48)"]};
+const OPERACOES=[
+ ["Cadastro de usuários da equipe","Nome, e-mail, papel de acesso","Controle de acesso e rastreabilidade","Execução das atividades de gestão ergonômica pela organização (art. 7º, V e IX, conforme definição do controlador)","Enquanto durar o vínculo com a equipe","Supabase (banco e autenticação)"],
+ ["Registros de avaliação (demanda, AEP, AET, ações, medições, documentos)","Descrição de postos e atividades, autoria, assinaturas eletrônicas","Gestão da ergonomia e prevenção; cumprimento de obrigação legal (NR-1 e NR-17)","Cumprimento de obrigação legal ou regulatória (art. 7º, II)","Mínimo de "+RETENCAO_ANOS+" anos para documentos aprovados (NR-1)","Supabase (banco)"],
+ ["Evidências (fotos e PDFs)","Imagens de postos de trabalho; podem registrar pessoas","Documentar a situação de trabalho","Obrigação legal ou legítimo interesse; consentimento quando a pessoa for identificável","Conforme a retenção do registro","Supabase Storage (acesso por link assinado)"],
+ ["Indicadores de saúde ocupacional","Somente números consolidados por grupo, com supressão de células pequenas","Orientar a prevenção sem expor pessoas","Tutela da saúde e cumprimento de obrigação legal (art. 11, II, a e f); dado agregado não identifica o titular","Conforme a retenção do registro","Supabase (banco), acesso por perfil"],
+ ["Assistente de IA","Texto da análise enviado para gerar sugestões","Apoio ao avaliador, com revisão humana","Definida pelo controlador","Não é guardado pelo app além do registro","Worker na Cloudflare e modelo de IA"],
+ ["Trilha de acesso","Quem abriu, imprimiu ou alterou papéis, com data e hora","Segurança e auditoria (art. 6º, VII e X)","Legítimo interesse e obrigação de segurança","Conforme a política da organização","Supabase (tabela de auditoria)"]
+];
+const DIREITOS=["Confirmação de que há tratamento e acesso aos dados","Correção de dados incompletos, inexatos ou desatualizados","Anonimização, bloqueio ou eliminação de dados desnecessários ou excessivos","Portabilidade dos dados","Eliminação dos dados tratados com consentimento","Informação sobre com quem os dados são compartilhados","Informação sobre a possibilidade de não fornecer consentimento e suas consequências","Revogação do consentimento"];
+function ctrlPriv(){const r=regOf("cad").find(x=>x.d.tc==="privacidade");return r?r.d:{}}
+function htmlPrivacidade(){
+  const c=ctrlPriv(),ok=(c.nome||"").trim()&&(c.contato||"").trim();
+  return `<div class="card"><h2>Privacidade e proteção de dados (LGPD)</h2>
+  ${ok?`<p><b>Controlador:</b> ${esc(c.nome)}${c.cnpj?" · CNPJ "+esc(c.cnpj):""}<br><b>Encarregado:</b> ${esc(c.encarregado||"não informado")} · <a href="mailto:${esc(c.contato)}">${esc(c.contato)}</a></p>`:`<div class="alerta">O controlador e o encarregado ainda não foram informados. O administrador cadastra em Cadastros › Controlador e encarregado (LGPD).</div>`}
+  <p class="mut" style="font-size:.88rem">O ErgoContexto trata dados para gerir a ergonomia e a prevenção. O foco é a situação de trabalho, e não o desempenho ou a saúde de uma pessoa. Dados clínicos individuais não devem ser registrados aqui.</p>
+  <h3>Operações de tratamento</h3>${relTab(["Operação","Dados","Finalidade","Base legal (a confirmar pelo controlador)","Retenção","Operadores e locais"],OPERACOES)}
+  <h3>Direitos do titular (art. 18)</h3><ul style="margin:6px 0 6px 18px;font-size:.9rem">${DIREITOS.map(d=>`<li>${esc(d)}</li>`).join("")}</ul>
+  <div class="linha"><button class="btn sec" data-lgpd="exportar">Exportar os meus dados</button>${ok?`<button class="btn sec" data-lgpd="solicitar">Fazer uma solicitação ao encarregado</button>`:""}<button class="btn sec" data-lgpd="imprimir">Imprimir aviso</button></div>
+  <p class="mut" style="font-size:.82rem;margin-top:10px">Termo de consentimento para imagem e áudio e registro de incidente estão em Documentos, com assinatura eletrônica. Em caso de incidente que possa causar risco ou dano relevante, a comunicação à ANPD e aos titulares é feita pelo controlador (art. 48). Este texto é um modelo técnico e deve ser revisado pelo jurídico da organização.</p></div>`;
+}
+const _renderConta22=renderConta;
+renderConta=function(){_renderConta22();const v=$("#v-conta");if(v&&!v.querySelector("[data-lgpd=exportar]"))v.insertAdjacentHTML("beforeend",htmlPrivacidade())};
+function exportarMeusDados(){
+  const a=autorAtual()||{};
+  const meus=REG.filter(r=>r.autor&&a.id&&r.autor.id===a.id);
+  const dados={sistema:"ErgoContexto",geradoEm:new Date().toISOString(),titular:{nome:a.nome||"",id:a.id||"",email:(sessao&&sessao.user&&sessao.user.email)||"",papel:(perfil&&perfil.papel)||""},registrosCriadosPorMim:meus.map(r=>({id:r.id,tipo:r.tipo,numero:r.d.numero||"",criadoEm:r.criadoEm,dados:r.d}))};
+  baixarBlob(new Blob([JSON.stringify(dados,null,1)],{type:"application/json"}),"meus-dados-ergocontexto-"+hojeISO()+".json");
+  logAcesso("exportou os próprios dados","");
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-lgpd]");if(!b)return;const k=b.dataset.lgpd,c=ctrlPriv();
+  if(k==="exportar")exportarMeusDados();
+  else if(k==="solicitar"){location.href="mailto:"+c.contato+"?subject="+encodeURIComponent("Solicitação de titular de dados (LGPD, art. 18)")+"&body="+encodeURIComponent("Olá,\n\nSolicito (descreva o direito: acesso, correção, eliminação, portabilidade, informação ou revogação):\n\n\nNome:\nE-mail de contato:\n")}
+  else if(k==="imprimir"){const w=window.open("");if(w){w.document.write(`<html><head><meta charset="utf-8"><title>Aviso de privacidade</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#000;font-size:12px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:4px;text-align:left}</style></head><body>${htmlPrivacidade().replace(/<div class="linha">.*?<\/div>/s,"")}<script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close()}}
+});
+/* =====================================================================
    INÍCIO
    ===================================================================== */
 migrarLegado();
